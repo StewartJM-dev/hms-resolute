@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ship's Registry · HMS Resolute</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --navy:#0b1d33;--navy2:#12294a;--brass:#b08d3e;--brass2:#d4af5a;
+  --steel:#5d6b7a;--steel2:#8494a5;--signal:#f2efe6;--paper:#efe9da;
+  --alert:#a63d40;--go:#3d8a5e;--ink:#101820;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:'Crimson Pro',Georgia,serif;
+  background:linear-gradient(170deg,var(--navy) 0%,#081426 60%,#060f1d 100%);
+  color:var(--signal); min-height:100vh; padding-bottom:60px;
+}
+header{ text-align:center; padding:30px 16px 6px; position:relative;}
+.pennant{ font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.35em;text-transform:uppercase;color:var(--brass2);}
+h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(24px,6vw,34px);letter-spacing:.08em;margin-top:4px;}
+.sub{ font-style:italic; color:var(--steel2); font-size:13px; margin-top:4px;}
+.back{ position:absolute; top:16px; left:14px; color:var(--brass2); text-decoration:none; font-family:'Lato',sans-serif; font-size:12px;}
+.hcrest{ width:54px; height:54px; border-radius:50%; box-shadow:0 3px 12px rgba(0,0,0,.5), 0 0 0 2px rgba(212,175,90,.4); margin-bottom:8px;}
+main{ max-width:640px; margin:20px auto 0; padding:0 12px;}
+nav{ display:flex; gap:8px; justify-content:center; margin-bottom:16px;}
+.tab{ flex:1; max-width:220px; padding:11px; text-align:center; cursor:pointer; border-radius:6px;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  background:rgba(0,0,0,.25); color:var(--steel2); border:1px solid rgba(132,148,165,.3);}
+.tab.on{ background:rgba(176,141,62,.18); color:var(--brass2); border-color:var(--brass);}
+.pane{ display:none;} .pane.on{ display:block;}
+.card{ background:linear-gradient(180deg,rgba(18,41,74,.8),rgba(11,29,51,.9));
+  border:1px solid rgba(212,175,90,.3); border-radius:10px; padding:16px; margin-bottom:14px;}
+.card h3{ font-family:'Cinzel',serif; font-size:14px; letter-spacing:.14em; color:var(--brass2); margin-bottom:10px;}
+label{ display:block; font-family:'Lato',sans-serif; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--steel2); margin:10px 0 5px;}
+input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:rgba(0,0,0,.3); color:var(--signal); border:1px solid rgba(132,148,165,.35);}
+.btn{ margin-top:12px; padding:12px 18px; border:none; border-radius:6px; cursor:pointer;
+  font-family:'Cinzel',serif; font-size:13px; letter-spacing:.1em;
+  background:linear-gradient(180deg,var(--brass2),var(--brass)); color:var(--ink); width:100%;}
+.btn.ghost{ background:transparent; color:var(--steel2); border:1px solid rgba(132,148,165,.4);}
+.err{ color:#e8a0a2; text-align:center; margin-top:10px; font-size:14px; display:none;}
+
+/* flags */
+.flag{ border-left:3px solid var(--alert); background:rgba(166,61,64,.12);
+  border-radius:0 8px 8px 0; padding:11px 13px; margin-bottom:9px; font-size:14.5px;}
+.flag .f-t{ font-family:'Lato',sans-serif; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#d98a8c;}
+.allclear{ text-align:center; color:#8fd4ad; font-style:italic; padding:14px;}
+
+/* muster table */
+.m-row{ display:flex; gap:8px; align-items:baseline; padding:9px 4px; border-bottom:1px solid rgba(132,148,165,.15); font-size:14px;}
+.m-row.fail{ background:rgba(166,61,64,.1);}
+.m-t{ font-family:'Lato',sans-serif; font-size:11px; color:var(--steel2); min-width:112px;}
+.m-who{ font-family:'Cinzel',serif; color:var(--brass2); min-width:78px; font-size:13.5px;}
+.m-det{ color:var(--paper); flex:1;}
+.m-ok{ font-size:12px;}
+.filters{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+.chip{ padding:6px 11px; border-radius:99px; cursor:pointer; font-family:'Lato',sans-serif; font-size:11px;
+  background:rgba(0,0,0,.25); color:var(--steel2); border:1px solid rgba(132,148,165,.3);}
+.chip.on{ color:var(--brass2); border-color:var(--brass); background:rgba(176,141,62,.15);}
+
+/* ID cards */
+.cards-wrap{ display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+@media(max-width:560px){ .cards-wrap{ grid-template-columns:1fr; } }
+.idcard{
+  background:linear-gradient(160deg,#13294a 0%,#0b1d33 70%);
+  border:2px solid var(--brass); border-radius:12px; padding:14px;
+  aspect-ratio:1.586; display:flex; flex-direction:column; position:relative; overflow:hidden;
+}
+.idcard::before{
+  content:""; position:absolute; right:-24px; bottom:-24px; width:150px; height:150px;
+  background:url('assets/crest.png') center/contain no-repeat; opacity:.10; pointer-events:none;
+}
+.id-top{ display:flex; justify-content:space-between; align-items:center; }
+.id-ship{ font-family:'Cinzel',serif; font-size:11px; letter-spacing:.2em; color:var(--brass2);}
+.id-hms{ font-family:'Lato',sans-serif; font-size:8px; letter-spacing:.3em; color:var(--steel2);}
+.id-mid{ display:flex; gap:12px; margin-top:auto; align-items:flex-end;}
+.id-qr{ background:#fff; padding:6px; border-radius:6px; width:88px; height:88px; flex-shrink:0;}
+.id-qr img, .id-qr canvas{ width:100%!important; height:100%!important;}
+.id-info{ flex:1; padding-bottom:2px;}
+.id-icon{ font-size:22px;}
+.id-name{ font-family:'Cinzel',serif; font-size:17px; font-weight:700; color:var(--signal); line-height:1.1;}
+.id-pos{ font-family:'Lato',sans-serif; font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--brass2); margin-top:3px;}
+.id-rank{ font-family:'Lato',sans-serif; font-size:8.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--steel2); margin-top:2px;}
+.reissue{ text-align:center; margin-top:6px;}
+.reissue button{ background:none; border:none; color:var(--steel); font-size:11px; cursor:pointer; text-decoration:underline; font-family:'Lato',sans-serif;}
+.print-note{ text-align:center; font-size:13px; font-style:italic; color:var(--steel2); margin:12px 0;}
+@media print{
+  body{ background:#fff; }
+  body *{ visibility:hidden; }
+  #p-cards, #p-cards .cards-wrap, #p-cards .idcard, #p-cards .idcard *{ visibility:visible; }
+  #p-cards{ position:absolute; inset:0; }
+  .idcard{ break-inside:avoid; border:2px solid #333; background:linear-gradient(160deg,#13294a,#0b1d33)!important;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; width:3.37in; height:2.125in; margin:0.15in;}
+  .reissue,.print-note,nav,header,.btn{ display:none!important; }
+}
+</style>
+</head>
+<body>
+
+<a class="back" href="./">← Gangway</a>
+<header>
+  <img class="hcrest" src="assets/crest.png" alt="HMS Resolute crest">
+  <div class="pennant">Officers Only · HMS Resolute</div>
+  <h1>SHIP'S REGISTRY</h1>
+  <div class="sub">Muster roll · crew identification</div>
+</header>
+
+<main>
+  <!-- GATE -->
+  <div class="card" id="gate">
+    <h3>OFFICER VERIFICATION</h3>
+    <label>Password (John or Dawn)</label>
+    <input type="password" id="gatePw" onkeydown="if(event.key==='Enter')unlock()">
+    <button class="btn" onclick="unlock()">Open the Registry</button>
+    <div class="err" id="gateErr">Incorrect.</div>
+  </div>
+
+  <div id="inner" style="display:none;">
+    <nav>
+      <div class="tab on" data-p="muster" onclick="go('muster')">📜 Muster Roll</div>
+      <div class="tab" data-p="cards" onclick="go('cards')">🪪 ID Cards</div>
+    </nav>
+
+    <!-- MUSTER -->
+    <div class="pane on" id="p-muster">
+      <div class="card">
+        <h3>⚠ WATCH FLAGS</h3>
+        <div id="flags"><div class="allclear">All clear. No irregularities on the watch.</div></div>
+      </div>
+      <div class="card">
+        <h3>MUSTER ROLL — LAST 200 ENTRIES</h3>
+        <div class="filters" id="filters">
+          <div class="chip on" data-f="all">All</div>
+          <div class="chip" data-f="fail">Failures</div>
+          <div class="chip" data-f="assist">Assisted</div>
+          <div class="chip" data-f="samuel">Samuel</div>
+          <div class="chip" data-f="johnjr">John Jr.</div>
+          <div class="chip" data-f="stephen">Stephen</div>
+          <div class="chip" data-f="daniel">Daniel</div>
+        </div>
+        <div id="musterList"></div>
+      </div>
+    </div>
+
+    <!-- CARDS -->
+    <div class="pane" id="p-cards">
+      <div class="print-note">Print on cardstock, cut, laminate. Standard ID size (3.37" × 2.125"). Reissuing a card voids the old one immediately.</div>
+      <div class="cards-wrap" id="cardsWrap"></div>
+      <button class="btn" style="margin-top:16px;" onclick="window.print()">🖨 Print All Cards</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+firebase.initializeApp(FB_CONFIG);
+const db = firebase.database();
+
+const CREW = {
+  samuel:{name:'Samuel', pos:'First Mate', icon:'🦅', rank:'Cadet'},
+  johnjr:{name:'John Jr.', pos:'Boatswain', icon:'🦁', rank:'Cadet'},
+  stephen:{name:'Stephen', pos:'Quartermaster', icon:'🦖', rank:'Cadet'},
+  daniel:{name:'Daniel', pos:"Gunner's Mate", icon:'🐘', rank:'Cadet'}
+};
+const NAMES = {john:'John',dawn:'Dawn',...Object.fromEntries(Object.entries(CREW).map(([k,v])=>[k,v.name])), unknown:'Unknown'};
+
+async function sha256(s){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Gate: accept either officer's password ──
+async function unlock(){
+  const pw = document.getElementById('gatePw').value;
+  const hash = await sha256(pw);
+  const snap = await db.ref('resolute/auth/parents').get();
+  const v = snap.val()||{};
+  if(hash===v.john || hash===v.dawn){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('inner').style.display='block';
+    loadMuster(); loadCards();
+  }else{
+    document.getElementById('gateErr').style.display='block';
+    db.ref('resolute/muster').push({t:firebase.database.ServerValue.TIMESTAMP, who:'unknown', method:'registry-gate', ok:false, device:navigator.userAgent.slice(0,40)});
+  }
+  document.getElementById('gatePw').value='';
+}
+
+function go(p){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  document.getElementById('p-'+p).classList.add('on');
+}
+
+// ── Muster roll ──
+let musterData=[], activeFilter='all';
+document.getElementById('filters').addEventListener('click', e=>{
+  const c=e.target.closest('.chip'); if(!c) return;
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); activeFilter=c.dataset.f; renderMuster();
+});
+function loadMuster(){
+  db.ref('resolute/muster').limitToLast(200).on('value', snap=>{
+    const v=snap.val()||{};
+    musterData = Object.values(v).sort((a,b)=>(b.t||0)-(a.t||0));
+    renderMuster(); renderFlags();
+  });
+}
+function fmtT(t){
+  const d=new Date(t);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+
+         d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function renderMuster(){
+  let rows = musterData;
+  if(activeFilter==='fail') rows=rows.filter(r=>r.ok===false);
+  else if(activeFilter==='assist') rows=rows.filter(r=>r.assist||r.method==='assist-start');
+  else if(activeFilter!=='all') rows=rows.filter(r=>r.who===activeFilter);
+  document.getElementById('musterList').innerHTML = rows.map(r=>`
+    <div class="m-row ${r.ok===false?'fail':''}">
+      <div class="m-t">${r.t?fmtT(r.t):'—'}</div>
+      <div class="m-who">${NAMES[r.who]||r.who||'—'}</div>
+      <div class="m-det">${r.method||''}${r.assist?` · assisting ${NAMES[r.assist.as]||r.assist.as}`:''}${r.note?` · ${r.note}`:''} · ${r.device||''}</div>
+      <div class="m-ok">${r.ok===false?'✕':'✓'}</div>
+    </div>`).join('') || '<div class="allclear">No entries yet.</div>';
+}
+// ── Auto flags ──
+function renderFlags(){
+  const flags=[];
+  const now=Date.now();
+  // repeated failures within 30 min windows, per person
+  const fails = musterData.filter(r=>r.ok===false && r.t);
+  const byWho = {};
+  fails.forEach(r=>{ (byWho[r.who]=byWho[r.who]||[]).push(r.t); });
+  Object.entries(byWho).forEach(([who,ts])=>{
+    ts.sort((a,b)=>a-b);
+    for(let i=0;i+2<=ts.length-1;i++){
+      if(ts[i+2]-ts[i] <= 30*60*1000){
+        flags.push({t:ts[i+2], txt:`${NAMES[who]||who}: 3+ failed attempts within 30 minutes`});
+        break;
+      }
+    }
+  });
+  // boys logging in during quiet hours (22:00–06:00), last 7 days
+  musterData.filter(r=>r.ok && r.t && (now-r.t)<7*86400000 && CREW[r.who] && ['qr','pin-fallback'].includes(r.method))
+    .forEach(r=>{
+      const h=new Date(r.t).getHours();
+      if(h>=22||h<6) flags.push({t:r.t, txt:`${NAMES[r.who]}: login at ${new Date(r.t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})} — quiet hours`});
+    });
+  // unknown cards
+  musterData.filter(r=>r.who==='unknown'&&r.t&&(now-r.t)<7*86400000).forEach(r=>{
+    flags.push({t:r.t, txt:`Unrecognized credential presented (${r.method||'?'}) — ${r.note||''}`});
+  });
+  flags.sort((a,b)=>b.t-a.t);
+  document.getElementById('flags').innerHTML = flags.length
+    ? flags.slice(0,12).map(f=>`<div class="flag"><div class="f-t">${fmtT(f.t)}</div>${f.txt}</div>`).join('')
+    : '<div class="allclear">All clear. No irregularities on the watch.</div>';
+}
+
+// ── ID cards ──
+async function loadCards(){
+  const snap = await db.ref('resolute/auth/cards').get();
+  const cards = snap.val()||{};
+  const byPerson = {};
+  Object.entries(cards).forEach(([token,v])=>{
+    if(!byPerson[v.person] || v.issued>byPerson[v.person].issued) byPerson[v.person]={token, issued:v.issued};
+  });
+  const wrap = document.getElementById('cardsWrap');
+  wrap.innerHTML='';
+  Object.entries(CREW).forEach(([id,c])=>{
+    const rec = byPerson[id];
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="idcard">
+        <div class="id-top">
+          <div><div class="id-ship">HMS RESOLUTE</div><div class="id-hms">HIS MAJESTY'S SERVICE</div></div>
+          <div class="id-icon">${c.icon}</div>
+        </div>
+        <div class="id-mid">
+          <div class="id-qr" id="qr-${id}"></div>
+          <div class="id-info">
+            <div class="id-name">${c.name}</div>
+            <div class="id-pos">${c.pos}</div>
+            <div class="id-rank">Rank: ${c.rank} · Crew, HMS Resolute</div>
+          </div>
+        </div>
+      </div>
+      <div class="reissue"><button onclick="reissue('${id}')">↻ Reissue ${c.name}'s card (voids old)</button></div>`;
+    wrap.appendChild(div);
+    if(rec) new QRCode(document.getElementById('qr-'+id), {text:rec.token, width:88, height:88, correctLevel:QRCode.CorrectLevel.M});
+    else document.getElementById('qr-'+id).textContent='no card';
+  });
+}
+function genToken(){
+  const a=new Uint8Array(6); crypto.getRandomValues(a);
+  return 'RSLT-'+[...a].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+async function reissue(id){
+  if(!confirm('Reissue '+CREW[id].name+"'s card? The old card stops working immediately.")) return;
+  const snap = await db.ref('resolute/auth/cards').get();
+  const cards = snap.val()||{};
+  for(const [token,v] of Object.entries(cards)){
+    if(v.person===id) await db.ref('resolute/auth/cards/'+token).remove();
+  }
+  await db.ref('resolute/auth/cards/'+genToken()).set({person:id, issued:Date.now()});
+  db.ref('resolute/muster').push({t:firebase.database.ServerValue.TIMESTAMP, who:id, method:'card-reissue', ok:true, device:'registry'});
+  loadCards();
+}
+</script>
+</body>
+</html>
