@@ -1,0 +1,4336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>OWCA Agent HQ</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OWCA">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --teal:#0a7a7a;--teal2:#0d9e9e;--teal3:#12c4c4;
+  --black:#0a0a0a;--dark:#111a1a;--dark2:#1a2626;
+  --white:#f0fafa;--offwhite:#d4eeee;
+  --gold:#e8b84a;--gold2:#f5d070;
+  --alpha:#1e3a6e;--alpha2:#2e5aae;
+  --bravo:#6e1e1e;--bravo2:#ae2e2e;
+  --dino:#1e5c2a;--dino2:#2e8a3a;
+  --wild:#7a5c1e;--wild2:#b88a2e;
+  --green:#2d6a47;--red:#8b3010;
+  --scan:rgba(12,200,200,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{
+  height: -webkit-fill-available;
+}
+body{
+  font-family:'Exo 2',sans-serif;
+  background:var(--black);color:var(--white);
+  font-size:14px;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,var(--scan) 2px,var(--scan) 4px);
+}
+
+/* ── SCREENS ── */
+.screen{
+  display:none;
+  flex-direction:column;
+  height:100vh;
+  height:-webkit-fill-available;
+  overflow:hidden;
+}
+.screen.active{display:flex;}
+
+/* ══════════════════════════════════════════════
+   AGENT SELECT SCREEN
+══════════════════════════════════════════════ */
+#screen-select{
+  background:var(--dark);
+  justify-content:flex-start;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:20px;
+}
+
+.owca-header{
+  background:var(--black);
+  border-bottom:2px solid var(--teal);
+  padding:18px 20px 14px;
+  text-align:center;
+  flex-shrink:0;
+}
+.owca-logo{
+  font-family:'Orbitron',sans-serif;
+  font-size:22px;font-weight:900;
+  color:var(--teal3);letter-spacing:4px;
+  text-shadow:0 0 20px rgba(12,200,200,.5);
+}
+.owca-sub{
+  font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--offwhite);
+  opacity:.6;margin-top:3px;
+}
+.owca-directive{
+  font-size:11px;color:var(--gold);
+  margin-top:8px;letter-spacing:.5px;
+  font-style:italic;
+}
+
+.select-label{
+  font-family:'Orbitron',sans-serif;
+  font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--teal2);
+  text-align:center;
+  padding:18px 20px 10px;
+}
+
+.agents-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;padding:0 14px;
+}
+
+.agent-card{
+  border-radius:10px;overflow:hidden;
+  border:2px solid transparent;
+  cursor:pointer;
+  transition:transform .15s,box-shadow .15s;
+  position:relative;
+}
+.agent-card:active{transform:scale(.96);}
+
+.agent-card-head{
+  padding:14px 12px 10px;
+  display:flex;flex-direction:column;
+  align-items:center;gap:6px;
+}
+.agent-avatar{
+  width:52px;height:52px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;background:rgba(0,0,0,.3);
+}
+.agent-codename{
+  font-family:'Orbitron',sans-serif;
+  font-size:9px;letter-spacing:2px;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.9);
+  text-align:center;
+}
+.agent-name{
+  font-size:16px;font-weight:700;
+  color:var(--white);text-align:center;
+}
+.agent-rank{
+  font-size:9px;letter-spacing:1px;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.5);
+  text-align:center;
+}
+
+.agent-card-foot{
+  padding:8px 12px;
+  background:rgba(0,0,0,.3);
+  border-top:1px solid rgba(255,255,255,.1);
+  text-align:center;
+}
+.agent-status-dot{
+  display:inline-block;width:6px;height:6px;
+  border-radius:50%;background:var(--teal3);
+  box-shadow:0 0 6px var(--teal3);
+  margin-right:5px;
+}
+.agent-status-text{
+  font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--teal2);
+}
+
+/* Agent colors */
+.agent-alpha .agent-card-head{background:linear-gradient(160deg,var(--alpha),#0a1a3a);}
+.agent-alpha{border-color:var(--alpha2);box-shadow:0 4px 20px rgba(30,58,110,.4);}
+.agent-bravo .agent-card-head{background:linear-gradient(160deg,var(--bravo),#3a0a0a);}
+.agent-bravo{border-color:var(--bravo2);box-shadow:0 4px 20px rgba(110,30,30,.4);}
+.agent-dino  .agent-card-head{background:linear-gradient(160deg,var(--dino),#0a2a10);}
+.agent-dino{border-color:var(--dino2);box-shadow:0 4px 20px rgba(30,92,42,.4);}
+.agent-wild  .agent-card-head{background:linear-gradient(160deg,var(--wild),#2a1a00);}
+.agent-wild{border-color:var(--wild2);box-shadow:0 4px 20px rgba(122,92,30,.4);}
+
+/* ══════════════════════════════════════════════
+   MAIN APP (after agent selected)
+══════════════════════════════════════════════ */
+#screen-app{background:var(--dark);}
+
+/* TOP BAR */
+.topbar{
+  background:var(--black);
+  border-bottom:2px solid var(--teal);
+  padding:10px 14px;
+  display:flex;align-items:center;
+  justify-content:space-between;
+  flex-shrink:0;
+  height:52px;
+}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.topbar-back{
+  width:28px;height:28px;border-radius:6px;
+  border:1px solid var(--teal);
+  background:transparent;cursor:pointer;
+  color:var(--teal2);font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+}
+.topbar-codename{
+  font-family:'Orbitron',sans-serif;
+  font-size:11px;font-weight:700;
+  letter-spacing:2px;
+}
+.topbar-name{
+  font-size:10px;color:rgba(255,255,255,.5);
+  margin-top:1px;letter-spacing:.5px;
+}
+.topbar-right{text-align:right;}
+.topbar-sync{
+  font-size:9px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--teal2);
+}
+
+/* CONTENT AREA */
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;}
+
+/* BOTTOM NAV */
+.botnav{
+  background:var(--black);
+  border-top:2px solid var(--teal);
+  display:flex;
+  flex-shrink:0;
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+}
+.bnb{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  border:none;background:transparent;cursor:pointer;
+  color:rgba(255,255,255,.3);
+  font-family:'Exo 2',sans-serif;
+  font-size:8px;letter-spacing:.5px;
+  text-transform:uppercase;padding:4px 2px;
+  transition:color .2s;
+}
+.bnb.active{color:var(--teal3);}
+.bnb svg{width:18px;height:18px;flex-shrink:0;}
+
+/* TABS */
+.tab{display:none;padding:14px 13px 20px;}
+.tab.active{display:block;}
+
+/* SECTION HEADERS */
+.sec-head{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:14px;
+}
+.sec-head-line{flex:1;height:1px;background:var(--teal);opacity:.3;}
+.sec-head-text{
+  font-family:'Orbitron',sans-serif;
+  font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--teal2);
+  white-space:nowrap;
+}
+.sec-head-diamond{
+  width:6px;height:6px;background:var(--teal);
+  transform:rotate(45deg);flex-shrink:0;
+  box-shadow:0 0 6px var(--teal2);
+}
+
+/* CARDS */
+.hw-card{
+  background:var(--dark2);
+  border:1px solid rgba(12,200,200,.2);
+  border-radius:10px;overflow:hidden;
+  margin-bottom:10px;
+}
+.hw-card-head{
+  padding:10px 13px;
+  border-bottom:1px solid rgba(12,200,200,.15);
+  display:flex;align-items:center;gap:8px;
+}
+.hw-card-icon{font-size:16px;flex-shrink:0;}
+.hw-card-title{
+  font-family:'Orbitron',sans-serif;
+  font-size:10px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--teal2);
+}
+.hw-card-body{padding:12px 13px;}
+
+/* MEAL DISPLAY */
+.meal-tonight{
+  background:linear-gradient(135deg,var(--dark2),#0a1a1a);
+  border:1px solid var(--teal);border-radius:10px;
+  padding:16px 14px;margin-bottom:10px;
+  position:relative;overflow:hidden;
+}
+.meal-tonight::before{
+  content:'FIELD RATION';
+  position:absolute;top:8px;right:10px;
+  font-family:'Orbitron',sans-serif;
+  font-size:7px;letter-spacing:2px;
+  color:rgba(12,200,200,.3);
+}
+.meal-label{
+  font-family:'Orbitron',sans-serif;
+  font-size:8px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--teal2);
+  margin-bottom:6px;
+}
+.meal-name{
+  font-size:20px;font-weight:700;
+  color:var(--white);margin-bottom:4px;
+  line-height:1.2;
+}
+.meal-sides{
+  font-size:12px;color:rgba(255,255,255,.5);
+  font-style:italic;margin-bottom:8px;
+}
+.meal-alert{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(232,184,74,.12);
+  border:1px solid rgba(232,184,74,.3);
+  border-radius:6px;padding:4px 9px;
+  font-size:10px;color:var(--gold);letter-spacing:.3px;
+}
+
+/* WEEK PLAN */
+.week-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid rgba(12,200,200,.08);
+}
+.week-row:last-child{border-bottom:none;}
+.week-day{
+  font-family:'Orbitron',sans-serif;
+  font-size:8px;letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--teal2);width:30px;flex-shrink:0;
+}
+.week-meal{font-size:13px;color:var(--white);flex:1;}
+.week-tag{
+  font-size:8px;letter-spacing:.5px;
+  text-transform:uppercase;padding:2px 6px;
+  border-radius:4px;flex-shrink:0;
+}
+.tag-boys{background:rgba(232,184,74,.15);color:var(--gold);}
+.tag-date{background:rgba(12,200,200,.1);color:var(--teal2);}
+
+/* LUNCH PICKER */
+.lunch-day-tabs{
+  display:flex;gap:4px;overflow-x:auto;
+  margin-bottom:12px;padding-bottom:2px;
+  -webkit-overflow-scrolling:touch;
+}
+.lunch-day-btn{
+  padding:5px 10px;border-radius:6px;
+  border:1px solid rgba(12,200,200,.2);
+  background:transparent;cursor:pointer;
+  color:rgba(255,255,255,.4);
+  font-family:'Orbitron',sans-serif;
+  font-size:8px;letter-spacing:1px;
+  white-space:nowrap;flex-shrink:0;
+  text-transform:uppercase;
+  transition:all .2s;
+}
+.lunch-day-btn.active{
+  background:var(--teal);border-color:var(--teal);
+  color:var(--black);
+}
+.lunch-option{
+  background:var(--dark2);
+  border:1px solid rgba(12,200,200,.15);
+  border-radius:8px;padding:11px 13px;
+  margin-bottom:7px;
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;transition:all .2s;
+}
+.lunch-option.selected{
+  border-color:var(--teal);
+  background:rgba(12,200,200,.08);
+}
+.lunch-option.taken{opacity:.4;cursor:default;}
+.lunch-opt-name{font-size:14px;color:var(--white);}
+.lunch-opt-qty{
+  font-family:'Orbitron',sans-serif;
+  font-size:9px;letter-spacing:1px;
+  color:var(--teal2);
+}
+.lunch-opt-check{
+  width:20px;height:20px;border-radius:50%;
+  border:2px solid rgba(12,200,200,.3);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-left:8px;
+  font-size:10px;
+}
+.lunch-option.selected .lunch-opt-check{
+  background:var(--teal);border-color:var(--teal);
+  color:var(--black);
+}
+.lunch-empty{
+  text-align:center;padding:24px;
+  font-size:12px;color:rgba(255,255,255,.3);
+  font-style:italic;
+}
+
+/* MISSIONS (placeholder) */
+.mission-card{
+  background:var(--dark2);
+  border:1px solid rgba(12,200,200,.15);
+  border-radius:8px;padding:12px 13px;
+  margin-bottom:8px;
+  display:flex;align-items:center;gap:12px;
+}
+.mission-check{
+  width:22px;height:22px;border-radius:6px;
+  border:2px solid rgba(12,200,200,.3);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;
+}
+.mission-check.done{
+  background:var(--teal);border-color:var(--teal);color:var(--black);
+  font-size:12px;
+}
+.mission-text{font-size:13px;color:var(--white);flex:1;}
+.mission-text.done{text-decoration:line-through;color:rgba(255,255,255,.3);}
+.mission-points{
+  font-family:'Orbitron',sans-serif;
+  font-size:9px;color:var(--gold);
+  letter-spacing:1px;
+}
+
+/* TRANSMISSIONS */
+.transmission{
+  background:var(--dark2);
+  border:1px solid rgba(12,200,200,.15);
+  border-left:3px solid var(--teal);
+  border-radius:8px;padding:11px 13px;
+  margin-bottom:8px;
+}
+.trans-from{
+  font-family:'Orbitron',sans-serif;
+  font-size:8px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--teal2);
+  margin-bottom:5px;
+}
+.trans-msg{font-size:13px;color:var(--white);line-height:1.5;}
+.trans-time{
+  font-size:10px;color:rgba(255,255,255,.3);
+  margin-top:5px;font-style:italic;
+}
+
+/* TRAINING (devotional placeholder) */
+.training-card{
+  background:linear-gradient(135deg,#0a1a2a,#0a0a1a);
+  border:1px solid rgba(100,100,200,.3);
+  border-radius:10px;padding:16px 14px;
+  margin-bottom:10px;
+}
+.training-verse{
+  font-size:16px;font-style:italic;
+  color:var(--white);line-height:1.6;
+  margin-bottom:8px;
+}
+.training-ref{
+  font-family:'Orbitron',sans-serif;
+  font-size:8px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--gold);
+}
+.training-coming{
+  text-align:center;padding:20px;
+  font-size:12px;color:rgba(255,255,255,.3);
+  font-style:italic;
+}
+
+/* STATUS BADGE */
+.status-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:20px;
+  font-family:'Orbitron',sans-serif;
+  font-size:8px;letter-spacing:1.5px;
+  text-transform:uppercase;
+}
+.status-go{background:rgba(45,106,71,.2);color:#4aaa6a;border:1px solid rgba(45,106,71,.3);}
+.status-wait{background:rgba(232,184,74,.15);color:var(--gold);border:1px solid rgba(232,184,74,.3);}
+.status-na{background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.1);}
+
+/* AGENT COLOR THEMES — applied to topbar when agent is active */
+body.theme-alpha .topbar{border-bottom-color:var(--alpha2);}
+body.theme-alpha .topbar-codename{color:var(--alpha2);}
+body.theme-alpha .botnav{border-top-color:var(--alpha2);}
+body.theme-alpha .bnb.active{color:#4a7ab5;}
+body.theme-alpha .sec-head-text{color:#4a7ab5;}
+body.theme-alpha .sec-head-diamond{background:var(--alpha2);}
+body.theme-alpha .meal-tonight{border-color:var(--alpha2);}
+body.theme-alpha .lunch-day-btn.active{background:var(--alpha2);border-color:var(--alpha2);color:var(--white);}
+body.theme-alpha .lunch-option.selected{border-color:var(--alpha2);background:rgba(30,58,110,.12);}
+body.theme-alpha .lunch-option.selected .lunch-opt-check{background:var(--alpha2);border-color:var(--alpha2);}
+body.theme-alpha .mission-check.done{background:var(--alpha2);border-color:var(--alpha2);}
+
+body.theme-bravo .topbar{border-bottom-color:var(--bravo2);}
+body.theme-bravo .topbar-codename{color:var(--bravo2);}
+body.theme-bravo .botnav{border-top-color:var(--bravo2);}
+body.theme-bravo .bnb.active{color:#b54a4a;}
+body.theme-bravo .sec-head-text{color:#b54a4a;}
+body.theme-bravo .sec-head-diamond{background:var(--bravo2);}
+body.theme-bravo .meal-tonight{border-color:var(--bravo2);}
+body.theme-bravo .lunch-day-btn.active{background:var(--bravo2);border-color:var(--bravo2);color:var(--white);}
+body.theme-bravo .lunch-option.selected{border-color:var(--bravo2);background:rgba(110,30,30,.12);}
+body.theme-bravo .lunch-option.selected .lunch-opt-check{background:var(--bravo2);border-color:var(--bravo2);}
+body.theme-bravo .mission-check.done{background:var(--bravo2);border-color:var(--bravo2);}
+
+body.theme-dino .topbar{border-bottom-color:var(--dino2);}
+body.theme-dino .topbar-codename{color:var(--dino2);}
+body.theme-dino .botnav{border-top-color:var(--dino2);}
+body.theme-dino .bnb.active{color:#4a9a5a;}
+body.theme-dino .sec-head-text{color:#4a9a5a;}
+body.theme-dino .sec-head-diamond{background:var(--dino2);}
+body.theme-dino .meal-tonight{border-color:var(--dino2);}
+body.theme-dino .lunch-day-btn.active{background:var(--dino2);border-color:var(--dino2);color:var(--white);}
+body.theme-dino .lunch-option.selected{border-color:var(--dino2);background:rgba(30,92,42,.12);}
+body.theme-dino .lunch-option.selected .lunch-opt-check{background:var(--dino2);border-color:var(--dino2);}
+body.theme-dino .mission-check.done{background:var(--dino2);border-color:var(--dino2);}
+
+body.theme-wild .topbar{border-bottom-color:var(--wild2);}
+body.theme-wild .topbar-codename{color:var(--wild2);}
+body.theme-wild .botnav{border-top-color:var(--wild2);}
+body.theme-wild .bnb.active{color:#b88a2e;}
+body.theme-wild .sec-head-text{color:#b88a2e;}
+body.theme-wild .sec-head-diamond{background:var(--wild2);}
+body.theme-wild .meal-tonight{border-color:var(--wild2);}
+body.theme-wild .lunch-day-btn.active{background:var(--wild2);border-color:var(--wild2);color:var(--white);}
+body.theme-wild .lunch-option.selected{border-color:var(--wild2);background:rgba(122,92,30,.12);}
+body.theme-wild .lunch-option.selected .lunch-opt-check{background:var(--wild2);border-color:var(--wild2);}
+body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--wild2);}
+
+/* UTILITY */
+.empty{text-align:center;padding:30px;color:rgba(255,255,255,.3);font-style:italic;font-size:13px;}
+</style>
+</head>
+
+<body>
+
+<div id="assist-banner" style="display:none;position:sticky;top:0;z-index:9998;text-align:center;padding:9px 14px;
+  background:linear-gradient(180deg,#d4af5a,#b08d3e);color:#101820;font-family:'Lato',sans-serif;
+  font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;">
+  <span id="assist-banner-text"></span>
+</div>
+<script>
+(function(){
+  var params = new URLSearchParams(location.search);
+  var assistParent = params.get('assist');
+  var assistAs = params.get('as');
+  var CREW_NAMES = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
+  var PARENT_NAMES = {john:'Captain',dawn:'Executive Officer'};
+  if(assistParent && assistAs){
+    var el = document.getElementById('assist-banner');
+    var txt = document.getElementById('assist-banner-text');
+    txt.textContent = '⚑ ' + (PARENT_NAMES[assistParent]||assistParent) + ' assisting ' + (CREW_NAMES[assistAs]||assistAs);
+    el.style.display = 'block';
+    // log the assist session start to the muster roll
+    try{
+      if(window.firebase && firebase.apps && firebase.apps.length){
+        firebase.database().ref('resolute/muster').push({
+          t: firebase.database.ServerValue.TIMESTAMP, who: assistParent,
+          method:'assist-active', ok:true, assist:{parent:assistParent, as:assistAs},
+          device:'boys-hq'
+        });
+      }
+    }catch(e){}
+  }
+})();
+</script>
+
+<!-- CELEBRATION OVERLAY -->
+<div id="celebration-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:30px;overflow:hidden;">
+  <canvas id="confetti-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+  <div id="celebration-emoji" style="font-size:72px;margin-bottom:16px;animation:celebrate-bounce .5s ease infinite alternate;position:relative;z-index:2;">&#127881;</div>
+  <div id="celebration-title" style="font-family:'Orbitron',sans-serif;font-size:24px;font-weight:900;letter-spacing:3px;margin-bottom:12px;text-transform:uppercase;position:relative;z-index:2;animation:celebrate-flash 1s ease infinite;"></div>
+  <div id="celebration-msg" style="font-size:14px;color:rgba(255,255,255,.85);line-height:1.6;max-width:320px;margin-bottom:26px;position:relative;z-index:2;"></div>
+  <button onclick="closeCelebration()" style="padding:13px 30px;border-radius:24px;background:var(--teal);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;position:relative;z-index:2;box-shadow:0 0 20px rgba(12,200,200,.6);">CONTINUE MISSION</button>
+</div>
+<style>
+@keyframes celebrate-bounce{from{transform:translateY(0) scale(1);}to{transform:translateY(-16px) scale(1.08);}}
+@keyframes celebrate-flash{
+  0%,100%{color:var(--gold);text-shadow:0 0 10px rgba(232,184,74,.8);}
+  50%{color:#fff;text-shadow:0 0 20px rgba(255,255,255,1),0 0 30px rgba(232,184,74,1);}
+}
+</style>
+
+
+<!-- ═══ AGENT SELECT SCREEN ═══ -->
+<div class="screen active" id="screen-select">
+  <div class="owca-header">
+    <div class="owca-logo">O.W.C.A.</div>
+    <div class="owca-sub">Organization Without a Cool Acronym &mdash; Family Division</div>
+    <div class="owca-directive">&#10022; Identify yourself, Agent &#10022;</div>
+  </div>
+  <div class="select-label">Select Your Agent Profile</div>
+  <div class="agents-grid">
+
+    <div class="agent-card agent-alpha" onclick="selectAgent('samuel','Agent Alpha','Samuel','Senior Field Agent','theme-alpha','&#129413;')">
+      <div class="agent-card-head">
+        <div class="agent-avatar">&#129413;</div>
+        <div class="agent-codename">Agent Alpha</div>
+        <div class="agent-name">Samuel</div>
+        <div class="agent-rank">Senior Field Agent &middot; Age 13</div>
+      </div>
+      <div class="agent-card-foot">
+        <span class="agent-status-dot"></span>
+        <span class="agent-status-text">Operational</span>
+      </div>
+    </div>
+
+    <div class="agent-card agent-bravo" onclick="selectAgent('johnjr','Agent Bravo','John Jr.','Field Agent','theme-bravo','&#129409;')">
+      <div class="agent-card-head">
+        <div class="agent-avatar">&#129409;</div>
+        <div class="agent-codename">Agent Bravo</div>
+        <div class="agent-name">John Jr.</div>
+        <div class="agent-rank">Field Agent &middot; Age 11</div>
+      </div>
+      <div class="agent-card-foot">
+        <span class="agent-status-dot"></span>
+        <span class="agent-status-text">Operational</span>
+      </div>
+    </div>
+
+    <div class="agent-card agent-dino" onclick="selectAgent('stephen','Agent Dino','Stephen','Field Specialist','theme-dino','&#129430;')">
+      <div class="agent-card-head">
+        <div class="agent-avatar">&#129430;</div>
+        <div class="agent-codename">Agent Dino</div>
+        <div class="agent-name">Stephen</div>
+        <div class="agent-rank">Field Specialist &middot; Age 9</div>
+      </div>
+      <div class="agent-card-foot">
+        <span class="agent-status-dot"></span>
+        <span class="agent-status-text">Operational</span>
+      </div>
+    </div>
+
+    <div class="agent-card agent-wild" onclick="selectAgent('daniel','Agent Wildcard','Daniel','Field Recruit','theme-wild','&#128024;')">
+      <div class="agent-card-head">
+        <div class="agent-avatar">&#128024;</div>
+        <div class="agent-codename">Agent Wildcard</div>
+        <div class="agent-name">Daniel</div>
+        <div class="agent-rank">Field Recruit &middot; Age 7</div>
+      </div>
+      <div class="agent-card-foot">
+        <span class="agent-status-dot"></span>
+        <span class="agent-status-text">Operational</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MAIN APP SCREEN ═══ -->
+<div class="screen" id="screen-app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid var(--teal);color:var(--teal2);font-size:14px;flex-shrink:0;" title="O.W.C.A.">&#128737;</div>
+      <button class="topbar-back" onclick="backToSelect()">&#8592;</button>
+      <div>
+        <div class="topbar-codename" id="topbar-codename">AGENT</div>
+        <div class="topbar-name" id="topbar-name">Loading...</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="topbar-sync" id="sync-status">&#9675; Connecting...</div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- TAB: RATIONS (meals) -->
+    <div class="tab active" id="tab-rations">
+      <div id="status-summary" style="margin-bottom:16px;"></div>
+      <div id="tonight-activity"></div>
+
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Tonight's Field Ration</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="tonight-meal">
+        <div class="empty">Loading mission data...</div>
+      </div>
+
+      <div class="sec-head" style="margin-top:16px;">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Weekly Deployment Schedule</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-card-body" id="week-schedule">
+          <div class="empty">Awaiting HQ meal plan...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: LUNCH DROP -->
+    <div class="tab" id="tab-lunch">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Lunch Drop</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div class="hw-card" style="margin-bottom:12px;">
+        <div class="hw-card-head">
+          <div class="hw-card-icon">&#128274;</div>
+          <div class="hw-card-title">Mission Briefing</div>
+        </div>
+        <div class="hw-card-body" style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;">
+          HQ loads your lunch options each week. Pick one per day from the available pool. First agent to claim an item gets it. Choose wisely, Agent.
+        </div>
+      </div>
+      <div class="lunch-day-tabs" id="lunch-day-tabs"></div>
+      <div id="lunch-options-list">
+        <div class="empty">Awaiting HQ lunch data...</div>
+      </div>
+    </div>
+
+    <!-- TAB: MISSIONS (chores) -->
+    <div class="tab" id="tab-missions">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Active Missions</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-card-head">
+          <div class="hw-card-icon">&#128203;</div>
+          <div class="hw-card-title">Mission Status</div>
+        </div>
+        <div class="hw-card-body">
+          <div id="missions-list">
+            <div class="empty">Loading missions...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: TRANSMISSIONS -->
+    <div class="tab" id="tab-transmissions">
+      <!-- BOARD MESSAGES VIEW -->
+      <div id="msg-board-view">
+        <div class="sec-head">
+          <div class="sec-head-diamond"></div>
+          <div class="sec-head-text">Transmissions from HQ</div>
+          <div class="sec-head-line"></div>
+        </div>
+        <div id="transmissions-list">
+          <div class="empty">No transmissions at this time.</div>
+        </div>
+
+        <div class="sec-head" style="margin-top:16px;">
+          <div class="sec-head-diamond"></div>
+          <div class="sec-head-text">Private Message</div>
+          <div class="sec-head-line"></div>
+        </div>
+        <div class="hw-card" style="margin-bottom:10px;cursor:pointer;" onclick="openGroupThread()">
+          <div class="hw-card-head">
+            <div class="hw-card-icon">&#128172;</div>
+            <div class="hw-card-title" style="flex:1;">Agent Group Chat</div>
+            <div id="group-unread-badge" style="display:none;background:var(--gold);color:var(--black);font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;">NEW</div>
+            <span style="color:rgba(255,255,255,.4);font-size:14px;margin-left:8px;">&#8250;</span>
+          </div>
+          <div class="hw-card-body" style="font-size:12px;color:rgba(255,255,255,.5);font-style:italic;" id="group-preview">
+            All agents can talk here. Mom &amp; Dad can see it too.
+          </div>
+        </div>
+        <div class="hw-card" style="margin-bottom:10px;cursor:pointer;" onclick="openPrivateThread()">
+          <div class="hw-card-head">
+            <div class="hw-card-icon">&#128274;</div>
+            <div class="hw-card-title" style="flex:1;">Message Dad &amp; Mom</div>
+            <div id="msg-unread-badge" style="display:none;background:var(--gold);color:var(--black);font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;">NEW</div>
+            <span style="color:rgba(255,255,255,.4);font-size:14px;margin-left:8px;">&#8250;</span>
+          </div>
+          <div class="hw-card-body" style="font-size:12px;color:rgba(255,255,255,.5);font-style:italic;" id="private-preview">
+            Tap to view your private thread with HQ
+          </div>
+        </div>
+      </div>
+
+      <!-- PRIVATE THREAD VIEW -->
+      <div id="msg-thread-view" style="display:none;flex-direction:column;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--dark);z-index:100;">
+        <div style="background:var(--black);border-bottom:2px solid var(--teal);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <button onclick="closePrivateThread()" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--teal);background:transparent;cursor:pointer;color:var(--teal2);font-size:14px;">&#8592;</button>
+          <div style="flex:1;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;" id="thread-agent-name">Private Thread</div>
+            <div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px;">Only you and HQ can see this</div>
+          </div>
+          <div style="font-size:9px;color:var(--teal2);" id="thread-sync">&#9679; Live</div>
+        </div>
+        <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 13px;display:flex;flex-direction:column;gap:8px;" id="private-messages"></div>
+        <div style="display:flex;gap:8px;padding:10px 13px;border-top:2px solid var(--teal);background:var(--black);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));">
+          <input type="text" id="private-input" placeholder="Send a message to Dad &amp; Mom..." maxlength="280"
+            style="flex:1;padding:9px 12px;border-radius:20px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;">
+          <button onclick="sendPrivateMessage()" style="width:38px;height:38px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;color:var(--black);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10148;</button>
+        </div>
+      </div>
+    </div>
+
+      <!-- GROUP CHAT THREAD VIEW -->
+      <div id="group-thread-view" style="display:none;flex-direction:column;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--dark);z-index:100;">
+        <div style="background:var(--black);border-bottom:2px solid var(--gold);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <button onclick="closeGroupThread()" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--gold);background:transparent;cursor:pointer;color:var(--gold);font-size:14px;">&#8592;</button>
+          <div style="flex:1;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;">Agent Group Chat</div>
+            <div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px;">All agents + Mom &amp; Dad can see this</div>
+          </div>
+          <div style="font-size:9px;color:var(--teal2);">&#9679; Live</div>
+        </div>
+        <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 13px;display:flex;flex-direction:column;gap:8px;" id="group-messages"></div>
+        <div id="group-mute-notice" style="display:none;padding:8px 13px;background:rgba(200,60,60,.18);border-top:1px solid rgba(200,60,60,.4);color:#ff9b9b;font-size:12px;text-align:center;"></div>
+          <div style="display:flex;gap:8px;padding:10px 13px;border-top:2px solid var(--gold);background:var(--black);flex-shrink:0;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));">
+          <input type="text" id="group-input" placeholder="Message the group..." maxlength="280"
+            style="flex:1;padding:9px 12px;border-radius:20px;border:1px solid rgba(200,146,42,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;">
+          <button onclick="sendGroupMessage()" style="width:38px;height:38px;border-radius:50%;background:var(--gold);border:none;cursor:pointer;color:var(--black);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10148;</button>
+        </div>
+      </div>
+
+    <!-- TAB: TRAINING (devotional) -->
+    <div class="tab" id="tab-training">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Agent Training</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div class="training-card">
+        <div class="training-verse">&ldquo;The Lord shall fight for you, and ye shall hold your peace.&rdquo;</div>
+        <div class="training-ref">Exodus 14:14 &nbsp;&#9670;&nbsp; Stewart Family Verse</div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-card-head">
+          <div class="hw-card-icon">&#9749;</div>
+          <div class="hw-card-title">This Week's Devotional</div>
+        </div>
+        <div class="hw-card-body" style="padding:0;">
+          <div id="family-devotional-display">
+            <div class="empty" style="color:rgba(255,255,255,.3);">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hw-card">
+        <div class="hw-card-head">
+          <div class="hw-card-icon">&#127919;</div>
+          <div class="hw-card-title">Agent Self-Assessment</div>
+        </div>
+        <div class="hw-card-body">
+          <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.6;">Every agent has strengths and a mission to grow. This is just between you and HQ &mdash; your brothers won't see it. Update it whenever you want.</div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">MY STRENGTH</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">Something I'm good at or proud of</div>
+            <textarea id="self-strength" placeholder="I'm good at..." maxlength="200" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">MY MISSION</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">Something I want to get better at</div>
+            <textarea id="self-mission" placeholder="I want to get better at..." maxlength="200" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">THIS WEEK'S STEP</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">One small thing I'm going to try</div>
+            <textarea id="self-step" placeholder="This week I'm going to try..." maxlength="200" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+          </div>
+
+          <button onclick="saveSelfAssessment()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">SAVE TO MY FILE</button>
+          <div id="self-assessment-saved" style="font-size:10px;color:#4aaa6a;text-align:center;margin-top:6px;display:none;">&#10003; Saved to your agent file</div>
+        </div>
+      </div>
+      <div class="sec-head" style="margin-top:18px;">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Teach Me Vote</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="teachme-vote-content">
+        <div class="empty">Loading vote...</div>
+      </div>
+    </div>
+
+    <!-- TAB: PAY -->
+    <div class="tab" id="tab-pay">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Weekly Pay & Rewards</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="pay-content">
+        <div class="empty">Loading pay data...</div>
+      </div>
+      <div class="sec-head" style="margin-top:18px;">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Super Family Night</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="super-fn-content">
+        <div class="empty">Loading...</div>
+      </div>
+    </div>
+
+    <!-- TAB: XBOX GAME TIME -->
+    <div class="tab" id="tab-xbox"><div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Xbox Game Time</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="gametime-content">
+        <div class="empty">Loading game time data...</div>
+      </div>
+
+      <div class="sec-head" style="margin-top:18px;">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Field Library</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="readinglog-content">
+        <div class="empty">Loading reading log...</div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="botnav">
+    <button class="bnb active" onclick="showTab('rations',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+      Rations
+    </button>
+    <button class="bnb" onclick="showTab('lunch',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Lunch
+    </button>
+    <button class="bnb" onclick="showTab('missions',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Missions
+    </button>
+    <button class="bnb" onclick="showTab('transmissions',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      HQ
+    </button>
+    <button class="bnb" onclick="showTab('training',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Training
+    </button>
+    <button class="bnb" onclick="showTab('pay',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Pay
+    </button>
+    <button class="bnb" onclick="showTab('xbox',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M7 12h.01"/><path d="M17 12h.01"/><path d="M12 8v8"/></svg>
+      Xbox
+    </button>
+  </nav>
+
+</div><!-- /screen-app -->
+
+<script>
+// ══════════════════════════════════════════════════════
+// DATE HELPER -- LOCAL date (fixes UTC evening-rollover bug)
+// toISOString() returns UTC, so after ~8pm Eastern it rolls to the next
+// day and mission checkmarks save/read under the wrong date key.
+// localDateStr() always returns the local YYYY-MM-DD.
+// ══════════════════════════════════════════════════════
+function localDateStr(date){
+  const d = date ? new Date(date) : new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+// ══════════════════════════════════════════════════════
+// LINKIFY -- escape HTML then turn URLs into tappable links
+// ══════════════════════════════════════════════════════
+function escapeHtml(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function linkify(text){
+  const esc = escapeHtml(text);
+  // Match http(s) URLs and bare www. links
+  const urlRe = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+  return esc.replace(urlRe, (url) => {
+    let href = url;
+    if(/^www\./i.test(href)) href = 'https://' + href;
+    // Trim trailing punctuation that often follows a pasted link
+    let trail = '';
+    const tm = href.match(/[.,!?)]+$/);
+    if(tm){ trail = url.slice(url.length - tm[0].length); href = href.slice(0, href.length - tm[0].length); url = url.slice(0, url.length - tm[0].length); }
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;font-weight:600;word-break:break-all;">${url}</a>${trail}`;
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// FIREBASE CONFIG
+// ══════════════════════════════════════════════════════
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+
+let _db = null;
+let currentAgent = null; // {id, codename, name, rank, theme, icon}
+let currentLunchDay = 'monday';
+let lunchWeekData = {};
+let lunchPicksData = {};
+let planData = [];
+let transmissionsData = [];
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+function initFirebase(){
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    _db = firebase.database();
+    setSyncStatus('live');
+
+    // Connection monitor
+    _db.ref('.info/connected').on('value', snap => {
+      setSyncStatus(snap.val() ? 'live' : 'offline');
+    });
+  } catch(e){
+    setSyncStatus('offline');
+    console.log('Firebase init error:', e);
+  }
+}
+
+function setSyncStatus(status){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  if(status === 'live'){
+    el.innerHTML = '&#9679; Synced';
+    el.style.color = '#2d6a47';
+  } else if(status === 'connecting'){
+    el.innerHTML = '&#9675; Connecting...';
+    el.style.color = '#a07000';
+  } else {
+    el.innerHTML = '&#9675; Offline';
+    el.style.color = '#8b3010';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// AGENT SELECT
+// ══════════════════════════════════════════════════════
+function selectAgent(id, codename, name, rank, theme, icon){
+  currentAgent = {id, codename, name, rank, theme, icon};
+
+  // Apply theme
+  document.body.className = theme;
+
+  // Update topbar
+  document.getElementById('topbar-codename').textContent = codename;
+  document.getElementById('topbar-name').textContent = name + ' — ' + rank;
+
+  // Switch screens
+  document.getElementById('screen-select').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
+
+  // Load all data
+  loadPlan();
+  loadLunch();
+  loadTransmissions();
+  buildLunchDayTabs();
+  renderMissions();
+  renderPayScreen();
+  loadPrivatePreview();
+  setTimeout(() => updateGroupBadge(), 1600);
+  setTimeout(() => runHansEngine(), 2000);
+  // Small delay then re-render missions once Firebase is settled
+  setTimeout(() => renderMissions(), 1500);
+  setTimeout(() => renderGameTime(), 1000);
+  setTimeout(() => renderReadingLog(), 1100);
+  renderStatusSummary();
+  renderSelfAssessment();
+  renderTonightActivity();
+  renderSuperFamilyNight();
+  renderFamilyDevotionalDisplay();
+  setTimeout(() => checkCelebrations(), 2000);
+}
+
+function backToSelect(){
+  document.body.className = '';
+  document.getElementById('screen-app').classList.remove('active');
+  document.getElementById('screen-select').classList.add('active');
+  currentAgent = null;
+  // Reset tabs
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-rations').classList.add('active');
+  document.querySelectorAll('.bnb').forEach(b => b.classList.remove('active'));
+  document.querySelector('.bnb').classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function showTab(name, btn){
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.bnb').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+
+  if(name === 'lunch') renderLunch();
+  if(name === 'missions') renderMissions();
+  if(name === 'pay'){ renderPayScreen(); renderSuperFamilyNight(); }
+  if(name === 'xbox'){ renderGameTime(); renderReadingLog(); }
+  if(name === 'transmissions') renderTransmissions();
+  if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); }
+}
+
+// ══════════════════════════════════════════════════════
+// MEAL PLAN (from Firebase — written by kitchen app)
+// ══════════════════════════════════════════════════════
+function loadPlan(){
+  if(!_db){ renderPlanFallback(); return; }
+  _db.ref('stewart/plan').on('value', snap => {
+    const val = snap.val();
+    planData = val && Array.isArray(val) ? val : [];
+    renderTonightMeal();
+    renderWeekSchedule();
+  });
+}
+
+function getTodayName(){
+  const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  return days[new Date().getDay()];
+}
+
+function renderTonightMeal(){
+  const el = document.getElementById('tonight-meal');
+  const today = getTodayName();
+  // Capitalize first letter
+  const todayCap = today.charAt(0).toUpperCase() + today.slice(1);
+
+  const slot = planData.find(s => s.day && s.day.toLowerCase() === todayCap.toLowerCase());
+
+  if(!slot || !slot.mealName){
+    el.innerHTML = '<div class="empty">No meal plan loaded yet.<br>Ask HQ to generate the week\'s plan.</div>';
+    return;
+  }
+
+  const alertHtml = slot.alert ?
+    `<div class="meal-alert">&#9200; ${slot.alert.label||slot.alert}</div>` : '';
+  const sidesHtml = slot.sides ?
+    `<div class="meal-sides">${slot.sides}</div>` : '';
+  const defrostHtml = slot.defrost ?
+    `<div class="meal-alert" style="margin-top:6px;color:var(--teal2);border-color:rgba(12,200,200,.3);background:rgba(12,200,200,.08);">&#10052; ${slot.defrost}</div>` : '';
+
+  // Friday — boys cook their own simple meal
+  const boysMealHtml = slot.boysMeal ?
+    `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(12,200,200,.25);">
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:4px;">&#127869; YOUR DINNER TONIGHT</div>
+      <div style="font-size:14px;font-weight:700;color:var(--white);">${slot.boysMeal}</div>
+      ${slot.boysMealSides?`<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;">${slot.boysMealSides}</div>`:''}
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;font-style:italic;">Mom &amp; Dad are on date night &mdash; you've got this, Agents.</div>
+    </div>` : '';
+
+  // Mon/Wed/Thu — dinner side reminder
+  let dinnerSideHtml = '';
+  if(currentAgent && isDinnerSideDay()){
+    const side = getMyDinnerSide(currentAgent.id);
+    const pair = PAIRS[currentAgent.id];
+    if(side && pair){
+      const partner = pair.partner==='johnjr'?'John Jr.':pair.partner.charAt(0).toUpperCase()+pair.partner.slice(1);
+      dinnerSideHtml = `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(232,184,74,.25);">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;">&#127858; YOUR SIDE TONIGHT</div>
+        <div style="font-size:13px;color:var(--white);">${side==='starch'?'Starch (potatoes, rice, or pasta)':'The vegetable'} &mdash; with ${partner}</div>
+      </div>`;
+    }
+  }
+
+  el.innerHTML = `<div class="meal-tonight">
+    <div class="meal-label">Today &mdash; ${todayCap}</div>
+    <div class="meal-name">${slot.mealName}</div>
+    ${sidesHtml}
+    ${alertHtml}
+    ${defrostHtml}
+    ${slot.chainName ? `<div style="font-size:10px;color:rgba(12,200,200,.5);margin-top:6px;">&#9851; ${slot.chainName}</div>` : ''}
+    ${slot.dessert ? `<div style="font-size:11px;color:var(--gold);margin-top:5px;">&#127856; Dessert: ${slot.dessert}</div>` : ''}
+    ${boysMealHtml}
+    ${dinnerSideHtml}
+  </div>`;
+}
+
+function renderWeekSchedule(){
+  const el = document.getElementById('week-schedule');
+  if(!planData || !planData.length){
+    el.innerHTML = '<div class="empty">Awaiting HQ meal plan...</div>';
+    return;
+  }
+  const today = getTodayName();
+  el.innerHTML = planData.map(s => {
+    const isToday = s.day && s.day.toLowerCase() === today;
+    const isBoys = s.type === 'Boys Cook';
+    const isDate = s.type === 'Date Night';
+    const dayShort = s.day ? s.day.slice(0,3).toUpperCase() : '---';
+    const tagHtml = isBoys ? '<span class="week-tag tag-boys">Your Night</span>' :
+                    isDate ? '<span class="week-tag tag-date">Date Night</span>' : '';
+    return `<div class="week-row" style="${isToday ? 'background:rgba(12,200,200,.06);border-radius:6px;padding:8px 6px;' : ''}">
+      <div class="week-day">${dayShort}</div>
+      <div class="week-meal" style="${isToday ? 'color:var(--teal3);font-weight:600;' : ''}">${s.mealName||'TBD'}</div>
+      ${tagHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderPlanFallback(){
+  document.getElementById('tonight-meal').innerHTML = '<div class="empty">Connect to WiFi to load meal plan.</div>';
+  document.getElementById('week-schedule').innerHTML = '<div class="empty">Connect to WiFi to load week schedule.</div>';
+}
+
+// ══════════════════════════════════════════════════════
+// LUNCH SYSTEM
+// ══════════════════════════════════════════════════════
+const DAYS = ['monday','tuesday','wednesday','thursday','friday'];
+const DAY_SHORT = {monday:'MON',tuesday:'TUE',wednesday:'WED',thursday:'THU',friday:'FRI'};
+
+function buildLunchDayTabs(){
+  const el = document.getElementById('lunch-day-tabs');
+  const today = getTodayName();
+  el.innerHTML = DAYS.map(d => `
+    <button class="lunch-day-btn ${d===today||(!DAYS.includes(today)&&d==='monday')?'active':''}"
+      onclick="selectLunchDay('${d}',this)">${DAY_SHORT[d]}</button>
+  `).join('');
+  currentLunchDay = DAYS.includes(today) ? today : 'monday';
+}
+
+function selectLunchDay(day, btn){
+  currentLunchDay = day;
+  document.querySelectorAll('.lunch-day-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderLunch();
+}
+
+function loadLunch(){
+  if(!_db) return;
+  // Listen to week options
+  _db.ref('stewart/lunch/week').on('value', snap => {
+    lunchWeekData = snap.val() || {};
+    renderLunch();
+  });
+  // Listen to all picks
+  _db.ref('stewart/lunch/picks').on('value', snap => {
+    lunchPicksData = snap.val() || {};
+    renderLunch();
+  });
+}
+
+function renderLunch(){
+  const el = document.getElementById('lunch-options-list');
+  if(!currentAgent) return;
+
+  const dayOptions = lunchWeekData[currentLunchDay];
+  if(!dayOptions || !Array.isArray(dayOptions) || !dayOptions.length){
+    el.innerHTML = '<div class="lunch-empty">HQ has not loaded lunch options for this day yet.<br>Check back later, Agent.</div>';
+    return;
+  }
+
+  // Build a map of what's been claimed on this day
+  const claimed = {}; // item -> agentId
+  Object.entries(lunchPicksData).forEach(([agentId, picks]) => {
+    if(picks && picks[currentLunchDay]){
+      claimed[picks[currentLunchDay]] = agentId;
+    }
+  });
+
+  const myPick = lunchPicksData[currentAgent.id] && lunchPicksData[currentAgent.id][currentLunchDay];
+
+  el.innerHTML = dayOptions.map((opt, i) => {
+    const claimedBy = claimed[opt.item];
+    const isMyPick = myPick === opt.item;
+    const isTakenByOther = claimedBy && claimedBy !== currentAgent.id;
+
+    // Count remaining
+    const claimedCount = Object.values(lunchPicksData).filter(p => p && p[currentLunchDay] === opt.item).length;
+    const remaining = Math.max(0, (opt.qty||1) - claimedCount);
+
+    let cls = 'lunch-option';
+    if(isMyPick) cls += ' selected';
+    if(isTakenByOther && remaining <= 0) cls += ' taken';
+
+    const checkMark = isMyPick ? '&#10003;' : '';
+    const qtyLabel = opt.qty > 1 ? `${remaining} left` : (remaining > 0 ? 'Available' : 'Claimed');
+
+    return `<div class="${cls}" onclick="pickLunch('${opt.item}')">
+      <div>
+        <div class="lunch-opt-name">${opt.item}</div>
+        <div class="lunch-opt-qty">${qtyLabel}</div>
+      </div>
+      <div class="lunch-opt-check">${checkMark}</div>
+    </div>`;
+  }).join('');
+}
+
+function pickLunch(item){
+  if(!currentAgent || !_db) return;
+
+  // Check if already picked this day
+  const myPick = lunchPicksData[currentAgent.id] && lunchPicksData[currentAgent.id][currentLunchDay];
+
+  // If picking same item, deselect
+  if(myPick === item){
+    _db.ref(`stewart/lunch/picks/${currentAgent.id}/${currentLunchDay}`).remove();
+    return;
+  }
+
+  // Check availability
+  const claimed = {};
+  Object.entries(lunchPicksData).forEach(([agentId, picks]) => {
+    if(picks && picks[currentLunchDay]) claimed[picks[currentLunchDay]] = (claimed[picks[currentLunchDay]]||0) + 1;
+  });
+
+  const dayOptions = lunchWeekData[currentLunchDay] || [];
+  const opt = dayOptions.find(o => o.item === item);
+  const qty = opt ? (opt.qty||1) : 1;
+  const claimedCount = claimed[item] || 0;
+
+  if(claimedCount >= qty && (!myPick || myPick !== item)){
+    alert('Sorry, Agent — that item has been claimed. Choose another.');
+    return;
+  }
+
+  // Save pick
+  _db.ref(`stewart/lunch/picks/${currentAgent.id}/${currentLunchDay}`).set(item);
+}
+
+// ══════════════════════════════════════════════════════
+// TRANSMISSIONS
+// ══════════════════════════════════════════════════════
+function loadTransmissions(){
+  if(!_db) return;
+  _db.ref('stewart/transmissions').on('value', snap => {
+    const val = snap.val();
+    if(val){
+      // Firebase returns object with keys, convert to array sorted by timestamp
+      transmissionsData = Object.values(val).sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+    } else {
+      transmissionsData = [];
+    }
+    if(document.getElementById('tab-transmissions').classList.contains('active')) renderTransmissions();
+  });
+}
+
+function renderTransmissions(){
+  const el = document.getElementById('transmissions-list');
+  if(!transmissionsData.length){
+    el.innerHTML = '<div class="empty">No transmissions from HQ.<br>All quiet on the home front.</div>';
+    return;
+  }
+  el.innerHTML = transmissionsData.map(t => {
+    const time = t.timestamp ? new Date(t.timestamp).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+    return `<div class="transmission">
+      <div class="trans-from">&#128225; Transmission from ${t.from||'HQ'}</div>
+      <div class="trans-msg">${linkify(t.message||'')}</div>
+      ${time ? `<div class="trans-time">${time}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// INIT ON LOAD
+// ══════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════
+// CHORE SYSTEM
+// ══════════════════════════════════════════════════════
+
+// Which team is on dishes today?
+// Week A: Mon/Wed/Fri/Sun = Sam&John, Tue/Thu/Sat = Stephen&Daniel
+// Week B: flips
+function getDishTeam(_d){
+  const now = _d ? new Date(_d) : new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun,1=Mon...6=Sat
+  // Week number (0 or 1) based on ISO week
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor((now - startOfYear) / (7 * 24 * 60 * 60 * 1000));
+  const weekParity = weekNum % 2; // 0 or 1
+
+  // Week A pattern: Sun=SJ, Mon=SJ, Tue=SD, Wed=SJ, Thu=SD, Fri=SJ, Sat=SD
+  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
+  // Week B: flipped
+  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
+
+  return weekParity === 0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
+}
+
+function isWeekend(_d){
+  const d = (_d?new Date(_d):new Date()).getDay();
+  return d === 0 || d === 6;
+}
+
+function getDayName(_d){
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return days[(_d?new Date(_d):new Date()).getDay()];
+}
+
+function isWednesday(_d){
+  return (_d?new Date(_d):new Date()).getDay() === 3;
+}
+
+// Date-aware version of isLaundryDay — checks a specific date, not "today"
+function isLaundryDayFor(agentId, dayOfWeek){
+  // dayOfWeek: 1=Mon, 4=Thu
+  if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
+  if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
+  return false;
+}
+
+// Monday = laundry day for Sam & John (pairId 'virtus')
+// Thursday = laundry day for Stephen & Daniel (pairId 'vulnere')
+function isLaundryDay(agentId, _d){
+  return isLaundryDayFor(agentId, (_d?new Date(_d):new Date()).getDay());
+}
+
+// Build mission list for a given agent based on today
+function buildMissions(agentId, _d){
+  const dishTeam = getDishTeam(_d);
+  const weekend = isWeekend(_d);
+  const wed = isWednesday(_d);
+  const day = getDayName(_d);
+  const isBathroomWeek = (agentId === getBathroomAgent(_d));
+
+  // Is this agent on dishes today?
+  const onDishes = (agentId === 'samuel' || agentId === 'johnjr')
+    ? dishTeam === 'sj'
+    : dishTeam === 'sd';
+
+  const onSetup = !onDishes; // opposite team does setup
+
+  const missions = [];
+
+  // ── SHARED DAILY (all 7 days) ──────────────────────
+  missions.push({
+    id: 'bed',
+    text: 'Make your bed',
+    detail: 'Every morning before anything else.',
+    points: 5,
+    category: 'bedroom',
+    always: true
+  });
+  missions.push({
+    id: 'bedroom',
+    text: 'Tidy your bedroom space',
+    detail: 'Your area clean and clothes put away.',
+    points: 5,
+    category: 'bedroom',
+    always: true
+  });
+  missions.push({
+    id: 'rabbit-own',
+    text: 'Care for your rabbit',
+    detail: 'Feed and water your own rabbit before bed.',
+    points: 5,
+    category: 'animals',
+    always: true
+  });
+
+  // ── DISHES TEAM DAILY ──────────────────────────────
+  if(onDishes){
+    // Dish team is either Sam+John or Stephen+Daniel
+    // Sam+John: both alternate load and unload between themselves
+    // Stephen+Daniel: Stephen UNLOADS, Daniel LOADS — always, no exceptions
+
+    if(agentId === 'samuel' || agentId === 'johnjr'){
+      const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
+      missions.push({
+        id: 'dishwasher-load',
+        text: `Load the dishwasher — with ${partner}`,
+        detail: `You and ${partner} handle dishes today. Load all dirty dishes after meals.`,
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+      missions.push({
+        id: 'dishwasher-unload',
+        text: `Unload dishwasher & put away — with ${partner}`,
+        detail: `Empty the clean dishes and put everything in its place. Work with ${partner}.`,
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+    }
+
+    if(agentId === 'stephen'){
+      // Stephen ONLY unloads — Daniel loads
+      missions.push({
+        id: 'dishwasher-unload',
+        text: 'Unload dishwasher & put away — with Daniel',
+        detail: 'Empty the clean dishes and put everything in its place. Daniel will load.',
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+    }
+
+    if(agentId === 'daniel'){
+      // Daniel ONLY loads — Stephen unloads
+      missions.push({
+        id: 'dishwasher-load',
+        text: 'Load the dishwasher — with Stephen',
+        detail: 'Load all the dirty dishes after meals. Stephen will unload and put away.',
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+    }
+
+    missions.push({
+      id: 'table-clear',
+      text: 'Clear the table after dinner',
+      detail: 'Bring all dishes, glasses, and food to the kitchen.',
+      points: 5,
+      category: 'kitchen',
+      always: true
+    });
+    missions.push({
+      id: 'table-wipe',
+      text: 'Wipe down the table after meals',
+      detail: 'Wipe the whole table after every meal — breakfast, lunch, and dinner.',
+      points: 5,
+      category: 'kitchen',
+      always: true
+    });
+  }
+
+// ── SETUP TEAM DAILY ──────────────────────────────
+  if(onSetup){
+    missions.push({
+      id: 'table-set',
+      text: 'Set the table before dinner',
+      detail: 'Plates, silverware, and napkins — set 10 minutes before we sit down.',
+      points: 5,
+      category: 'kitchen',
+      always: true
+    });
+    // Drinks — only older boys
+    if(agentId === 'samuel' || agentId === 'johnjr'){
+      const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
+      missions.push({
+        id: 'drinks',
+        text: `Pour drinks before dinner — with ${partner}`,
+        detail: `Pour everyone's drinks 10 minutes before dinner. You and ${partner} handle setup today.`,
+        points: 5,
+        category: 'kitchen',
+        always: true
+      });
+    }
+    // Appliance wipes — Sam, John, Stephen only, dropped on their laundry day
+    if(agentId !== 'daniel' && !isLaundryDay(agentId, _d)){
+      missions.push({
+        id: 'stovetop',
+        text: 'Wipe down the stovetop',
+        detail: 'Wipe down all burners and the stovetop surface after cooking.',
+        points: 5,
+        category: 'kitchen',
+        always: true
+      });
+      missions.push({
+        id: 'microwave',
+        text: 'Wipe down the microwave',
+        detail: 'Inside and outside. Check for splatter.',
+        points: 5,
+        category: 'kitchen',
+        always: true
+      });
+    }
+  }
+
+  // ── AGENT-SPECIFIC DAILY ─────────────────────────
+  if(agentId === 'samuel'){
+    missions.push({
+      id: 'floor-laundry',
+      text: 'Sweep the laundry room floor',
+      detail: 'Sweep and tidy the laundry room.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+  }
+
+  if(agentId === 'johnjr'){
+    missions.push({
+      id: 'floor-living',
+      text: 'Sweep the living room floor',
+      detail: 'Sweep the full living room floor.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+  }
+
+  if(agentId === 'stephen'){
+    missions.push({
+      id: 'kitchen-counter',
+      text: 'Clean & wipe kitchen counters',
+      detail: 'Wipe down all counter surfaces. Clear anything that doesn\'t belong.',
+      points: 10,
+      category: 'kitchen',
+      weekday: true
+    });
+    missions.push({
+      id: 'floor-kitchen',
+      text: 'Sweep the kitchen floor',
+      detail: 'Sweep the full kitchen floor including under the table.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+  }
+
+  if(agentId === 'daniel'){
+    missions.push({
+      id: 'floor-hallway',
+      text: 'Sweep the hallway',
+      detail: 'Sweep the hallway floor.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+    missions.push({
+      id: 'floor-rabbit',
+      text: 'Sweep the rabbit cage area',
+      detail: 'Sweep around and under the rabbit cages.',
+      points: 5,
+      category: 'animals',
+      weekday: true
+    });
+  }
+
+  // ── WEEKLY MISSIONS ────────────────────────────────
+  // Only show on weekdays, one per week — app marks when done
+
+  if(agentId === 'samuel'){
+    if(isLaundryDay('samuel', _d)){
+      missions.push({
+        id: 'laundry-sam',
+        text: 'Laundry Day — with John Jr.',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 15,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'fridge',
+      text: 'Wipe down the fridge',
+      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true,
+      rotate: 'sj-stephen'
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  if(agentId === 'johnjr'){
+    if(isLaundryDay('johnjr', _d)){
+      missions.push({
+        id: 'laundry-john',
+        text: 'Laundry Day — with Samuel',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 15,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'fridge',
+      text: 'Wipe down the fridge',
+      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true,
+      rotate: 'sj-stephen'
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  if(agentId === 'stephen'){
+    if(isLaundryDay('stephen', _d)){
+      missions.push({
+        id: 'laundry-stephen',
+        text: 'Laundry Day — with Daniel',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 15,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'hutch',
+      text: 'Organize the hutch',
+      detail: 'Keep the food hutch organized — boxes neat, nothing expired, everything in its place.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true
+    });
+    missions.push({
+      id: 'fridge',
+      text: 'Wipe down the fridge',
+      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true,
+      rotate: 'sj-stephen'
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  if(agentId === 'daniel'){
+    if(isLaundryDay('daniel', _d)){
+      missions.push({
+        id: 'laundry-daniel',
+        text: 'Laundry Day — with Stephen',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 10,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'bathroom-trash',
+      text: 'Empty bathroom trash',
+      detail: 'Wednesday morning — empty the bathroom trash can and bring it to the road with Sam and John.',
+      points: 10,
+      category: 'bathroom',
+      weekly: true,
+      wednesday: true
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  // ── WEDNESDAY TRASH ────────────────────────────────
+  if(wed && (agentId === 'samuel' || agentId === 'johnjr')){
+    const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
+    missions.push({
+      id: 'trash',
+      text: `Take trash to the road — with ${partner}`,
+      detail: `Wednesday mission — you and ${partner} go together. Long driveway, out before 9am. Daniel brings the bathroom trash to you.`,
+      points: 10,
+      category: 'trash',
+      always: true,
+      urgent: true
+    });
+  }
+
+  // ── WEEKLY RABBIT CAGE CLEAN ─────────────────────
+  missions.push({
+    id: 'rabbit-cage',
+    text: 'Clean rabbit cages',
+    detail: 'All four boys clean the cages together once this week.',
+    points: 15,
+    category: 'animals',
+    weekly: true
+  });
+
+  // ── DINNER SIDE DISH (Mon/Wed/Thu) ────────────────
+  if(isDinnerSideDay(_d)){
+    const side = getMyDinnerSide(agentId, _d);
+    const pair = PAIRS[agentId];
+    if(side && pair){
+      const partner = pair.partner === 'johnjr' ? 'John Jr.' : pair.partner.charAt(0).toUpperCase() + pair.partner.slice(1);
+      if(side === 'starch'){
+        missions.push({
+          id: 'dinner-side-starch',
+          text: `Make the starch side — with ${partner}`,
+          detail: `Potatoes, rice, pasta, or similar. Work with ${partner} to get it ready for dinner.`,
+          points: 10,
+          category: 'kitchen',
+          always: true
+        });
+      } else {
+        missions.push({
+          id: 'dinner-side-veggie',
+          text: `Make the vegetable — with ${partner}`,
+          detail: `Heat the vegetable on the stove or microwave with ${partner} for dinner tonight.`,
+          points: 5,
+          category: 'kitchen',
+          always: true
+        });
+      }
+    }
+  }
+
+  // Filter by day type
+  return missions.filter(m => {
+    if(m.always) return true;
+    if(m.weekday && !weekend) return true;
+    if(m.weekly && !weekend) return true;
+    if(m.wednesday && wed) return true;
+    return false;
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// POINTS SYSTEM — 100 points = $1.00 = 6 minutes per day
+// ══════════════════════════════════════════════════════
+
+// Calculate a boy's score for a given day: returns {earned, possible, pct, dollars, minutes}
+function calculateDayScore(agentId, missions, doneMap){
+  const possible = missions.reduce((sum,m) => sum + (m.points||0), 0);
+  const earned = missions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
+  const pct = possible > 0 ? (earned / possible) : 0;
+  return {
+    earned,
+    possible,
+    pct,
+    points100: Math.round(pct * 100),
+    dollars: Math.round(pct * 100) / 100, // $1.00 max
+    minutes: pct * 6 // 6 min max
+  };
+}
+
+// Apply transfer adjustments to a base score
+// transferAdjust is in points-out-of-100 (e.g. +50 or -50)
+function applyTransferAdjustment(score100, transferAdjust){
+  let adjusted = score100 + (transferAdjust||0);
+  adjusted = Math.max(0, Math.min(100, adjusted));
+  return {
+    points100: adjusted,
+    dollars: adjusted / 100,
+    minutes: (adjusted / 100) * 6
+  };
+}
+
+// Apply Dawn's behavior deductions
+// deductions is array of -25 point entries
+function applyBehaviorDeductions(score100, deductionPoints){
+  let adjusted = score100 - (deductionPoints||0);
+  adjusted = Math.max(0, Math.min(100, adjusted));
+  return {
+    points100: adjusted,
+    dollars: adjusted / 100,
+    minutes: (adjusted / 100) * 6
+  };
+}
+
+// Get the dish mission IDs for a given pair (used in transfer detection)
+const DISH_MISSION_IDS = ['dishwasher-load','dishwasher-unload','table-clear','table-wipe'];
+
+// Check if the OTHER team's dish missions from yesterday are still incomplete,
+// and if THIS agent's team completed them today on top of their own.
+// Returns true if a transfer should be recorded.
+function detectDishTransfer(myDoneToday, partnerDoneToday, myExpectedToday){
+  // Were dish missions part of today's expected list? (i.e. is my team on dishes today?)
+  const onDishesToday = myExpectedToday.some(m => DISH_MISSION_IDS.includes(m.id));
+  if(!onDishesToday) return false;
+
+  // Did both me and my partner complete ALL of today's dish missions?
+  const dishMissionsToday = myExpectedToday.filter(m => DISH_MISSION_IDS.includes(m.id));
+  const allDishesDone = dishMissionsToday.every(m => myDoneToday[m.id]);
+  return allDishesDone;
+}
+
+// ══════════════════════════════════════════════════════
+// SCORE RECALCULATION — writes 0-100 to stewart/scores
+// ══════════════════════════════════════════════════════
+
+// Recalculate and store a boy's score for a given date.
+// Base score from mission completion, then apply transfer adjustment
+// and behavior deductions stored separately.
+function recalculateScore(agentId, dateStr){
+  if(!_db) return;
+
+  Promise.all([
+    _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value'),
+    _db.ref(`stewart/transferAdjust/${agentId}/${dateStr}`).once('value'),
+    _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value')
+  ]).then(([mSnap, tSnap, dSnap]) => {
+    const done = mSnap.val() || {};
+    const transferAdjust = tSnap.val() || 0; // e.g. +50 or -50
+    const deductions = dSnap.val() || {}; // {reasonKey: points, ...}
+
+    // Build expected missions for that date (use date-aware logic)
+    const dayDate = new Date(dateStr);
+    const dayOfWeek = dayDate.getDay();
+    if(dayOfWeek===0||dayOfWeek===6){
+      // Weekend — no score
+      _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null);
+      return;
+    }
+
+    const missions = buildMissionsForDate(agentId, dayDate);
+    const base = calculateDayScore(agentId, missions, done);
+
+    let score = base.points100;
+    score += transferAdjust;
+    const totalDeductions = Object.values(deductions).reduce((a,b)=>a+b,0);
+    score -= totalDeductions;
+    score = Math.max(0, Math.min(100, score));
+
+    _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(score);
+  });
+}
+
+// Build the expected mission list for ANY date (not just today)
+// Mirrors buildMissions but accepts an explicit date
+function buildMissionsForDate(agentId, dayDate){
+  const dayOfWeek = dayDate.getDay();
+  const startOfYear = new Date(dayDate.getFullYear(), 0, 1);
+  const weekNum = Math.floor((dayDate - startOfYear) / (7*24*60*60*1000));
+  const weekParity = weekNum % 2;
+  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
+  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
+  const dishTeam = weekParity===0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
+  const onDishes = (agentId==='samuel'||agentId==='johnjr') ? dishTeam==='sj' : dishTeam==='sd';
+  const onSetup = !onDishes;
+  const wed = dayOfWeek===3;
+  const onLaundry = isLaundryDayFor(agentId, dayOfWeek);
+  const bathroomOrder = ['samuel','johnjr','stephen','daniel'];
+  const isBathroomWeek = (agentId === bathroomOrder[weekNum % 4]);
+
+  const missions = [];
+  missions.push({id:'bed', points:5});
+  missions.push({id:'bedroom', points:5});
+  missions.push({id:'rabbit-own', points:5});
+
+  if(onDishes){
+    if(agentId==='samuel'||agentId==='johnjr'){
+      missions.push({id:'dishwasher-load', points:10});
+      missions.push({id:'dishwasher-unload', points:10});
+    }
+    if(agentId==='stephen') missions.push({id:'dishwasher-unload', points:10});
+    if(agentId==='daniel') missions.push({id:'dishwasher-load', points:10});
+    missions.push({id:'table-clear', points:5});
+    missions.push({id:'table-wipe', points:5});
+  }
+  if(onSetup){
+    missions.push({id:'table-set', points:5});
+    if(agentId==='samuel'||agentId==='johnjr') missions.push({id:'drinks', points:5});
+    if(agentId!=='daniel' && !onLaundry){
+      missions.push({id:'stovetop', points:5});
+      missions.push({id:'microwave', points:5});
+    }
+  }
+
+  if(agentId==='samuel') missions.push({id:'floor-laundry', points:5});
+  if(agentId==='johnjr') missions.push({id:'floor-living', points:5});
+  if(agentId==='stephen'){
+    missions.push({id:'kitchen-counter', points:10});
+    missions.push({id:'floor-kitchen', points:5});
+  }
+  if(agentId==='daniel'){
+    missions.push({id:'floor-hallway', points:5});
+    missions.push({id:'floor-rabbit', points:5});
+  }
+
+  if(onLaundry){
+    if(agentId==='samuel') missions.push({id:'laundry-sam', points:15});
+    if(agentId==='johnjr') missions.push({id:'laundry-john', points:15});
+    if(agentId==='stephen') missions.push({id:'laundry-stephen', points:15});
+    if(agentId==='daniel') missions.push({id:'laundry-daniel', points:10});
+  }
+
+  if(wed && (agentId==='samuel'||agentId==='johnjr')) missions.push({id:'trash', points:10});
+  if(wed && agentId==='daniel') missions.push({id:'bathroom-trash', points:10});
+
+  if(agentId==='samuel'||agentId==='johnjr'||agentId==='stephen') missions.push({id:'fridge', points:10});
+  if(agentId==='stephen') missions.push({id:'hutch', points:10});
+  if(isBathroomWeek) missions.push({id:'bathroom-clean', points:15});
+
+  missions.push({id:'rabbit-cage', points:15});
+
+  // Dinner sides — Mon/Wed/Thu
+  if(DINNER_SIDE_DAYS.includes(dayOfWeek)){
+    const assignment = getDinnerSideAssignment(dayDate);
+    const pair = PAIRS[agentId];
+    if(assignment && pair){
+      const side = assignment[pair.pairId];
+      if(side === 'starch') missions.push({id:'dinner-side-starch', points:10});
+      else missions.push({id:'dinner-side-veggie', points:5});
+    }
+  }
+
+  return missions;
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER MISSIONS
+// ══════════════════════════════════════════════════════
+function renderMissions(){
+  if(!currentAgent) return;
+  const el = document.getElementById('missions-list');
+  const missions = buildMissions(currentAgent.id);
+
+  // Render immediately with no completion data so missions show right away
+  renderMissionsList(el, missions, {}, null);
+
+  // Then load completion state from Firebase and re-render with checkmarks
+  const today = localDateStr();
+  const refPath = `stewart/missions/${currentAgent.id}/${today}`;
+
+  if(_db){
+    _db.ref(refPath).once('value', snap => {
+      const done = snap.val() || {};
+      renderMissionsList(el, missions, done, refPath);
+    });
+  }
+}
+
+function renderMissionsList(el, missions, done, refPath){
+  if(!missions.length){
+    el.innerHTML = '<div class="empty">No missions today, Agent.<br>Enjoy your day off.</div>';
+    return;
+  }
+
+  const dishTeam = getDishTeam();
+  const agentId = currentAgent.id;
+  const onDishes = (agentId === 'samuel' || agentId === 'johnjr') ? dishTeam === 'sj' : dishTeam === 'sd';
+  const teamLabel = onDishes ? 'DISHES TEAM TODAY' : 'SETUP TEAM TODAY';
+  const teamColor = onDishes ? 'var(--teal2)' : 'var(--gold)';
+
+  // Category order
+  const catOrder = ['bedroom','kitchen','floors','animals','laundry','bathroom','trash'];
+  const catLabels = {
+    bedroom:'Bedroom',kitchen:'Kitchen',floors:'Floors',
+    animals:'Animals',laundry:'Laundry',bathroom:'Bathroom',trash:'Trash'
+  };
+
+  // Group by category
+  const grouped = {};
+  missions.forEach(m => {
+    if(!grouped[m.category]) grouped[m.category] = [];
+    grouped[m.category].push(m);
+  });
+
+  const totalPoints = missions.reduce((s,m) => s + (m.points||0), 0);
+  const donePoints = missions.filter(m => done[m.id]).reduce((s,m) => s + (m.points||0), 0);
+  const pct = totalPoints > 0 ? Math.round((donePoints/totalPoints)*100) : 0;
+
+  let html = `
+    <div style="margin-bottom:14px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:${teamColor};margin-bottom:6px;">
+        ${teamLabel} &mdash; ${getDayName().toUpperCase()}
+      </div>
+      <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;margin-bottom:4px;">
+        <div style="height:100%;width:${pct}%;background:var(--teal);border-radius:6px;transition:width .5s;"></div>
+      </div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);">${donePoints} / ${totalPoints} points &mdash; ${pct}% complete</div>
+    </div>`;
+
+  catOrder.forEach(cat => {
+    if(!grouped[cat]) return;
+    html += `<div style="font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);margin:10px 0 6px;">${catLabels[cat]||cat}</div>`;
+    grouped[cat].forEach(m => {
+      const isDone = !!done[m.id];
+      html += `<div class="mission-card" onclick="toggleMission('${m.id}','${refPath}')">
+        <div class="mission-check ${isDone?'done':''}">${isDone?'&#10003;':''}</div>
+        <div style="flex:1;">
+          <div class="mission-text ${isDone?'done':''}">${m.text}${m.urgent?'<span style="color:var(--gold);margin-left:6px;font-size:10px;">&#9888; TODAY</span>':''}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;line-height:1.4;">${m.detail}</div>
+        </div>
+        <div class="mission-points">${m.points}pts</div>
+      </div>`;
+    });
+  });
+
+  el.innerHTML = html;
+}
+
+function toggleMission(missionId, refPath){
+  if(!_db || !refPath) return;
+  const ref = _db.ref(`${refPath}/${missionId}`);
+  ref.once('value', snap => {
+    const isDone = snap.val();
+    const newVal = isDone ? null : true;
+    ref.set(newVal).then(() => {
+      const today = localDateStr();
+      if(newVal) checkDishTransfer(missionId, today);
+      recalculateScore(currentAgent.id, today);
+      if(newVal){
+        // Check immediately for unlock celebrations
+        setTimeout(() => checkCelebrations(), 600);
+      }
+      renderMissions();
+      renderStatusSummary();
+  renderSelfAssessment();
+  renderTonightActivity();
+  renderSuperFamilyNight();
+  renderFamilyDevotionalDisplay();
+  setTimeout(() => runHansEngine(), 500);
+    });
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// PAY & REWARD SYSTEM
+// ══════════════════════════════════════════════════════
+
+const AGENTS = ['samuel','johnjr','stephen','daniel'];
+const AGENT_NAMES = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
+const DISH_MISSIONS = ['dishwasher-load','dishwasher-unload','table-clear','table-wipe'];
+const WEEKLY_MISSIONS = ['laundry-sam','laundry-john','laundry-stephen','laundry-daniel',
+  'hutch','fridge','bathroom-clean','rabbit-cage','bathroom-trash'];
+
+// Determine which agent is on bathroom duty this week (rotates weekly)
+function getBathroomAgent(_d){
+  const order = ['samuel','johnjr','stephen','daniel'];
+  const now = _d ? new Date(_d) : new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
+  return order[weekNum % 4];
+}
+
+// Get Monday of current week as YYYY-MM-DD
+function getWeekStart(){
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return localDateStr(monday);
+}
+
+// Get all weekdays Mon-Fri for current week
+function getWeekDays(){
+  const monday = new Date(getWeekStart());
+  const days = [];
+  for(let i=0;i<5;i++){
+    const d = new Date(monday);
+    d.setDate(monday.getDate()+i);
+    days.push(localDateStr(d));
+  }
+  return days;
+}
+
+function isFriday(){ return new Date().getDay() === 5; }
+
+// Check if a boy completed all his DAILY missions for a given date
+// Returns: 'earned' | 'missed' | 'pending' | 'transferred'
+function getDayStatus(agentId, dateStr, missionData, transferData){
+  const today = localDateStr();
+  if(dateStr > today) return 'pending';
+
+  const done = (missionData[agentId] && missionData[agentId][dateStr]) || {};
+  const transfers = (transferData && transferData[dateStr]) || {};
+
+  // Build expected daily missions for that day (use a proxy date)
+  const dayDate = new Date(dateStr);
+  const dayOfWeek = dayDate.getDay();
+  const isWknd = dayOfWeek === 0 || dayOfWeek === 6;
+  if(isWknd) return 'weekend';
+
+  // Get missions for this agent on that day
+  // We need to know dish team for that specific date
+  const startOfYear = new Date(dayDate.getFullYear(), 0, 1);
+  const weekNum = Math.floor((dayDate - startOfYear) / (7*24*60*60*1000));
+  const weekParity = weekNum % 2;
+  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
+  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
+  const dishTeam = weekParity===0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
+  const onDishes = (agentId==='samuel'||agentId==='johnjr') ? dishTeam==='sj' : dishTeam==='sd';
+
+  // Core daily missions every boy must do
+  const required = ['bed','bedroom','rabbit-own'];
+  const onLaundryDay = isLaundryDayFor(agentId, dayOfWeek);
+
+  // Dishes team
+  if(onDishes){
+    required.push('dishwasher-load','dishwasher-unload','table-clear','table-wipe');
+  } else {
+    required.push('table-set');
+    if(agentId==='samuel'||agentId==='johnjr') required.push('drinks');
+    if(agentId!=='daniel' && !onLaundryDay) required.push('stovetop','microwave');
+  }
+
+  // Agent specific floors
+  if(agentId==='samuel') required.push('floor-laundry');
+  if(agentId==='johnjr') required.push('floor-living');
+  if(agentId==='stephen') required.push('kitchen-counter','floor-kitchen');
+  if(agentId==='daniel') required.push('floor-hallway','floor-rabbit','table-set');
+
+  // Laundry day — replaces appliance wipe, becomes its own required mission
+  if(onLaundryDay){
+    if(agentId==='samuel') required.push('laundry-sam');
+    if(agentId==='johnjr') required.push('laundry-john');
+    if(agentId==='stephen') required.push('laundry-stephen');
+    if(agentId==='daniel') required.push('laundry-daniel');
+  }
+
+  // Check if all required daily missions completed
+  const allDone = required.every(m => done[m]);
+
+  // Check transfer — did this agent receive transferred dish credit?
+  const receivedTransfer = transfers.to === agentId;
+  const lostToTransfer = transfers.from === agentId;
+
+  if(lostToTransfer) return 'transferred-out'; // lost their dollar
+  if(allDone || receivedTransfer) return 'earned';
+  return 'missed';
+}
+
+// ── RENDER PAY SCREEN ─────────────────────────────────
+function renderPayScreen(){
+  if(!currentAgent) return;
+  const el = document.getElementById('pay-content');
+  if(!el) return;
+
+  el.innerHTML = '<div class="empty" style="color:var(--teal2);">Loading pay data...</div>';
+
+  if(!_db){ el.innerHTML = '<div class="empty">Connect to WiFi to view pay data.</div>'; return; }
+
+  const weekDays = getWeekDays();
+  const weekStart = getWeekStart();
+
+  // Ensure today's score is up to date, then load the week's scores
+  const today = localDateStr();
+  recalculateScore(currentAgent.id, today);
+
+  Promise.all([
+    _db.ref(`stewart/scores/${currentAgent.id}`).once('value'),
+    _db.ref(`stewart/transfers`).once('value'),
+    _db.ref(`stewart/weekly/${currentAgent.id}/${weekStart}`).once('value'),
+    _db.ref(`stewart/deductions/${currentAgent.id}`).once('value')
+  ]).then(([sSnap, tSnap, wSnap, dSnap]) => {
+    const scores = sSnap.val() || {};
+    const transferData = tSnap.val() || {};
+    const weeklyDone = wSnap.val() || {};
+    const allDeductions = dSnap.val() || {};
+
+    let totalDollars = 0;
+    const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+    const todayStr = localDateStr();
+
+    let daysHtml = '<div style="display:flex;gap:8px;margin-bottom:16px;">';
+    weekDays.forEach((dateStr, i) => {
+      const score = scores[dateStr]; // 0-100 or null/undefined
+      let bg, icon, label, dollars, displayVal;
+
+      if(dateStr > todayStr){
+        bg='rgba(255,255,255,.04)';icon='&mdash;';label='color:rgba(255,255,255,.2)';dollars=0;displayVal='&mdash;';
+      } else if(score===null||score===undefined){
+        bg='rgba(255,255,255,.05)';icon='&#9675;';label='color:rgba(255,255,255,.3)';dollars=0;displayVal='$0.00';
+      } else {
+        dollars = score/100;
+        if(score>=80){ bg='rgba(45,106,71,.2)';icon='&#10003;';label='color:#4aaa6a'; }
+        else if(score>=50){ bg='rgba(232,184,74,.15)';icon='&#9679;';label='color:var(--gold)'; }
+        else { bg='rgba(139,48,16,.2)';icon='&#10007;';label='color:#cc5533'; }
+        displayVal = '$'+dollars.toFixed(2);
+      }
+      totalDollars += (dollars||0);
+      daysHtml += `<div style="flex:1;background:${bg};border-radius:8px;padding:10px 6px;text-align:center;">
+        <div style="font-size:18px;${label}">${icon}</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:4px;">${dayLabels[i]}</div>
+        <div style="font-size:10px;${label};margin-top:2px;">${displayVal}</div>
+      </div>`;
+    });
+    daysHtml += '</div>';
+
+    // Weekly chores completion
+    const bathroomAgent = getBathroomAgent();
+    const weeklyMissionsForAgent = WEEKLY_MISSIONS.filter(m => {
+      if(m==='laundry-sam') return currentAgent.id==='samuel';
+      if(m==='laundry-john') return currentAgent.id==='johnjr';
+      if(m==='laundry-stephen') return currentAgent.id==='stephen';
+      if(m==='laundry-daniel') return currentAgent.id==='daniel';
+      if(m==='hutch') return currentAgent.id==='stephen';
+      if(m==='bathroom-trash') return currentAgent.id==='daniel';
+      if(m==='bathroom-clean') return currentAgent.id===bathroomAgent;
+      return true; // rabbit-cage, fridge — all agents
+    });
+    const weeklyTotal = weeklyMissionsForAgent.length;
+    const weeklyComplete = weeklyMissionsForAgent.filter(m => weeklyDone[m]).length;
+    const weeklyPct = weeklyTotal > 0 ? Math.round((weeklyComplete/weeklyTotal)*100) : 0;
+
+    // Check family night — need Firebase data for all boys
+    _db.ref('stewart/familynight').once('value', fnSnap => {
+      const fnData = fnSnap.val() || {};
+      const familyNightUnlocked = fnData[weekStart] === true;
+
+      // Transfer notes for this week
+      let transferNote = '';
+      const weekTransfers = Object.entries(transferData)
+        .filter(([date]) => weekDays.includes(date))
+        .filter(([_, t]) => {
+          const toList = (t.to||'').split(',');
+          const fromList = (t.from||'').split(',');
+          return toList.includes(currentAgent.id) || fromList.includes(currentAgent.id);
+        });
+
+      if(weekTransfers.length){
+        transferNote = '<div style="margin-bottom:12px;">';
+        weekTransfers.forEach(([date, t]) => {
+          const d = new Date(date);
+          const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+          const toList = (t.to||'').split(',');
+          const fromList = (t.from||'').split(',');
+          if(toList.includes(currentAgent.id)){
+            const fromNames = fromList.map(a=>AGENT_NAMES[a]).join(' & ');
+            transferNote += `<div style="font-size:11px;color:#4aaa6a;background:rgba(45,106,71,.1);border-radius:6px;padding:5px 9px;margin-bottom:4px;">+$0.50 ${dayName} &mdash; Covered ${fromNames}'s dishes from the day before</div>`;
+          } else if(fromList.includes(currentAgent.id)){
+            const toNames = toList.map(a=>AGENT_NAMES[a]).join(' & ');
+            transferNote += `<div style="font-size:11px;color:#cc5533;background:rgba(139,48,16,.1);border-radius:6px;padding:5px 9px;margin-bottom:4px;">-$0.50 ${dayName} &mdash; Dishes left for ${toNames} to finish</div>`;
+          }
+        });
+        transferNote += '</div>';
+      }
+
+      // Behavior deduction notes for the week
+      let deductionNote = '';
+      const weekDeductions = weekDays
+        .filter(d => allDeductions[d])
+        .map(d => ({ date: d, items: allDeductions[d] }));
+
+      if(weekDeductions.length){
+        deductionNote = '<div style="margin-bottom:12px;">';
+        weekDeductions.forEach(({date, items}) => {
+          const d = new Date(date);
+          const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+          Object.entries(items).forEach(([reasonKey, pts]) => {
+            const label = BEHAVIOR_LABELS[reasonKey] || reasonKey;
+            const dollarAmt = (pts/100).toFixed(2);
+            deductionNote += `<div style="font-size:11px;color:#cc5533;background:rgba(139,48,16,.1);border-radius:6px;padding:5px 9px;margin-bottom:4px;">-$${dollarAmt} ${dayName} &mdash; ${label}</div>`;
+          });
+        });
+        deductionNote += '</div>';
+      }
+
+      const familyNightHtml = familyNightUnlocked
+        ? `<div style="background:linear-gradient(135deg,var(--teal),var(--indigo));border-radius:12px;padding:16px;text-align:center;margin-bottom:14px;border:2px solid var(--gold);">
+            <div style="font-size:28px;margin-bottom:6px;">&#127881;</div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;">FAMILY NIGHT UNLOCKED</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.8);">All four agents completed their weekly missions.<br>Time to choose your family activity!</div>
+           </div>`
+        : `<div class="hw-card" style="margin-bottom:14px;">
+            <div class="hw-card-head"><div class="hw-card-icon">&#127881;</div><div class="hw-card-title">Family Night</div></div>
+            <div class="hw-card-body">
+              <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px;">Complete all weekly missions by Sunday to unlock Family Night.</div>
+              <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;margin-bottom:4px;">
+                <div style="height:100%;width:${weeklyPct}%;background:var(--gold);border-radius:6px;transition:width .5s;"></div>
+              </div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35);">${weeklyComplete} / ${weeklyTotal} weekly missions &mdash; ${weeklyPct}%</div>
+            </div>
+           </div>`;
+
+      el.innerHTML = `
+        <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;color:var(--teal2);margin-bottom:10px;">
+          WEEK OF ${weekStart} &mdash; MAX $5.00
+        </div>
+        ${daysHtml}
+        <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px;text-align:center;margin-bottom:14px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;color:${totalDollars>=4?'#4aaa6a':totalDollars>=2?'var(--gold)':'#cc5533'};">
+            $${totalDollars.toFixed(2)}
+          </div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;">earned so far this week</div>
+          ${isFriday()?'<div style="font-size:11px;color:var(--gold);margin-top:6px;font-style:italic;">&#9733; Payday! Collect your $'+totalDollars.toFixed(2)+' from Dad.</div>':''}
+        </div>
+        ${transferNote}
+        ${deductionNote}
+        ${familyNightHtml}`;
+    });
+  });
+}
+
+// ── CHECK AND TRIGGER FAMILY NIGHT ───────────────────
+function checkFamilyNight(){
+  if(!_db) return;
+  const weekStart = getWeekStart();
+  const bathroomAgent = getBathroomAgent();
+
+  // Check all four boys' weekly mission completion
+  Promise.all(AGENTS.map(agentId =>
+    _db.ref(`stewart/weekly/${agentId}/${weekStart}`).once('value')
+  )).then(snaps => {
+    const allComplete = snaps.every((snap, i) => {
+      const done = snap.val() || {};
+      const agentId = AGENTS[i];
+      const required = ['rabbit-cage'];
+      // Only the agent whose turn it is needs bathroom-clean
+      if(agentId === bathroomAgent) required.push('bathroom-clean');
+      if(agentId==='samuel') required.push('laundry-sam','fridge');
+      if(agentId==='johnjr') required.push('laundry-john','fridge');
+      if(agentId==='stephen') required.push('laundry-stephen','hutch','fridge');
+      if(agentId==='daniel') required.push('laundry-daniel','bathroom-trash');
+      return required.every(m => done[m]);
+    });
+
+    // Completion can happen any day, but only mark/display starting Friday
+    const dow = new Date().getDay(); // 0=Sun...5=Fri,6=Sat
+    const isFridayOrLater = dow === 5 || dow === 6 || dow === 0; // Fri, Sat, or Sun (week wrap)
+
+    if(allComplete && isFridayOrLater){
+      _db.ref(`stewart/familynight/${weekStart}`).set(true);
+    } else if(!allComplete){
+      // Clear it if conditions are no longer met (e.g. new week)
+      _db.ref(`stewart/familynight/${weekStart}`).remove();
+    }
+  });
+}
+
+// ── WEEKLY MISSION TOGGLE ────────────────────────────
+function toggleWeeklyMission(missionId){
+  if(!_db || !currentAgent) return;
+  const weekStart = getWeekStart();
+  const ref = _db.ref(`stewart/weekly/${currentAgent.id}/${weekStart}/${missionId}`);
+  ref.once('value', snap => {
+    ref.set(snap.val() ? null : true).then(() => {
+      checkFamilyNight();
+      renderPayScreen();
+    });
+  });
+}
+
+// ── DISH TRANSFER DETECTION ──────────────────────────
+// Called when a boy checks off a dish mission that wasn't theirs
+function checkDishTransfer(missionId, dateStr){
+  if(!DISH_MISSIONS.includes(missionId)) return;
+  if(!_db || !currentAgent) return;
+
+  const agentId = currentAgent.id;
+  const agentIsSJ = (agentId === 'samuel' || agentId === 'johnjr');
+
+  // Determine which team is scheduled for dishes TODAY
+  const today = new Date(dateStr);
+  const todayDow = today.getDay();
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const weekNum = Math.floor((today - startOfYear) / (7*24*60*60*1000));
+  const weekParity = weekNum % 2;
+  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
+  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
+  const todayDishTeam = weekParity===0 ? weekAPattern[todayDow] : weekBPattern[todayDow];
+  const scheduledSJToday = todayDishTeam === 'sj';
+
+  // Is THIS agent on the scheduled team today?
+  const onScheduledTeamToday = (agentIsSJ && scheduledSJToday) || (!agentIsSJ && !scheduledSJToday);
+
+  // If I'm NOT on the scheduled team today, but I just completed a dish mission,
+  // check if YESTERDAY's dish missions (my OWN team's responsibility) are still undone —
+  // that means I'm covering for my own team's prior-day failure. Not a transfer.
+  //
+  // A TRANSFER happens when: I complete dish missions today that belong to TODAY'S
+  // schedule (the other team's job), meaning the other team didn't show up at all today
+  // AND yesterday they also left things undone — simplified model: if I am NOT on the
+  // scheduled team today but dish missions are appearing in MY list and I complete them,
+  // it means yesterday's scheduled team (opposite of today's, which is MY team) left
+  // dishes undone and they rolled into today as still-incomplete, now done by the
+  // OTHER team (me).
+
+  if(!onScheduledTeamToday){
+    // I completed a dish mission that wasn't "mine" by today's schedule —
+    // this means yesterday's team (my own team) left it undone, and I'm
+    // covering it a day late. Determine yesterday's date and that team's members.
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate()-1);
+    const yDateStr = localDateStr(yesterday);
+    const yDow = yesterday.getDay();
+
+    // Skip if yesterday was a weekend (no missions to fail)
+    if(yDow===0||yDow===6) return;
+
+    const yWeekNum = Math.floor((yesterday - new Date(yesterday.getFullYear(),0,1)) / (7*24*60*60*1000));
+    const yWeekParity = yWeekNum % 2;
+    const yDishTeam = yWeekParity===0 ? weekAPattern[yDow] : weekBPattern[yDow];
+    const yScheduledSJ = yDishTeam === 'sj';
+
+    // The team that SHOULD have done dishes yesterday
+    const yTeamAgents = yScheduledSJ ? ['samuel','johnjr'] : ['stephen','daniel'];
+    // The team covering today (me + my partner)
+    const myPair = PAIRS[agentId];
+    const coveringAgents = myPair ? [agentId, myPair.partner] : [agentId];
+
+    // Only proceed if I'm covering for the OTHER team (not my own missed day)
+    const overlap = yTeamAgents.some(a => coveringAgents.includes(a));
+    if(overlap) return; // I'm just doing my own late work, not a transfer
+
+    // Check if a transfer was already recorded for yesterday
+    _db.ref(`stewart/transfers/${yDateStr}`).once('value', snap => {
+      if(snap.val()) return; // already recorded
+
+      // Record the transfer
+      _db.ref(`stewart/transfers/${yDateStr}`).set({
+        from: yTeamAgents.join(','),
+        to: coveringAgents.join(','),
+        mission: missionId,
+        timestamp: Date.now()
+      });
+
+      // Apply flat 50-point swing
+      coveringAgents.forEach(a => {
+        _db.ref(`stewart/transferAdjust/${a}/${dateStr}`).set(50).then(() => recalculateScore(a, dateStr));
+      });
+      yTeamAgents.forEach(a => {
+        _db.ref(`stewart/transferAdjust/${a}/${yDateStr}`).set(-50).then(() => recalculateScore(a, yDateStr));
+      });
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PRIVATE MESSAGING — BOYS SIDE
+// ══════════════════════════════════════════════════════
+let privateThreadListener = null;
+
+function openPrivateThread(){
+  if(!currentAgent) return;
+  document.getElementById('msg-board-view').style.display = 'none';
+  const threadView = document.getElementById('msg-thread-view');
+  threadView.style.display = 'flex';
+  threadView.style.flexDirection = 'column';
+  document.getElementById('thread-agent-name').textContent = currentAgent.codename + ' — Private Thread';
+
+  // Listen for messages
+  if(_db){
+    if(privateThreadListener) _db.ref(`stewart/messages/${currentAgent.id}`).off('value', privateThreadListener);
+    privateThreadListener = _db.ref(`stewart/messages/${currentAgent.id}`).on('value', snap => {
+      renderPrivateMessages(snap.val()||{});
+    });
+  }
+
+  // Focus input
+  setTimeout(() => document.getElementById('private-input').focus(), 300);
+}
+
+function closePrivateThread(){
+  document.getElementById('msg-thread-view').style.display = 'none';
+  document.getElementById('msg-board-view').style.display = 'block';
+  if(_db && privateThreadListener){
+    _db.ref(`stewart/messages/${currentAgent.id}`).off('value', privateThreadListener);
+    privateThreadListener = null;
+  }
+  loadPrivatePreview();
+}
+
+function renderPrivateMessages(msgs){
+  const el = document.getElementById('private-messages');
+  const items = Object.values(msgs).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  if(!items.length){
+    el.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.3);">No messages yet.<br>Send HQ a message anytime.</div>';
+    return;
+  }
+  const AGENT_ICONS = {samuel:'&#129413;',johnjr:'&#129409;',stephen:'&#129430;',daniel:'&#128024;'};
+  const HANS_ICON = '&#129441;'; // mad scientist emoji as Hans stand-in
+  el.innerHTML = items.map(m => {
+    const isHeinz = m.isHeinz || m.agentId==='heinz';
+    const isHans = m.isHans || m.agentId==='hans';
+    const isParent = isHans || isHeinz || m.from==='Dad'||m.from==='Mom'||m.from==='HQ';
+    let icon;
+    if(isHeinz) icon = '\u{1F9D1}\u200D\u{1F52C}\u26A1';
+    else if(isHans) icon = '\u{1F9D1}\u200D\u{1F52C}';
+    else if(isParent) icon = HANS_ICON;
+    else icon = (AGENT_ICONS[m.agentId] || '&#128100;');
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    let bubbleBg;
+    if(isHeinz) bubbleBg = 'background:rgba(120,40,140,.22);border:1px solid rgba(160,60,180,.5);border-bottom-left-radius:4px;';
+    else if(isHans) bubbleBg = 'background:rgba(200,146,42,.16);border:1px solid rgba(200,146,42,.35);border-bottom-left-radius:4px;';
+    else if(isParent) bubbleBg = 'background:rgba(12,200,200,.15);border-bottom-left-radius:4px;';
+    else bubbleBg = 'background:var(--teal);color:var(--black);border-bottom-right-radius:4px;';
+    const nameColor = isHeinz ? 'color:#c77dff;' : (isHans ? 'color:var(--gold);' : '');
+    return `<div style="display:flex;flex-direction:column;align-items:${isParent?'flex-start':'flex-end'};">
+      <div style="display:flex;align-items:flex-end;gap:6px;${isParent?'':'flex-direction:row-reverse;'}">
+        <div style="font-size:18px;flex-shrink:0;">${icon}</div>
+        <div style="max-width:75%;padding:9px 12px;border-radius:12px;${bubbleBg}line-height:1.4;font-size:13px;">
+          <div style="font-size:9px;opacity:.7;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;${nameColor}">${m.from||'Unknown'}</div>
+          ${linkify(m.text||'')}
+          <div style="font-size:9px;opacity:.5;margin-top:4px;text-align:${isParent?'left':'right'};">${time}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendPrivateMessage(){
+  if(!currentAgent||!_db) return;
+  const input = document.getElementById('private-input');
+  const text = input.value.trim();
+  if(!text) return;
+  _db.ref(`stewart/messages/${currentAgent.id}`).push({
+    text,
+    from: currentAgent.name,
+    agentId: currentAgent.id,
+    timestamp: Date.now()
+  }).then(() => { input.value = ''; });
+}
+
+// ══════════════════════════════════════════════════════
+// GROUP CHAT — all agents + HQ, everyone sees it
+// ══════════════════════════════════════════════════════
+let groupThreadListener = null;
+
+function openGroupThread(){
+  if(!currentAgent) return;
+  document.getElementById('msg-board-view').style.display = 'none';
+  const v = document.getElementById('group-thread-view');
+  v.style.display = 'flex';
+  v.style.flexDirection = 'column';
+  checkChatMute();
+  if(_db){
+    if(groupThreadListener) _db.ref('stewart/groupchat').off('value', groupThreadListener);
+    groupThreadListener = _db.ref('stewart/groupchat').on('value', snap => {
+      const msgs = snap.val()||{};
+      renderGroupMessages(msgs);
+      // Mark all as seen (we're looking at them)
+      const items = Object.values(msgs);
+      const latest = items.reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
+      try{ localStorage.setItem('sk-group-seen', String(latest)); }catch(e){}
+      updateGroupBadge();
+    });
+  }
+  setTimeout(() => document.getElementById('group-input').focus(), 300);
+}
+
+function closeGroupThread(){
+  document.getElementById('group-thread-view').style.display = 'none';
+  document.getElementById('msg-board-view').style.display = 'block';
+  if(_db && groupThreadListener){
+    _db.ref('stewart/groupchat').off('value', groupThreadListener);
+    groupThreadListener = null;
+  }
+}
+
+function renderGroupMessages(msgs){
+  const el = document.getElementById('group-messages');
+  if(!el) return;
+  const items = Object.values(msgs).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  if(!items.length){
+    el.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.3);">No messages yet.<br>Say hi to the group!</div>';
+    return;
+  }
+  const AGENT_ICONS = {samuel:'\u{1F985}',johnjr:'\u{1F981}',stephen:'\u{1F996}',daniel:'\u{1F418}'};
+  const HANS_ICON = '\u{1F9D1}';
+  el.innerHTML = items.map(m => {
+    const isMe = m.agentId === currentAgent.id;
+    const isParent = m.from==='Dad'||m.from==='Mom'||m.from==='HQ';
+    const icon = isParent ? HANS_ICON : (AGENT_ICONS[m.agentId] || '\u{1F464}');
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    const bubble = isMe
+      ? 'background:var(--teal);color:var(--black);border-bottom-right-radius:4px;'
+      : (isParent ? 'background:rgba(200,146,42,.18);border-bottom-left-radius:4px;' : 'background:var(--dark2);border-bottom-left-radius:4px;');
+    return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};">
+      <div style="display:flex;align-items:flex-end;gap:6px;${isMe?'flex-direction:row-reverse;':''}">
+        <div style="font-size:18px;flex-shrink:0;">${icon}</div>
+        <div style="max-width:75%;padding:9px 12px;border-radius:12px;${bubble}line-height:1.4;font-size:13px;">
+          <div style="font-size:9px;opacity:.6;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;">${m.from||'Unknown'}</div>
+          ${linkify(m.text||'')}
+          <div style="font-size:9px;opacity:.5;margin-top:4px;text-align:${isMe?'right':'left'};">${time}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendGroupMessage(){
+  if(!currentAgent||!_db) return;
+  const input = document.getElementById('group-input');
+  const text = input.value.trim();
+  if(!text) return;
+  // Check if this agent is muted by a parent
+  _db.ref('stewart/chatmutes/'+currentAgent.id).once('value', mSnap => {
+    const mute = mSnap.val();
+    const mutedUntil = (mute===true) ? Infinity : (typeof mute==='number' ? mute : 0);
+    if(mutedUntil && Date.now() < mutedUntil){
+      const when = (mutedUntil===Infinity) ? 'until a parent lifts it' : ('until '+new Date(mutedUntil).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}));
+      alert('Your group chat is paused by Mom or Dad '+when+'. Take a breather, Agent.');
+      return;
+    }
+    _db.ref('stewart/groupchat').push({
+      text,
+      from: currentAgent.name,
+      agentId: currentAgent.id,
+      timestamp: Date.now()
+    }).then(() => { input.value = ''; });
+  });
+}
+
+function checkChatMute(){
+  if(!currentAgent||!_db) return;
+  _db.ref('stewart/chatmutes/'+currentAgent.id).on('value', mSnap => {
+    const mute = mSnap.val();
+    const mutedUntil = (mute===true) ? Infinity : (typeof mute==='number' ? mute : 0);
+    const active = mutedUntil && Date.now() < mutedUntil;
+    const input = document.getElementById('group-input');
+    const notice = document.getElementById('group-mute-notice');
+    if(input){
+      input.disabled = !!active;
+      input.placeholder = active ? 'Group chat paused by Mom or Dad…' : 'Message the group…';
+    }
+    if(notice){
+      if(active){
+        const when = (mutedUntil===Infinity) ? '' : (' until '+new Date(mutedUntil).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}));
+        notice.textContent = '⏸ Your group chat is paused'+when+'.';
+        notice.style.display = 'block';
+      } else {
+        notice.style.display = 'none';
+      }
+    }
+  });
+}
+
+function updateGroupBadge(){
+  if(!_db) return;
+  _db.ref('stewart/groupchat').limitToLast(1).once('value', snap => {
+    const val = snap.val();
+    const badge = document.getElementById('group-unread-badge');
+    if(!badge) return;
+    if(val){
+      const latest = Object.values(val).reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
+      let seen = 0;
+      try{ seen = parseInt(localStorage.getItem('sk-group-seen')||'0',10); }catch(e){}
+      const lastMsg = Object.values(val)[0];
+      // Show NEW only if the latest message is from someone else and unseen
+      if(latest > seen && lastMsg && lastMsg.agentId !== (currentAgent&&currentAgent.id)){
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// HANS DOOFENSHMIRTZ — automated encouragement engine
+// Posts tailored, funny status messages into each boy's private thread.
+// Triggers: on app open (when something changed), morning, evening, milestones.
+// ══════════════════════════════════════════════════════
+
+const HANS_FROM = 'Hans (HQ)';
+
+// Helper: pick a random line from an array
+function hansPick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// Big rotating pools of Hans lines. {NAME} and {LEFT}/{DONE}/{TOTAL} get filled in.
+const HANS_LINES = {
+  morning: [
+    "Good morning, Agent {NAME}! Today is a new day, full of possibility and also chores. Back in Gimmelshtump, we had to wake up BEFORE we went to sleep. Don't ask. Go get 'em!",
+    "Rise and shine, {NAME}! The early agent gets the... uh... the thing. The worm? Who wants a worm. The POINTS. The early agent gets the points!",
+    "Morning, {NAME}! I believe in you. My father never believed in me — he believed in a garden gnome named Kevin — but I believe in YOU. Make your bed first!",
+    "Ah, {NAME}, you're awake! Excellent. Today's evil scheme: complete all your missions. It's not even evil. It's just good. I'm bad at this. GO!",
+    "Top of the morning, Agent {NAME}! You have {LEFT} missions ahead of you. That's fewer than the number of times I was replaced by a balloon as a child. You've got this!"
+  ],
+  evening: [
+    "Evening report, Agent {NAME}! You knocked out {DONE} of {TOTAL} missions today. Curse you, remaining chores! ...I mean, great job on what you finished!",
+    "Well, {NAME}, the day is winding down. {DONE} of {TOTAL} done. When I was your age I finished ZERO missions and was grounded until I was forty. You're doing better than me!",
+    "Nighttime, Agent {NAME}. {DONE} of {TOTAL} missions complete. Do your rabbit before bed or it will haunt your dreams. Trust me, I know about haunting. Long story. Goodnight!",
+    "End of day, {NAME}! {DONE} of {TOTAL}. Tomorrow we rise again, like my self-esteem after therapy. Sleep well, Agent.",
+    "The sun sets, {NAME}, and so does the chore window. {DONE} of {TOTAL} today. Be proud! I once got a participation trophy and cried for a week. Happy tears!"
+  ],
+  notStarted: [
+    "Agent {NAME}! You have {TOTAL} missions and have done... zero. ZERO! That's how many friends I had in boarding school! Let's not relive my childhood. Get started!",
+    "{NAME}, the missions are just sitting there. Waiting. Like I waited for my parents to pick me up from school. They didn't. But your chores WILL be done! Begin!",
+    "Ahem. Agent {NAME}. Nothing checked off yet. The first step is the hardest — like the first step off the curb when you're afraid of curbs. I was. Go do ONE mission!"
+  ],
+  partway: [
+    "Look at you go, {NAME}! {DONE} of {TOTAL} done and {LEFT} to go. You're halfway up the mountain, and unlike my mountain-climbing uncle, you will make it!",
+    "Progress, Agent {NAME}! {DONE} down, {LEFT} left. You're cooking with gas! Not literally. Do not cook with gas. That's a different mission.",
+    "{NAME}, you've done {DONE}! Only {LEFT} more! This is going better than my plan to take over the Tri-State Area, and I had a BLUEPRINT.",
+    "Keep it up, {NAME}! {LEFT} missions remain. You're closer than I ever got to winning my father's approval, and that's beautiful."
+  ],
+  nearlyDone: [
+    "SO close, Agent {NAME}! Just {LEFT} mission(s) left! I can feel it! This is more excitement than I've had since they invented the self-destruct button!",
+    "{NAME}, you magnificent agent, only {LEFT} to go! Finish strong! Don't stop now, like I stopped going to the gym after one day!",
+    "Almost there, {NAME}! {LEFT} left! The finish line is RIGHT THERE. Closer than my evil schemes ever got. SO much closer. Go!"
+  ],
+  allDone: [
+    "AGENT {NAME}! ALL {TOTAL} MISSIONS COMPLETE! A perfect day! I'm so proud I could cry, and I WILL, because I cry easily. INCREDIBLE work!",
+    "{NAME}! You did EVERYTHING! Curse you for being so... so GOOD at this! This is the best news since my Roombas learned to love! Well done, Agent!",
+    "PERFECT DAY, {NAME}! Every single mission! When I do everything right, which is never, I imagine it feels exactly like this. You're a STAR!",
+    "{NAME}, you completed all {TOTAL} missions! Flawless! I'm putting this in my Big Book Of Things That Went Right. It's a very thin book. You're on page one!"
+  ],
+  streak: [
+    "Agent {NAME}, you're on a STREAK! Multiple perfect days in a row! Consistency! The one thing I could never master, besides everything else. Keep it BURNING!",
+    "{NAME}, the streak continues! You're more reliable than my back-up generator, which exploded. You will NOT explode. Probably. Amazing work!"
+  ],
+  dishes: [
+    "Heads up, {NAME} — it's your dish duty today! Embrace the suds! I once tried to take over the world with dish soap. Failed. But the kitchen was SPOTLESS.",
+    "{NAME}, dishes are calling your name today. Answer the call! Unlike my mother, who never returned my calls. The dishwasher won't ghost you. Go!"
+  ],
+  laundry: [
+    "Laundry day, Agent {NAME}! Sort, wash, fold, conquer! Fun fact: I'm afraid of fitted sheets. Nobody can fold those. But YOU can fold everything else!",
+    "{NAME}, the laundry awaits! Clean clothes are a gift. Back in Gimmelshtump I wore the same potato sack for nine years. You don't have to! Go wash!"
+  ],
+  behind: [
+    "Agent {NAME}, you're running a little behind on missions — but DON'T despair! I've been behind my whole life and look at me! ...okay, bad example. But you can catch up!",
+    "{NAME}, the day's getting on and there are still missions to do. No shame! I once procrastinated so long my evil scheme became irrelevant. Yours won't! There's still time!"
+  ]
+};
+
+// Decide which on-open status pool fits the current numbers
+function hansStatusContext(done, total){
+  if(total === 0) return null;
+  if(done === 0) return 'notStarted';
+  if(done >= total) return 'allDone';
+  const ratio = done / total;
+  if(ratio >= 0.7) return 'nearlyDone';
+  return 'partway';
+}
+
+// Post a Hans or Heinz message into the current agent's private thread (with auto-trim)
+function hansPost(text, persona){
+  if(!currentAgent || !_db) return;
+  const isHeinz = persona === 'heinz';
+  const ref = _db.ref(`stewart/messages/${currentAgent.id}`);
+  ref.push({
+    text,
+    from: isHeinz ? HEINZ_FROM : HANS_FROM,
+    agentId: isHeinz ? 'heinz' : 'hans',
+    isHans: !isHeinz,
+    isHeinz: isHeinz,
+    timestamp: Date.now()
+  }).then(() => hansTrimThread(currentAgent.id));
+}
+
+// Keep only the most recent 50 messages in a thread
+function hansTrimThread(agentId){
+  if(!_db) return;
+  const ref = _db.ref(`stewart/messages/${agentId}`);
+  ref.once('value', snap => {
+    const val = snap.val();
+    if(!val) return;
+    const keys = Object.keys(val);
+    if(keys.length <= 50) return;
+    // Sort by timestamp ascending, remove oldest beyond 50
+    keys.sort((a,b)=>(val[a].timestamp||0)-(val[b].timestamp||0));
+    const toRemove = keys.slice(0, keys.length - 50);
+    const updates = {};
+    toRemove.forEach(k => updates[k] = null);
+    ref.update(updates);
+  });
+}
+
+function hansFill(line, name, done, total){
+  const left = Math.max(0, total - done);
+  return line.replace(/\{NAME\}/g, name)
+             .replace(/\{LEFT\}/g, left)
+             .replace(/\{DONE\}/g, done)
+             .replace(/\{TOTAL\}/g, total);
+}
+
+
+// ══════════════════════════════════════════════════════
+// HEINZ DOOFENSHMIRTZ — the "evil path" persona
+// Same character as Hans, but theatrically villainous when a boy is
+// behind / not started / has behavior deductions. Always funny, always
+// nudging back toward good. When they improve, Hans takes back over.
+// ══════════════════════════════════════════════════════
+
+const HEINZ_FROM = 'Heinz (HQ)';
+
+const HEINZ_LINES = {
+  notStarted: [
+    "Agent {NAME}... NOTHING done yet? Excellent. EXCELLENT! Chaos! Disorder! This is my favorite kind of morning! ...but you're better than this. Prove me wrong. Do a mission. I DARE you.",
+    "Behold, {NAME}! A to-do list completely UNTOUCHED! It's beautiful, in an evil way. Curse you, productivity! ...okay fine, go ruin my evil mood by actually doing something.",
+    "Ah-HA, {NAME}! Zero missions complete! My evil plan of you-doing-nothing is working PERFECTLY! Unless... no. You wouldn't. You wouldn't actually go do them, would you? WOULD you?!"
+  ],
+  behind: [
+    "Agent {NAME}, you're falling behiiiind! And I LOVE it! This is the kind of slacking that built my entire career! ...which, admittedly, was a series of failures. Okay, catch up. For both our sakes.",
+    "Curse you, half-finished chore list! {DONE} of {TOTAL}, {NAME}? You're SO close to total chaos and SO close to actually succeeding. Pick a side! (Pick the good side.)",
+    "{NAME}! It's getting late and missions remain! My evil sensors are TINGLING! But here's the twist nobody saw coming... I believe you can still finish. Plot twist! Get going!"
+  ],
+  deductions: [
+    "Ohhh, {NAME}, I see a behavior deduction on the books today. Naughty! Villainous! I'm almost proud... NO. No, I'm not. Shake it off, Agent. Turn this day around. I know you can.",
+    "Agent {NAME}, points were lost to... shall we say... CHAOS today. As a professional chaos enthusiast, I respect it. As someone who actually cares about you — knock it off and finish strong!",
+    "A deduction, {NAME}?! In MY tri-state area?! Look, even I clean up my messes eventually. Usually. Sometimes. The point is: you can still make today a win!"
+  ],
+  eveningEvil: [
+    "Well, {NAME}, the day ends with {DONE} of {TOTAL} done. Not your best work, my friend. But here's a Doofenshmirtz secret: tomorrow is a brand new scheme. Rest up. We try again.",
+    "Agent {NAME}, today got away from us, didn't it? {DONE} of {TOTAL}. Listen — I've had THOUSANDS of bad days. The trick is showing up tomorrow anyway. I'll see you then. Don't give up."
+  ]
+};
+
+// Hans's special "bounce back" lines — shown on the FIRST login the day
+// AFTER a rough day (low score / lots undone / deductions yesterday).
+const HANS_BOUNCEBACK = [
+  "Good morning, Agent {NAME}! Yesterday was a tough one — but you know what? Every great agent has off days. I have off DECADES. Today is a fresh start. Let's make it a good one together!",
+  "{NAME}! New day, clean slate! Yesterday is in the past, like my many regrets. Today, we rise! I believe in you more than my father ever believed in me. Let's GO!",
+  "Hey {NAME}, about yesterday — forget it. Done. Over. Back in Gimmelshtump we had a saying: 'A new day, a new chance to not get replaced by a balloon.' Today's YOUR day. Try your best!",
+  "Agent {NAME}, yesterday didn't go how we wanted. But here's the thing about bouncing back — it's the BEST part of the story! Today, let's show 'em what you've got. I'm rooting for you!"
+];
+
+// Determine the path: 'evil' (summon Heinz) or 'good' (summon Hans)
+// Evil if: nothing done, OR behind pace in afternoon, OR there are deductions today.
+function hansHeinzPath(completed, total, deductionTotal, hour){
+  if(deductionTotal > 0) return 'evil';
+  if(total > 0 && completed === 0 && hour >= 9) return 'evil';
+  if(hour >= 14 && total > 0 && completed < total/2) return 'evil';
+  return 'good';
+}
+
+
+// Main: run the Hans/Heinz engine for the current agent
+function runHansEngine(){
+  if(!currentAgent || !_db) return;
+  const agentId = currentAgent.id;
+  const name = currentAgent.name;
+  const today = localDateStr();
+  const hour = new Date().getHours();
+
+  // Yesterday's date for bounce-back check
+  const yDate = new Date(); yDate.setDate(yDate.getDate()-1);
+  const yesterday = localDateStr(yDate);
+
+  Promise.all([
+    _db.ref(`stewart/missions/${agentId}/${today}`).once('value'),
+    _db.ref(`stewart/deductions/${agentId}/${today}`).once('value'),
+    _db.ref(`stewart/scores/${agentId}/${yesterday}`).once('value'),
+    _db.ref(`stewart/deductions/${agentId}/${yesterday}`).once('value'),
+    _db.ref(`stewart/missions/${agentId}/${yesterday}`).once('value')
+  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap]) => {
+    const done = mSnap.val() || {};
+    const missions = buildMissions(agentId);
+    const total = missions.length;
+    const completed = missions.filter(m => done[m.id]).length;
+
+    const deductions = dSnap.val() || {};
+    const deductionTotal = Object.values(deductions).reduce((a,b)=>a+b,0);
+
+    // Determine yesterday's "bad day": low score, or had deductions, or finished little
+    const yScore = yScoreSnap.val();
+    const yDed = yDedSnap.val() || {};
+    const yDedTotal = Object.values(yDed).reduce((a,b)=>a+b,0);
+    const yDone = yMissionSnap.val() || {};
+    const yMissions = buildMissionsForDate(agentId, yDate);
+    const yCompleted = yMissions.filter(m => yDone[m.id]).length;
+    const yWasWeekday = (yDate.getDay() !== 0 && yDate.getDay() !== 6);
+    const hadBadDay = yWasWeekday && (
+      (yScore !== null && yScore !== undefined && yScore < 60) ||
+      yDedTotal > 0 ||
+      (yMissions.length > 0 && yCompleted < yMissions.length / 2)
+    );
+
+    // Determine today's path
+    const path = hansHeinzPath(completed, total, deductionTotal, hour);
+
+    // Spam-control state
+    let state = {};
+    try { state = JSON.parse(localStorage.getItem('hans-'+agentId+'-'+today) || '{}'); } catch(e){}
+
+    const toPost = [];
+
+    // 0. BOUNCE-BACK: first message of the day after a bad day (Hans, encouraging)
+    if(hadBadDay && !state.bounceback && !state.morning){
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_BOUNCEBACK), name, completed, total)});
+      state.bounceback = true;
+    }
+
+    // 1. MORNING (before noon, once per day) — persona follows the path
+    if(hour < 12 && !state.morning){
+      if(path === 'evil' && deductionTotal === 0){
+        // Morning with nothing done yet leans Heinz playful
+        toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.notStarted), name, completed, total)});
+      } else if(path === 'evil'){
+        toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.deductions), name, completed, total)});
+      } else {
+        toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.morning), name, completed, total)});
+      }
+      state.morning = true;
+    }
+
+    // 2. EVENING (after 5pm, once per day) — persona follows the path
+    if(hour >= 17 && !state.evening){
+      if(path === 'evil'){
+        toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.eveningEvil), name, completed, total)});
+      } else {
+        toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.evening), name, completed, total)});
+      }
+      state.evening = true;
+    }
+
+    // 3. MILESTONE: all done (Hans, once per day) — always good
+    if(completed >= total && total > 0 && !state.allDone){
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.allDone), name, completed, total)});
+      state.allDone = true;
+    }
+
+    // 4. DEDUCTION ALERT (Heinz, once per day) — fire if a deduction appeared
+    if(deductionTotal > 0 && !state.deductionNoted && toPost.length === 0){
+      toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.deductions), name, completed, total)});
+      state.deductionNoted = true;
+    }
+
+    // 5. ON-OPEN STATUS: only if completed count changed since last time
+    if(state.lastCompleted !== completed && !(completed >= total && state.allDone) && toPost.length === 0){
+      if(path === 'good'){
+        const ctx = hansStatusContext(completed, total);
+        if(ctx && ctx !== 'allDone'){
+          toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES[ctx]), name, completed, total)});
+        }
+      } else {
+        // evil path on-open status
+        const pool = (completed === 0) ? HEINZ_LINES.notStarted : HEINZ_LINES.behind;
+        toPost.push({persona:'heinz', text: hansFill(hansPick(pool), name, completed, total)});
+      }
+    }
+
+    // 6. BEHIND nudge (afternoon, Heinz, once per day)
+    if(hour >= 14 && hour < 17 && completed < total/2 && total > 0 && !state.behind && toPost.length === 0){
+      toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.behind), name, completed, total)});
+      state.behind = true;
+    }
+
+    state.lastCompleted = completed;
+    try { localStorage.setItem('hans-'+agentId+'-'+today, JSON.stringify(state)); } catch(e){}
+
+    // Post sequentially in order
+    toPost.forEach((item, idx) => setTimeout(() => hansPost(item.text, item.persona), idx * 450));
+  });
+}
+
+
+function loadPrivatePreview(){
+  if(!currentAgent||!_db) return;
+  _db.ref(`stewart/messages/${currentAgent.id}`).limitToLast(1).once('value', snap => {
+    const val = snap.val();
+    const previewEl = document.getElementById('private-preview');
+    const badgeEl = document.getElementById('msg-unread-badge');
+    if(val){
+      const last = Object.values(val)[0];
+      const isParent = last.from==='Dad'||last.from==='Mom'||last.from==='HQ';
+      if(previewEl) previewEl.textContent = `${last.from}: ${(last.text||'').slice(0,50)}`;
+      if(badgeEl && isParent) badgeEl.style.display = 'block';
+    }
+  });
+}
+
+// Enter key to send
+
+// ══════════════════════════════════════════════════════
+// XBOX GAME TIME SYSTEM
+// ══════════════════════════════════════════════════════
+
+const PAIRS = {
+  'samuel':  { partner: 'johnjr',  pairId: 'virtus',   label: 'Team Virtus',   names: 'Samuel & John Jr.' },
+  'johnjr':  { partner: 'samuel',  pairId: 'virtus',   label: 'Team Virtus',   names: 'Samuel & John Jr.' },
+  'stephen': { partner: 'daniel',  pairId: 'vulnere',  label: 'Team Vulnere',  names: 'Stephen & Daniel' },
+  'daniel':  { partner: 'stephen', pairId: 'vulnere',  label: 'Team Vulnere',  names: 'Stephen & Daniel' },
+};
+
+function getWeekDaysGT(){
+  const now = new Date();
+  const dow = now.getDay();
+  const diff = dow===0?-6:1-dow;
+  const mon = new Date(now); mon.setDate(now.getDate()+diff);
+  const days = [];
+  for(let i=0;i<5;i++){
+    const d=new Date(mon); d.setDate(mon.getDate()+i);
+    days.push(localDateStr(d));
+  }
+  return days;
+}
+
+function getDayLabel(dateStr){
+  const d = new Date(dateStr);
+  return ['Mon','Tue','Wed','Thu','Fri'][d.getDay()-1]||'';
+}
+
+function renderGameTime(){
+  if(!currentAgent) return;
+  const el = document.getElementById('gametime-content');
+  if(!el) return;
+  if(!_db){ el.innerHTML='<div class="empty">Connect to WiFi to view game time.</div>'; return; }
+
+  const weekDays = getWeekDaysGT();
+  const pair = PAIRS[currentAgent.id];
+
+  // Make sure today's score is current
+  const today = localDateStr();
+  recalculateScore(currentAgent.id, today);
+
+  const weekStart = weekDays[0];
+  const group = READING_GROUP[currentAgent.id];
+
+  Promise.all([
+    _db.ref(`stewart/scores/${currentAgent.id}`).once('value'),
+    _db.ref(`stewart/reading/${currentAgent.id}/${weekStart}`).once('value'),
+    _db.ref(`stewart/readinggoals/${currentAgent.id}`).once('value')
+  ]).then(([scoreSnap, readingSnap, goalSnap]) => {
+    const scores = scoreSnap.val() || {};
+    const readingLog = readingSnap.val() || {};
+    const chapterGoal = goalSnap.val() || DEFAULT_CHAPTER_GOAL;
+
+    let totalMinutes = 0;
+    const dayResults = weekDays.map(d => {
+      const score = scores[d]; // 0-100 or null
+      if(d > today) return { day: d, status: 'pending', minutes: 0 };
+      if(score===null||score===undefined) return { day: d, status: 'missed', minutes: 0 };
+
+      const minutes = (score/100) * 6;
+      totalMinutes += minutes;
+
+      let status;
+      if(score >= 80) status = 'earned';
+      else if(score >= 50) status = 'partial';
+      else status = 'missed';
+      if(d === today) status = status === 'earned' ? 'earned' : 'today';
+
+      return { day: d, status, minutes, score };
+    });
+
+    const missionMinutes = totalMinutes;
+
+    // Reading bonus calculation
+    let readingBonus = 0;
+    if(group === 'books'){
+      const daysCompleted = weekDays.filter(d => readingLog[d] && readingLog[d].title && readingLog[d].verified).length;
+      readingBonus = (daysCompleted/5) * 15;
+    } else {
+      const weeklyGoal = chapterGoal * 5;
+      let totalChapters = 0;
+      weekDays.forEach(d => { if(readingLog[d] && readingLog[d].chapters && readingLog[d].verified) totalChapters += Number(readingLog[d].chapters); });
+      readingBonus = Math.min(15, (totalChapters/weeklyGoal) * 15);
+    }
+
+    const combinedMinutes = missionMinutes + readingBonus;
+
+    // Payout tier based on COMBINED total (max 45)
+    let payout, payoutColor, payoutIcon;
+    if(combinedMinutes >= 37.5){ payout='45 min'; payoutColor='#2d6a47'; payoutIcon='&#127918;'; }
+    else if(combinedMinutes >= 25){ payout='30 min'; payoutColor='#2d6a47'; payoutIcon='&#127918;'; }
+    else if(combinedMinutes >= 15){ payout='15 min'; payoutColor='#c8922a'; payoutIcon='&#9203;'; }
+    else { payout='No game time'; payoutColor='#b5451b'; payoutIcon='&#10060;'; }
+
+    const totalDisplay = Math.round(combinedMinutes * 10) / 10;
+    const missionDisplay = Math.round(missionMinutes * 10) / 10;
+    const readingDisplay = Math.round(readingBonus * 10) / 10;
+
+    el.innerHTML = `
+      <!-- AGENT HEADER -->
+      <div style="background:linear-gradient(135deg,var(--dark2),#0a1a0a);border:1px solid rgba(12,200,200,.2);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:6px;">${currentAgent.codename.toUpperCase()} &mdash; INDIVIDUAL TRACKING</div>
+        <div style="font-size:22px;margin-bottom:4px;">${payoutIcon}</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:26px;font-weight:700;color:${payoutColor};">${totalDisplay} min</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;">earned this week &mdash; max 45 min</div>
+        <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;margin:10px 0 4px;">
+          <div style="height:100%;width:${Math.min(100,Math.round((combinedMinutes/45)*100))}%;background:${payoutColor};border-radius:6px;transition:width .5s;"></div>
+        </div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:${payoutColor};margin-top:6px;">
+          Weekend: ${payout}
+        </div>
+        <div style="display:flex;justify-content:center;gap:14px;margin-top:10px;font-size:10px;color:rgba(255,255,255,.5);">
+          <span>&#127918; Missions: ${missionDisplay} min</span>
+          <span>&#128218; Reading: +${readingDisplay} min</span>
+        </div>
+      </div>
+
+      <!-- DAY BY DAY -->
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:8px;">Daily Points Log</div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;">
+        ${dayResults.map(r => {
+          const bg = r.status==='earned'?'rgba(45,106,71,.2)':r.status==='partial'?'rgba(232,184,74,.15)':r.status==='missed'?'rgba(139,48,16,.2)':r.status==='today'?'rgba(12,200,200,.1)':'rgba(255,255,255,.04)';
+          const icon = r.status==='earned'?'&#10003;':r.status==='partial'?'&#9679;':r.status==='missed'?'&#10007;':r.status==='today'?'&#9675;':'&mdash;';
+          const col = r.status==='earned'?'#4aaa6a':r.status==='partial'?'var(--gold)':r.status==='missed'?'#cc5533':r.status==='today'?'var(--teal2)':'rgba(255,255,255,.2)';
+          const minDisplay = r.minutes ? '+'+(Math.round(r.minutes*10)/10) : '0';
+          return `<div style="flex:1;background:${bg};border-radius:8px;padding:8px 4px;text-align:center;">
+            <div style="font-size:16px;color:${col};">${icon}</div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:3px;">${getDayLabel(r.day)}</div>
+            <div style="font-size:9px;color:${col};margin-top:1px;">${minDisplay}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      ${pair ? `
+      <!-- TEAM NOTE -->
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:11px 13px;margin-bottom:14px;">
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;">
+          You're part of <strong style="color:var(--teal2);">${pair.label}</strong> with ${pair.partner==='johnjr'?'John Jr.':pair.partner.charAt(0).toUpperCase()+pair.partner.slice(1)}, but your game time is earned individually based on your own missions.
+        </div>
+      </div>` : ''}
+
+      <!-- RULE REMINDER -->
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:11px 13px;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:6px;">Mission Rules</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;">
+          Each mission you complete earns points toward your day. A full day = 6 minutes (max 30/week).<br>
+          Reading adds up to 15 more minutes &mdash; see Field Library below.<br>
+          If a mission is left for the next day and someone else finishes it, points transfer to them.<br>
+          <span style="color:var(--gold);">37.5+ min = 45 min &nbsp;&#9670;&nbsp; 25-37.4 = 30 min &nbsp;&#9670;&nbsp; 15-24.9 = 15 min &nbsp;&#9670;&nbsp; Under 15 = none</span>
+        </div>
+      </div>`;
+  });
+}
+
+
+
+
+// ══════════════════════════════════════════════════════
+// CELEBRATIONS
+// ══════════════════════════════════════════════════════
+
+let confettiAnimationId = null;
+
+function showCelebration(emoji, title, msg){
+  document.getElementById('celebration-emoji').innerHTML = emoji;
+  document.getElementById('celebration-title').textContent = title;
+  document.getElementById('celebration-msg').textContent = msg;
+  document.getElementById('celebration-overlay').style.display = 'flex';
+  startConfetti();
+}
+
+function closeCelebration(){
+  document.getElementById('celebration-overlay').style.display = 'none';
+  stopConfetti();
+}
+
+function startConfetti(){
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const colors = ['#0cc8c8','#e8b84a','#ffffff','#4aaa6a','#cc5533'];
+  const pieces = [];
+  for(let i=0;i<80;i++){
+    pieces.push({
+      x: Math.random()*canvas.width,
+      y: -20 - Math.random()*canvas.height*0.5,
+      size: 4 + Math.random()*6,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      speedY: 2 + Math.random()*4,
+      speedX: (Math.random()-0.5)*3,
+      rotation: Math.random()*360,
+      rotationSpeed: (Math.random()-0.5)*10
+    });
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    let stillFalling = false;
+    pieces.forEach(p => {
+      p.y += p.speedY;
+      p.x += p.speedX;
+      p.rotation += p.rotationSpeed;
+      if(p.y < canvas.height + 20) stillFalling = true;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI/180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6);
+      ctx.restore();
+    });
+    if(stillFalling){
+      confettiAnimationId = requestAnimationFrame(draw);
+    } else {
+      // Restart for continuous celebration while overlay is open
+      pieces.forEach(p => {
+        p.y = -20 - Math.random()*100;
+        p.x = Math.random()*canvas.width;
+      });
+      confettiAnimationId = requestAnimationFrame(draw);
+    }
+  }
+  draw();
+}
+
+function stopConfetti(){
+  if(confettiAnimationId){
+    cancelAnimationFrame(confettiAnimationId);
+    confettiAnimationId = null;
+  }
+}
+
+function checkCelebrations(){
+  if(!currentAgent||!_db) return;
+  const weekStart = getWeekStart();
+  const today = localDateStr();
+
+  // DAILY COMPLETION celebration — all today's missions done
+  _db.ref(`stewart/missions/${currentAgent.id}/${today}`).once('value', snap => {
+    const done = snap.val() || {};
+    const expected = getExpectedMissionsLocal(currentAgent.id);
+    const allDone = expected.length > 0 && expected.every(m => done[m]);
+    if(allDone){
+      _db.ref(`stewart/celebrations/daily/${currentAgent.id}/${today}`).once('value', seenSnap => {
+        if(!seenSnap.val()){
+          showCelebration('&#9989;', 'Mission Complete!', `All missions complete for today, Agent ${currentAgent.codename.split(' ')[1]}! Outstanding work.`);
+          _db.ref(`stewart/celebrations/daily/${currentAgent.id}/${today}`).set(true);
+          return; // don't stack with other celebrations at the same moment
+        }
+        checkWeeklyCelebrations();
+      });
+    } else {
+      checkWeeklyCelebrations();
+    }
+  });
+}
+
+function checkWeeklyCelebrations(){
+  if(!currentAgent||!_db) return;
+  const weekStart = getWeekStart();
+
+  // FAMILY NIGHT celebration
+  _db.ref(`stewart/familynight/${weekStart}`).once('value', snap => {
+    if(snap.val()){
+      _db.ref(`stewart/celebrations/familynight/${weekStart}/${currentAgent.id}`).once('value', seenSnap => {
+        if(!seenSnap.val()){
+          showCelebration('&#127881;', 'Family Night Unlocked!', 'Every agent completed their missions this week. Time to celebrate together, Agent ' + currentAgent.codename.split(' ')[1] + '!');
+          _db.ref(`stewart/celebrations/familynight/${weekStart}/${currentAgent.id}`).set(true);
+        }
+      });
+    }
+  });
+
+  // GAME TIME celebration — check this agent's pair
+  const pair = PAIRS[currentAgent.id];
+  if(!pair) return;
+
+  const weekDays = getWeekDaysGT();
+  Promise.all([
+    Promise.all(weekDays.map(d => _db.ref(`stewart/missions/${currentAgent.id}/${d}`).once('value'))),
+    Promise.all(weekDays.map(d => _db.ref(`stewart/missions/${pair.partner}/${d}`).once('value')))
+  ]).then(([mySnaps, partnerSnaps]) => {
+    let totalMinutes = 0;
+    const today = localDateStr();
+    weekDays.forEach((d, i) => {
+      if(d > today) return;
+      const myDone = mySnaps[i].val()||{};
+      const partnerDone = partnerSnaps[i].val()||{};
+      const myExpected = getExpectedMissionsLocal(currentAgent.id);
+      const partnerExpected = getExpectedMissionsLocal(pair.partner);
+      const myComplete = myExpected.every(m => myDone[m]) && myExpected.length > 0;
+      const partnerComplete = partnerExpected.every(m => partnerDone[m]) && partnerExpected.length > 0;
+      if(myComplete && partnerComplete) totalMinutes += 6;
+    });
+
+    let tier = 0;
+    if(totalMinutes >= 25) tier = 30;
+    else if(totalMinutes >= 15) tier = 15;
+
+    if(tier > 0){
+      _db.ref(`stewart/celebrations/gametime/${weekStart}/${pair.pairId}`).once('value', seenSnap => {
+        if(seenSnap.val() !== tier){
+          showCelebration('&#127918;', tier + ' Min Xbox Unlocked!', pair.label + ' earned ' + tier + ' minutes of game time this weekend. Great teamwork, Agents!');
+          _db.ref(`stewart/celebrations/gametime/${weekStart}/${pair.pairId}`).set(tier);
+        }
+      });
+    }
+  });
+}
+
+// Local copy of expected missions logic for celebration checks
+function getExpectedMissionsLocal(agentId){
+  const dt = getDishTeam();
+  const onDishes = (agentId==='samuel'||agentId==='johnjr') ? dt==='sj' : dt==='sd';
+  const base = ['bed','bedroom','rabbit-own'];
+  if(agentId==='samuel') base.push('floor-laundry');
+  if(agentId==='johnjr') base.push('floor-living');
+  if(agentId==='stephen') base.push('kitchen-counter','floor-kitchen');
+  if(agentId==='daniel') base.push('floor-hallway','floor-rabbit','table-set');
+
+  const onLaundryDay = isLaundryDayFor(agentId, new Date().getDay());
+
+  if(onDishes){
+    if(agentId==='stephen') base.push('dishwasher-unload','table-clear','table-wipe');
+    else if(agentId==='daniel') base.push('dishwasher-load','table-clear','table-wipe');
+    else base.push('dishwasher-load','dishwasher-unload','table-clear','table-wipe');
+  } else {
+    if(!base.includes('table-set')) base.push('table-set');
+    if(agentId==='samuel'||agentId==='johnjr') base.push('drinks');
+    if(agentId!=='daniel' && !onLaundryDay) base.push('stovetop','microwave');
+  }
+
+  if(new Date().getDay()===3){
+    if(agentId==='samuel'||agentId==='johnjr') base.push('trash');
+    if(agentId==='daniel') base.push('bathroom-trash');
+  }
+
+  if(onLaundryDay){
+    if(agentId==='samuel') base.push('laundry-sam');
+    if(agentId==='johnjr') base.push('laundry-john');
+    if(agentId==='stephen') base.push('laundry-stephen');
+    if(agentId==='daniel') base.push('laundry-daniel');
+  }
+
+  return [...new Set(base)];
+}
+
+
+
+// ══════════════════════════════════════════════════════
+// FIELD LIBRARY — READING LOG
+// ══════════════════════════════════════════════════════
+
+const READING_GROUP = {
+  samuel: 'chapters', johnjr: 'chapters',
+  stephen: 'books', daniel: 'books'
+};
+
+const DEFAULT_CHAPTER_GOAL = 3; // per day, Sam & John
+
+const BEHAVIOR_LABELS = {
+  attitude: 'Attitude',
+  disobedience: 'Disobedience',
+  fighting: 'Fighting',
+  dishonesty: 'Dishonesty'
+};
+
+// ══════════════════════════════════════════════════════
+// DINNER SIDES — Mon/Wed/Thu, Virtus & Vulnere alternate
+// starch/veggie, continuous across weeks
+// ══════════════════════════════════════════════════════
+
+const DINNER_SIDE_DAYS = [1, 3, 4]; // Mon, Wed, Thu
+
+function isDinnerSideDay(_d){
+  return DINNER_SIDE_DAYS.includes((_d?new Date(_d):new Date()).getDay());
+}
+
+// Count which "cooking day" this is since a fixed epoch (Mon Jan 1 2024)
+// to get continuous alternation regardless of week
+function getDinnerSideAssignment(dateOverride){
+  const date = dateOverride ? new Date(dateOverride) : new Date();
+  const dow = date.getDay();
+  if(!DINNER_SIDE_DAYS.includes(dow)) return null;
+
+  const epoch = new Date(2024, 0, 1); // Jan 1, 2024 (Monday)
+  const daysSinceEpoch = Math.floor((date - epoch) / (24*60*60*1000));
+  const fullWeeks = Math.floor(daysSinceEpoch / 7);
+  const remainderDays = daysSinceEpoch % 7;
+  // Each full week contributes 3 cooking days (Mon, Wed, Thu)
+  // Count cooking days in the remainder (days 0..remainderDays-1 of this week, Sun-based)
+  let cookingDayIndex = fullWeeks * 3;
+  for(let i=0;i<remainderDays;i++){
+    if(DINNER_SIDE_DAYS.includes(i)) cookingDayIndex++;
+  }
+
+  // Even index = Virtus does starch, Vulnere does veggie. Odd = swap.
+  const virtusGetsStarch = (cookingDayIndex % 2 === 0);
+  return {
+    virtus: virtusGetsStarch ? 'starch' : 'veggie',
+    vulnere: virtusGetsStarch ? 'veggie' : 'starch'
+  };
+}
+
+function getMyDinnerSide(agentId, _d){
+  const pair = PAIRS[agentId];
+  if(!pair) return null;
+  const assignment = getDinnerSideAssignment(_d);
+  if(!assignment) return null;
+  return assignment[pair.pairId];
+}
+
+
+function getWeekDaysReading(){
+  return getWeekDaysGT(); // Mon-Fri, same as game time
+}
+
+function renderReadingLog(){
+  if(!currentAgent) return;
+  const el = document.getElementById('readinglog-content');
+  if(!el) return;
+  if(!_db){ el.innerHTML='<div class="empty">Connect to WiFi to view reading log.</div>'; return; }
+
+  const weekDays = getWeekDaysReading();
+  const weekStart = weekDays[0];
+  const today = localDateStr();
+  const group = READING_GROUP[currentAgent.id];
+
+  Promise.all([
+    _db.ref(`stewart/reading/${currentAgent.id}/${weekStart}`).once('value'),
+    _db.ref(`stewart/readinggoals/${currentAgent.id}`).once('value')
+  ]).then(([logSnap, goalSnap]) => {
+    const log = logSnap.val() || {};
+    const chapterGoal = goalSnap.val() || DEFAULT_CHAPTER_GOAL;
+
+    let bonusMinutes = 0;
+    let progressLabel = '';
+    let progressPct = 0;
+
+    if(group === 'books'){
+      // One book per day, Mon-Fri
+      const daysCompleted = weekDays.filter(d => log[d] && log[d].title && log[d].verified).length;
+      progressPct = Math.round((daysCompleted/5)*100);
+      bonusMinutes = (daysCompleted/5) * 15;
+      progressLabel = `${daysCompleted} / 5 days &mdash; one book per day`;
+    } else {
+      // Chapters per day toward weekly goal
+      const weeklyGoal = chapterGoal * 5;
+      let totalChapters = 0;
+      weekDays.forEach(d => { if(log[d] && log[d].chapters && log[d].verified) totalChapters += Number(log[d].chapters); });
+      progressPct = Math.min(100, Math.round((totalChapters/weeklyGoal)*100));
+      bonusMinutes = Math.min(15, (totalChapters/weeklyGoal) * 15);
+      progressLabel = `${totalChapters} / ${weeklyGoal} chapters this week &mdash; ${chapterGoal}/day goal`;
+    }
+
+    const bonusDisplay = Math.round(bonusMinutes*10)/10;
+    const todayEntry = log[today] || {};
+
+    let formHtml = '';
+    if(group === 'books'){
+      formHtml = `
+        <div style="margin-bottom:8px;">
+          <input type="text" id="reading-title-input" placeholder="Book title read today..." value="${todayEntry.title||''}"
+            style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;">
+        </div>
+        <button onclick="saveReadingEntry()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">
+          ${todayEntry.title ? 'UPDATE TODAYS BOOK' : 'LOG TODAYS BOOK'}
+        </button>`;
+    } else {
+      formHtml = `
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input type="text" id="reading-title-input" placeholder="Book title..." value="${todayEntry.title||''}"
+            style="flex:2;padding:9px 12px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;">
+          <input type="number" id="reading-chapters-input" placeholder="Ch." min="0" max="30" value="${todayEntry.chapters||''}"
+            style="flex:1;padding:9px 12px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;text-align:center;">
+        </div>
+        <button onclick="saveReadingEntry()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">
+          ${todayEntry.chapters ? 'UPDATE TODAYS READING' : 'LOG TODAYS READING'}
+        </button>`;
+    }
+
+    // Week-at-a-glance
+    const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+    const weekTiles = weekDays.map((d,i) => {
+      const entry = log[d];
+      const hasEntry = entry && (entry.title || entry.chapters);
+      const isVerified = hasEntry && entry.verified;
+      const isToday = d === today;
+      const isFuture = d > today;
+      let bg, icon;
+      if(isFuture){ bg='rgba(255,255,255,.04)'; icon='&mdash;'; }
+      else if(isVerified){ bg='rgba(45,106,71,.2)'; icon='&#10003;'; }
+      else if(hasEntry){ bg='rgba(232,184,74,.12)'; icon='&#9203;'; }
+      else if(isToday){ bg='rgba(12,200,200,.1)'; icon='&#9675;'; }
+      else { bg='rgba(139,48,16,.2)'; icon='&#10007;'; }
+      const detail = group==='books' ? (entry?.title ? entry.title.slice(0,10) : '') : (entry?.chapters ? entry.chapters+' ch' : '');
+      return `<div style="flex:1;background:${bg};border-radius:8px;padding:8px 4px;text-align:center;">
+        <div style="font-size:14px;">${icon}</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:1px;color:rgba(255,255,255,.4);margin-top:3px;">${dayLabels[i]}</div>
+        <div style="font-size:8px;color:rgba(255,255,255,.5);margin-top:1px;overflow:hidden;white-space:nowrap;">${detail}</div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,var(--dark2),#0a1a0a);border:1px solid rgba(232,184,74,.2);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:4px;">&#128218;</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:24px;font-weight:700;color:var(--gold);">+${bonusDisplay} min</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;">reading bonus this week &mdash; max 15 min</div>
+        <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;margin:10px 0 4px;">
+          <div style="height:100%;width:${progressPct}%;background:var(--gold);border-radius:6px;transition:width .5s;"></div>
+        </div>
+        <div style="font-size:10px;color:rgba(255,255,255,.4);">${progressLabel}</div>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:14px;">${weekTiles}</div>
+
+      <div class="hw-card" style="margin-bottom:12px;">
+        <div class="hw-card-head"><div class="hw-card-icon">&#9999;</div><div class="hw-card-title">Today's Reading</div></div>
+        <div class="hw-card-body">${formHtml}</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:11px 13px;">
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;">
+          ${group==='books'
+            ? 'Read one full book every day, Monday through Friday. Complete all 5 days for the full 15-minute bonus.'
+            : `Read ${chapterGoal} chapters every day, Monday through Friday (${chapterGoal*5} chapters total). Hit the weekly goal for the full 15-minute bonus.`}<br>
+          <span style="color:var(--gold);">&#9203; Gold = logged, waiting on Mom or Dad to verify. &#10003; Green = verified and counted.</span><br>
+          <span style="color:var(--gold);">Mission minutes (max 30) + Reading bonus (max 15) = 45 min total possible each week.</span>
+        </div>
+      </div>`;
+  });
+}
+
+function saveReadingEntry(){
+  if(!currentAgent||!_db) return;
+  const today = localDateStr();
+  const weekStart = getWeekDaysReading()[0];
+  const group = READING_GROUP[currentAgent.id];
+
+  const title = document.getElementById('reading-title-input').value.trim();
+  if(!title) return;
+
+  let entry = { title };
+  if(group === 'chapters'){
+    const chapters = document.getElementById('reading-chapters-input').value;
+    entry.chapters = chapters ? Number(chapters) : 0;
+  }
+
+  _db.ref(`stewart/reading/${currentAgent.id}/${weekStart}/${today}`).set(entry).then(() => {
+    renderReadingLog();
+    setTimeout(() => checkCelebrations(), 600);
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// STATUS SUMMARY — whole picture at a glance
+// ══════════════════════════════════════════════════════
+
+function renderStatusSummary(){
+  if(!currentAgent) return;
+  const el = document.getElementById('status-summary');
+  if(!el) return;
+  if(!_db){ el.innerHTML=''; return; }
+
+  const today = localDateStr();
+  const weekStart = getWeekStart();
+  recalculateScore(currentAgent.id, today);
+
+  Promise.all([
+    _db.ref(`stewart/scores/${currentAgent.id}/${today}`).once('value'),
+    _db.ref(`stewart/missions/${currentAgent.id}/${today}`).once('value'),
+    _db.ref(`stewart/weekly/${currentAgent.id}/${weekStart}`).once('value'),
+    _db.ref(`stewart/familynight/${weekStart}`).once('value')
+  ]).then(([scoreSnap, missionSnap, weeklySnap, fnSnap]) => {
+    const score = scoreSnap.val();
+    const done = missionSnap.val() || {};
+    const weeklyDone = weeklySnap.val() || {};
+    const familyNightUnlocked = fnSnap.val() === true;
+
+    const missions = buildMissions(currentAgent.id);
+    const completed = missions.filter(m => done[m.id]).length;
+    const total = missions.length;
+    const dollars = score!==null&&score!==undefined ? (score/100).toFixed(2) : '0.00';
+    const minutes = score!==null&&score!==undefined ? Math.round((score/100)*6*10)/10 : 0;
+
+    // Weekly completion for Family Night progress
+    const bathroomAgent = getBathroomAgent();
+    const weeklyMissionsForAgent = WEEKLY_MISSIONS.filter(m => {
+      if(m==='laundry-sam') return currentAgent.id==='samuel';
+      if(m==='laundry-john') return currentAgent.id==='johnjr';
+      if(m==='laundry-stephen') return currentAgent.id==='stephen';
+      if(m==='laundry-daniel') return currentAgent.id==='daniel';
+      if(m==='hutch') return currentAgent.id==='stephen';
+      if(m==='bathroom-trash') return currentAgent.id==='daniel';
+      if(m==='bathroom-clean') return currentAgent.id===bathroomAgent;
+      return true;
+    });
+    const weeklyTotal = weeklyMissionsForAgent.length;
+    const weeklyComplete = weeklyMissionsForAgent.filter(m => weeklyDone[m]).length;
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dayName = dayNames[new Date().getDay()];
+
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,var(--dark2),#0a1a0a);border:1px solid rgba(12,200,200,.2);border-radius:10px;padding:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;color:var(--teal2);">${dayName.toUpperCase()} STATUS</div>
+          ${familyNightUnlocked ? '<span style="font-size:10px;color:var(--gold);">&#127881; Family Night Unlocked</span>' : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="text-align:center;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;color:var(--teal2);">${completed}/${total}</div>
+            <div style="font-size:8px;letter-spacing:1px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:2px;">Missions</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;color:var(--gold);">$${dollars}</div>
+            <div style="font-size:8px;letter-spacing:1px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:2px;">Today</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;color:#4aaa6a;">${minutes}m</div>
+            <div style="font-size:8px;letter-spacing:1px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:2px;">Game Time</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.06);border-radius:6px;height:5px;overflow:hidden;margin-bottom:4px;">
+          <div style="height:100%;width:${total>0?Math.round((completed/total)*100):0}%;background:var(--teal);border-radius:6px;transition:width .5s;"></div>
+        </div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);text-align:center;">
+          Weekly chores: ${weeklyComplete}/${weeklyTotal} &mdash; Family Night ${familyNightUnlocked?'ready!':'in progress'}
+        </div>
+      </div>`;
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// AGENT SELF-ASSESSMENT — My Strength / My Mission / Step
+// ══════════════════════════════════════════════════════
+
+function renderSelfAssessment(){
+  if(!currentAgent || !_db) return;
+  _db.ref(`stewart/selfassessment/${currentAgent.id}`).once('value', snap => {
+    const data = snap.val() || {};
+    const strengthEl = document.getElementById('self-strength');
+    const missionEl = document.getElementById('self-mission');
+    const stepEl = document.getElementById('self-step');
+    if(strengthEl) strengthEl.value = data.strength || '';
+    if(missionEl) missionEl.value = data.mission || '';
+    if(stepEl) stepEl.value = data.step || '';
+    const savedEl = document.getElementById('self-assessment-saved');
+    if(savedEl) savedEl.style.display = 'none';
+  });
+}
+
+function saveSelfAssessment(){
+  if(!currentAgent || !_db) return;
+  const strength = document.getElementById('self-strength').value.trim();
+  const mission = document.getElementById('self-mission').value.trim();
+  const step = document.getElementById('self-step').value.trim();
+
+  _db.ref(`stewart/selfassessment/${currentAgent.id}`).set({
+    strength, mission, step,
+    updatedAt: Date.now()
+  }).then(() => {
+    const savedEl = document.getElementById('self-assessment-saved');
+    if(savedEl){
+      savedEl.style.display = 'block';
+      setTimeout(() => { savedEl.style.display = 'none'; }, 3000);
+    }
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// TONIGHT'S ACTIVITY (read-only for boys)
+// ══════════════════════════════════════════════════════
+
+function renderTonightActivity(){
+  const el = document.getElementById('tonight-activity');
+  if(!el || !_db) return;
+
+  const today = localDateStr();
+  _db.ref(`stewart/familynight/activities/${today}`).once('value', snap => {
+    const activity = snap.val();
+    if(!activity){
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,rgba(12,200,200,.12),rgba(74,48,180,.12));border:1px solid rgba(12,200,200,.25);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:6px;">&#9733; TONIGHT'S MISSION</div>
+        <div style="font-size:24px;margin-bottom:4px;">${activity.icon}</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--white);">${activity.label}</div>
+      </div>`;
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// TEACH ME VOTE SYSTEM
+// Mon: Suggest | Tue-Thu: Vote (missions must be complete)
+// ══════════════════════════════════════════════════════
+
+const TEACH_ME_OPTIONS = [
+  { id:'bike', label:'Bike Maintenance', icon:'🚲', desc:'Fix flats, adjust brakes, tune gears' },
+  { id:'tools', label:'Tool Basics', icon:'🔧', desc:'Measure, cut, drill, build something' },
+  { id:'car', label:'Car Basics', icon:'🚗', desc:'Oil, tires, jump starts, under the hood' },
+  { id:'knots', label:'Knots & Rope Work', icon:'🪢', desc:'Trail Life knots, lashing, rescue lines' },
+  { id:'fire', label:'Fire Building', icon:'🔥', desc:'Tinder to fire — safely and fast' },
+  { id:'firstaid', label:'First Aid', icon:'🩹', desc:'Cuts, burns, sprains, emergencies' },
+  { id:'cooking', label:'Campfire Cooking', icon:'🍳', desc:'Cast iron, camp stove, open flame' },
+  { id:'navigation', label:'Map & Navigation', icon:'🗺️', desc:'Read a map, use a compass, find your way' },
+  { id:'woodwork', label:'Basic Woodworking', icon:'🪚', desc:'Measure twice, cut once — build something real' },
+  { id:'fishing', label:'Fishing Basics', icon:'🎣', desc:'Knots, bait, casting, cleaning a fish' },
+  { id:'electrical', label:'Basic Electrical', icon:'💡', desc:'Circuits, outlets, safe wiring basics' },
+  { id:'plumbing', label:'Basic Plumbing', icon:'🔩', desc:'Shut-offs, fixing leaks, unclogging drains' },
+];
+
+function getVoteWeekKey(){
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateStr(monday);
+}
+
+function renderTeachMeVote(){
+  if(!currentAgent) return;
+  const el = document.getElementById('teachme-vote-content');
+  if(!el) return;
+  if(!_db){ el.innerHTML='<div class="empty">Connect to WiFi to participate.</div>'; return; }
+
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun,1=Mon...5=Fri,6=Sat
+  const weekKey = getVoteWeekKey();
+  const today = localDateStr(now);
+
+  // Phase: 1=suggest(Mon), 2=vote(Tue-Thu), 3=closed(Fri-Sun)
+  const phase = dow === 1 ? 'suggest' : (dow >= 2 && dow <= 4) ? 'vote' : 'closed';
+
+  Promise.all([
+    _db.ref(`stewart/teachvote/${weekKey}`).once('value'),
+    _db.ref(`stewart/missions/${currentAgent.id}/${today}`).once('value')
+  ]).then(([voteSnap, missionSnap]) => {
+    const voteData = voteSnap.val() || {};
+    const missionDone = missionSnap.val() || {};
+    const suggestions = voteData.suggestions || {};
+    const votes = voteData.votes || {};
+    const winner = voteData.winner || null;
+
+    // Check if today's missions are complete
+    const missions = buildMissions(currentAgent.id);
+    const totalMissions = missions.length;
+    const completedMissions = missions.filter(m => missionDone[m.id]).length;
+    const missionsComplete = completedMissions >= totalMissions;
+
+    const myVote = votes[currentAgent.id];
+    const mySuggestion = suggestions[currentAgent.id];
+
+    if(phase === 'suggest'){
+      renderSuggestPhase(el, weekKey, mySuggestion);
+    } else if(phase === 'vote'){
+      renderVotePhase(el, weekKey, suggestions, votes, myVote, missionsComplete, completedMissions, totalMissions);
+    } else {
+      renderVoteResults(el, suggestions, votes, winner, voteData.completedDate);
+    }
+  });
+}
+
+function renderSuggestPhase(el, weekKey, mySuggestion){
+  const optionsHtml = TEACH_ME_OPTIONS.map(o =>
+    `<option value="${o.id}" ${mySuggestion===o.id?'selected':''}>${o.icon} ${o.label} — ${o.desc}</option>`
+  ).join('');
+
+  el.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--dark2),#0a1a14);border:1px solid rgba(12,200,200,.2);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:4px;">PHASE 1 — MONDAY</div>
+      <div style="font-size:13px;color:var(--white);font-weight:700;margin-bottom:4px;">Submit Your Suggestion</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);">What do you want to learn this week? Everyone submits one. Voting opens tomorrow.</div>
+    </div>
+
+    ${mySuggestion ? `
+    <div style="background:rgba(45,106,71,.15);border:1px solid rgba(45,106,71,.3);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <div style="font-size:10px;color:#4aaa6a;margin-bottom:3px;">&#10003; You suggested:</div>
+      <div style="font-size:13px;color:var(--white);">${TEACH_ME_OPTIONS.find(o=>o.id===mySuggestion)?.icon||''} ${TEACH_ME_OPTIONS.find(o=>o.id===mySuggestion)?.label||mySuggestion}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:3px;">You can change this until midnight tonight.</div>
+    </div>` : ''}
+
+    <div class="hw-card">
+      <div class="hw-card-head"><div class="hw-card-icon">🎯</div><div class="hw-card-title">What do you want to learn?</div></div>
+      <div class="hw-card-body">
+        <select id="suggest-select" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;margin-bottom:10px;">
+          <option value="">Pick something...</option>
+          ${optionsHtml}
+        </select>
+        <button onclick="submitSuggestion('${weekKey}')" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">
+          ${mySuggestion ? 'UPDATE MY SUGGESTION' : 'SUBMIT SUGGESTION'}
+        </button>
+      </div>
+    </div>`;
+}
+
+function renderVotePhase(el, weekKey, suggestions, votes, myVote, missionsComplete, completedMissions, totalMissions){
+  // Collect all suggestions (boys + parents)
+  const allSuggestions = Object.entries(suggestions);
+  const voteCounts = {};
+  Object.values(votes).forEach(v => { voteCounts[v] = (voteCounts[v]||0)+1; });
+
+  const votePhaseHtml = allSuggestions.length === 0 ?
+    `<div class="empty">No suggestions yet — check back later.</div>` :
+    allSuggestions.map(([agentId, optId]) => {
+      const opt = TEACH_ME_OPTIONS.find(o=>o.id===optId);
+      if(!opt) return '';
+      const voteCount = voteCounts[optId] || 0;
+      const isMyVote = myVote === optId;
+      const suggesterName = agentId === 'dad' ? 'Dad' : agentId === 'mom' ? 'Mom' : AGENT_NAMES[agentId] || agentId;
+      return `<div style="border:2px solid ${isMyVote?'var(--teal)':'rgba(255,255,255,.1)'};border-radius:10px;padding:12px 14px;margin-bottom:8px;background:${isMyVote?'rgba(12,200,200,.08)':'transparent'};">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:26px;">${opt.icon}</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--white);">${opt.label}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);">${opt.desc}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px;">Suggested by ${suggesterName}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;color:${voteCount>0?'var(--teal2)':'rgba(255,255,255,.2)'};">${voteCount}</div>
+            <div style="font-size:8px;color:rgba(255,255,255,.3);">votes</div>
+          </div>
+        </div>
+        ${missionsComplete ?
+          `<button onclick="castVote('${weekKey}','${optId}')" style="width:100%;margin-top:10px;padding:8px;border-radius:7px;border:none;background:${isMyVote?'var(--teal)':'rgba(255,255,255,.08)'};color:${isMyVote?'var(--black)':'rgba(255,255,255,.6)'};font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;">
+            ${isMyVote ? '✓ YOUR VOTE' : 'VOTE FOR THIS'}
+          </button>` :
+          `<div style="margin-top:8px;padding:8px;border-radius:7px;background:rgba(139,48,16,.15);border:1px solid rgba(139,48,16,.3);text-align:center;">
+            <div style="font-size:10px;color:#cc5533;">&#128274; Complete today's missions to unlock your vote</div>
+            <div style="font-size:9px;color:rgba(255,255,255,.3);margin-top:2px;">${completedMissions}/${totalMissions} missions done</div>
+          </div>`
+        }
+      </div>`;
+    }).join('');
+
+  el.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--dark2),#0a1a14);border:1px solid rgba(12,200,200,.2);border-radius:10px;padding:14px;margin-bottom:12px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;">PHASE 2 — VOTING OPEN</div>
+      <div style="font-size:13px;color:var(--white);font-weight:700;margin-bottom:4px;">What do we learn this week?</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);">Voting closes Thursday. ${missionsComplete?'Your vote is unlocked.':'Finish your missions to vote.'}</div>
+    </div>
+    ${votePhaseHtml}`;
+}
+
+function renderVoteResults(el, suggestions, votes, winner, completedDate){
+  const voteCounts = {};
+  Object.values(votes).forEach(v => { voteCounts[v] = (voteCounts[v]||0)+1; });
+  const winnerOpt = TEACH_ME_OPTIONS.find(o=>o.id===winner) || TEACH_ME_OPTIONS.find(o=>o.id===Object.keys(voteCounts).sort((a,b)=>voteCounts[b]-voteCounts[a])[0]);
+
+  el.innerHTML = `
+    <div style="background:linear-gradient(135deg,rgba(232,184,74,.15),rgba(12,200,200,.1));border:1px solid var(--gold);border-radius:10px;padding:16px;margin-bottom:12px;text-align:center;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:6px;">THIS WEEK'S TEACH ME</div>
+      <div style="font-size:36px;margin-bottom:6px;">${winnerOpt?.icon||'🎯'}</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:var(--white);">${winnerOpt?.label||winner}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">${winnerOpt?.desc||''}</div>
+    </div>
+    <div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;">Voting closed. Check back Monday to suggest next week's topic.</div>`;
+}
+
+function submitSuggestion(weekKey){
+  if(!currentAgent||!_db) return;
+  const select = document.getElementById('suggest-select');
+  const val = select.value;
+  if(!val) return;
+  _db.ref(`stewart/teachvote/${weekKey}/suggestions/${currentAgent.id}`).set(val)
+    .then(() => renderTeachMeVote());
+}
+
+function castVote(weekKey, optionId){
+  if(!currentAgent||!_db) return;
+  _db.ref(`stewart/teachvote/${weekKey}/votes/${currentAgent.id}`).set(optionId)
+    .then(() => renderTeachMeVote());
+}
+
+
+// ══════════════════════════════════════════════════════
+// SUPER FAMILY NIGHT — 80% monthly family average
+// ══════════════════════════════════════════════════════
+
+function getSuperFNMonthKey(){
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+function getWeekdaysInMonth(){
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = localDateStr(now);
+  const days = [];
+  const d = new Date(year, month, 1);
+  while(d.getMonth() === month){
+    const dow = d.getDay();
+    const dateStr = localDateStr(d);
+    if(dow >= 1 && dow <= 5 && dateStr <= today) days.push(dateStr);
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+
+function renderSuperFamilyNight(){
+  const el = document.getElementById('super-fn-content');
+  if(!el||!_db) return;
+
+  const monthKey = getSuperFNMonthKey();
+  _db.ref(`stewart/superfamilynight/${monthKey}`).once('value', snap => {
+    const sfnData = snap.val() || {};
+
+    // Also check live average
+    const agentIds = ['samuel','johnjr','stephen','daniel'];
+    const now = new Date();
+    const today = localDateStr(now);
+    const year = now.getFullYear(), month = now.getMonth();
+    const weekdays = [];
+    const d = new Date(year, month, 1);
+    while(d.getMonth()===month){
+      const dow = d.getDay(), ds = localDateStr(d);
+      if(dow>=1&&dow<=5&&ds<=today) weekdays.push(ds);
+      d.setDate(d.getDate()+1);
+    }
+
+    Promise.all(agentIds.map(id => _db.ref(`stewart/scores/${id}`).once('value')))
+    .then(scoreSnaps => {
+      let totalScore=0, totalDays=0;
+      const agentAverages = {};
+      scoreSnaps.forEach((snap,i) => {
+        const scores = snap.val()||{};
+        let at=0, ad=0;
+        weekdays.forEach(ds => {
+          if(scores[ds]!==null&&scores[ds]!==undefined){ at+=scores[ds]; ad++; totalScore+=scores[ds]; totalDays++; }
+        });
+        agentAverages[agentIds[i]] = ad>0 ? Math.round(at/ad) : 0;
+      });
+
+      const familyAvg = totalDays>0 ? Math.round(totalScore/totalDays) : 0;
+      const isUnlocked = sfnData.unlocked || familyAvg >= 80;
+      const myAvg = agentAverages[currentAgent?.id] || 0;
+
+      // FULL CELEBRATION if unlocked
+      if(isUnlocked && sfnData.food){
+        triggerSuperFNBanner(sfnData);
+      }
+
+      el.innerHTML = `
+        <div style="background:linear-gradient(135deg,var(--dark2),#1a0a2e);border:2px solid ${isUnlocked?'var(--gold)':'rgba(255,255,255,.15)'};border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:${isUnlocked?'var(--gold)':'var(--teal2)'};margin-bottom:6px;">SUPER FAMILY NIGHT</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px;">${new Date().toLocaleString('en-US',{month:'long'})} Family Average</div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:40px;font-weight:700;color:${familyAvg>=80?'#4aaa6a':familyAvg>=60?'var(--gold)':'#cc5533'};">${familyAvg}%</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;">${weekdays.length} weekdays tracked</div>
+          <div style="background:rgba(255,255,255,.06);border-radius:8px;height:10px;overflow:hidden;margin:12px 0;">
+            <div style="height:100%;width:${Math.min(100,familyAvg)}%;background:${familyAvg>=80?'linear-gradient(90deg,#4aaa6a,var(--gold))':familyAvg>=60?'var(--gold)':'#cc5533'};border-radius:8px;transition:width .8s;"></div>
+          </div>
+          <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px;">Goal: 80% &nbsp;&#9670;&nbsp; ${isUnlocked?'🎉 UNLOCKED!':'Need '+Math.max(0,80-familyAvg)+'% more'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+            ${agentIds.map(id => {
+              const a = AGENTS.find(ag=>ag.id===id);
+              const avg = agentAverages[id];
+              const isMe = id === currentAgent?.id;
+              return `<div style="background:${isMe?'rgba(12,200,200,.1)':'rgba(255,255,255,.05)'};border:${isMe?'1px solid rgba(12,200,200,.3)':'none'};border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:10px;color:rgba(255,255,255,.5);">${a?a.name:id}${isMe?' (you)':''}</div>
+                <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:${avg>=80?'#4aaa6a':avg>=60?'var(--gold)':'#cc5533'};">${avg}%</div>
+              </div>`;
+            }).join('')}
+          </div>
+          ${isUnlocked && sfnData.food ? `
+          <div style="background:linear-gradient(135deg,var(--teal),var(--indigo));border-radius:10px;padding:12px;margin-top:4px;">
+            <div style="font-size:20px;margin-bottom:4px;">🎉🍕🎉</div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--gold);">SUPER FAMILY NIGHT IS ON!</div>
+            ${sfnData.food?`<div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:4px;">Takeout: ${sfnData.food}</div>`:''}
+            ${sfnData.activity?`<div style="font-size:11px;color:rgba(255,255,255,.8);">Activity: ${sfnData.activity}</div>`:''}
+          </div>` :
+          isUnlocked ? `<div style="font-size:11px;color:var(--gold);">Unlocked! Dad &amp; Mom are planning the details...</div>` :
+          `<div style="font-size:11px;color:rgba(255,255,255,.4);line-height:1.6;">Every agent's daily score counts toward the family average. Pull together — if one team slips, the other can help pick up the pace.</div>`}
+        </div>`;
+    });
+  });
+}
+
+function triggerSuperFNBanner(sfnData){
+  if(document.getElementById('super-fn-banner')) return; // already showing
+  const banner = document.createElement('div');
+  banner.id = 'super-fn-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,rgba(12,200,200,.97),rgba(74,48,180,.97));z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;animation:sfnFadeIn .5s ease;';
+  banner.innerHTML = `
+    <style>@keyframes sfnFadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}</style>
+    <div style="font-size:60px;animation:bounce 1s infinite;margin-bottom:16px;">🎉</div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:3px;color:var(--gold);margin-bottom:8px;">SUPER FAMILY NIGHT</div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;color:white;margin-bottom:16px;">UNLOCKED!</div>
+    <div style="font-size:14px;color:rgba(255,255,255,.9);line-height:1.8;margin-bottom:6px;">You crushed it this month as a team.</div>
+    ${sfnData.food?`<div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px;">🍕 ${sfnData.food}</div>`:''}
+    ${sfnData.activity?`<div style="font-size:16px;font-weight:700;color:white;margin-bottom:20px;">🌙 ${sfnData.activity}</div>`:'<div style="margin-bottom:20px;"></div>'}
+    <button onclick="document.getElementById('super-fn-banner').remove()" style="padding:12px 32px;border:2px solid white;border-radius:30px;background:transparent;color:white;font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:2px;cursor:pointer;">LET'S GO!</button>`;
+  document.body.appendChild(banner);
+}
+
+
+// ══════════════════════════════════════════════════════
+// DEVOTIONAL SYSTEM
+// Family Devotional: Dawn leads with all boys, weekly
+// Dawn's Daily: personal, private, dashboard only
+// ══════════════════════════════════════════════════════
+
+function getDevotionalWeekKey(){
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateStr(monday);
+}
+
+// ─── FAMILY DEVOTIONAL INPUT (Dashboard) ──────────────
+
+function renderFamilyDevotionalInput(){
+  if(!_db) return;
+  const weekKey = getDevotionalWeekKey();
+  const d = new Date(weekKey);
+  const weekLabel = d.toLocaleDateString('en-US',{month:'long', day:'numeric'});
+
+  _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('family-devotional-input');
+    if(!el) return;
+
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Week of ${weekLabel}. This devotional will appear in each boy's Training tab when they open the app.
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Title / Theme</div>
+        <input type="text" id="fdev-title" placeholder="e.g. Patience Under Fire — Hans learns to wait" value="${data.title||''}"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;">
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Scripture</div>
+        <input type="text" id="fdev-scripture-ref" placeholder="Reference — e.g. James 1:2-4" value="${data.scriptureRef||''}"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;margin-bottom:6px;">
+        <textarea id="fdev-scripture-text" placeholder="Verse text (KJV)..." rows="3"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:none;">${data.scriptureText||''}</textarea>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Narrative / Story</div>
+        <textarea id="fdev-narrative" placeholder="The OWCA story, Hans vignette, field agent scene — write it here..." rows="8"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:vertical;">${data.narrative||''}</textarea>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Discussion Question</div>
+        <textarea id="fdev-question" placeholder="A question for the dinner table or the end of the reading..." rows="2"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:none;">${data.question||''}</textarea>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Prayer Prompt</div>
+        <textarea id="fdev-prayer" placeholder="Close with — e.g. Ask God to help you be patient this week, especially when..." rows="2"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:none;">${data.prayer||''}</textarea>
+      </div>
+
+      <button onclick="saveFamilyDevotional('${weekKey}')" class="btn-primary" style="width:100%;">
+        Save Family Devotional
+      </button>
+      <div id="fdev-saved" style="font-size:11px;color:var(--green2);text-align:center;margin-top:6px;display:none;">✓ Saved — boys will see this in their Training tab</div>
+
+      <!-- Previous weeks -->
+      <div id="fdev-history" style="margin-top:16px;"></div>`;
+
+    renderDevotionalHistory();
+  });
+}
+
+function saveFamilyDevotional(weekKey){
+  if(!_db) return;
+  const entry = {
+    title: document.getElementById('fdev-title').value.trim(),
+    scriptureRef: document.getElementById('fdev-scripture-ref').value.trim(),
+    scriptureText: document.getElementById('fdev-scripture-text').value.trim(),
+    narrative: document.getElementById('fdev-narrative').value.trim(),
+    question: document.getElementById('fdev-question').value.trim(),
+    prayer: document.getElementById('fdev-prayer').value.trim(),
+    savedAt: Date.now()
+  };
+  _db.ref(`stewart/devotional/family/${weekKey}`).set(entry).then(() => {
+    const el = document.getElementById('fdev-saved');
+    if(el){ el.style.display='block'; setTimeout(()=>el.style.display='none', 3000); }
+    renderDevotionalHistory();
+  });
+}
+
+function renderDevotionalHistory(){
+  if(!_db) return;
+  _db.ref('stewart/devotional/family').once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('fdev-history');
+    if(!el) return;
+    const weeks = Object.keys(data).sort().reverse().slice(1, 6); // skip current week
+    if(!weeks.length){ el.innerHTML=''; return; }
+
+    el.innerHTML = `<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Previous Weeks</div>` +
+      weeks.map(wk => {
+        const entry = data[wk];
+        const d = new Date(wk);
+        const label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        return `<div style="border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-bottom:6px;cursor:pointer;" onclick="loadDevotionalWeek('${wk}')">
+          <div style="font-size:12px;font-weight:700;color:var(--ink);">Week of ${label}${entry.title?' — '+entry.title:''}</div>
+          ${entry.scriptureRef?`<div style="font-size:11px;color:var(--muted);">${entry.scriptureRef}</div>`:''}
+        </div>`;
+      }).join('');
+  });
+}
+
+function loadDevotionalWeek(weekKey){
+  if(!_db) return;
+  _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
+    const data = snap.val() || {};
+    document.getElementById('fdev-title').value = data.title||'';
+    document.getElementById('fdev-scripture-ref').value = data.scriptureRef||'';
+    document.getElementById('fdev-scripture-text').value = data.scriptureText||'';
+    document.getElementById('fdev-narrative').value = data.narrative||'';
+    document.getElementById('fdev-question').value = data.question||'';
+    document.getElementById('fdev-prayer').value = data.prayer||'';
+    window.scrollTo(0,0);
+  });
+}
+
+// ─── DAWN'S DAILY DEVOTIONAL INPUT (Dashboard) ────────
+
+function renderDawnDevotionalInput(){
+  if(!_db) return;
+  const today = localDateStr();
+  const weekKey = getDevotionalWeekKey();
+
+  _db.ref(`stewart/devotional/dawn/${weekKey}`).once('value', snap => {
+    const weekData = snap.val() || {};
+    const el = document.getElementById('dawn-devotional-input');
+    if(!el) return;
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dow = new Date().getDay();
+
+    // Build day tabs Mon-Sun
+    const days = [];
+    for(let i=0; i<7; i++){
+      const d = new Date(weekKey);
+      d.setDate(d.getDate()+i);
+      days.push(localDateStr(d));
+    }
+
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Private — only visible here in your dashboard.
+      </div>
+      <div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;">
+        ${days.map((ds,i) => {
+          const hasEntry = weekData[ds] && weekData[ds].text;
+          const isToday = ds === today;
+          return `<button onclick="selectDawnDay('${ds}')" id="dawn-day-btn-${ds}"
+            style="flex-shrink:0;padding:6px 10px;border-radius:20px;border:1px solid ${isToday?'var(--green2)':hasEntry?'var(--border)':'var(--border)'};background:${isToday?'var(--green2)':hasEntry?'rgba(45,106,71,.1)':'transparent'};color:${isToday?'white':hasEntry?'var(--green2)':'var(--muted)'};font-size:11px;cursor:pointer;">
+            ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}${hasEntry?' ✓':''}
+          </button>`;
+        }).join('')}
+      </div>
+      <div id="dawn-day-entry"></div>`;
+
+    // Load today's entry by default
+    selectDawnDay(today);
+  });
+}
+
+function selectDawnDay(dateStr){
+  if(!_db) return;
+  const weekKey = getDevotionalWeekKey();
+  _db.ref(`stewart/devotional/dawn/${weekKey}/${dateStr}`).once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('dawn-day-entry');
+    if(!el) return;
+
+    const d = new Date(dateStr);
+    const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:8px;">${dayName}, ${dateStr}</div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Scripture</div>
+        <input type="text" id="dawn-dev-ref" placeholder="Reference" value="${data.ref||''}"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:5px;">
+        <textarea id="dawn-dev-verse" placeholder="Verse text..." rows="2"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:none;">${data.verse||''}</textarea>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Reflection / Notes</div>
+        <textarea id="dawn-dev-text" placeholder="What stood out today, what you're praying through, what God is showing you..." rows="5"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:vertical;">${data.text||''}</textarea>
+      </div>
+      <button onclick="saveDawnDevotional('${dateStr}')" class="btn-primary" style="width:100%;">Save</button>
+      <div id="dawn-dev-saved" style="font-size:11px;color:var(--green2);text-align:center;margin-top:5px;display:none;">✓ Saved</div>`;
+  });
+}
+
+function saveDawnDevotional(dateStr){
+  if(!_db) return;
+  const weekKey = getDevotionalWeekKey();
+  const entry = {
+    ref: document.getElementById('dawn-dev-ref').value.trim(),
+    verse: document.getElementById('dawn-dev-verse').value.trim(),
+    text: document.getElementById('dawn-dev-text').value.trim(),
+    savedAt: Date.now()
+  };
+  _db.ref(`stewart/devotional/dawn/${weekKey}/${dateStr}`).set(entry).then(() => {
+    const el = document.getElementById('dawn-dev-saved');
+    if(el){ el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
+    renderDawnDevotionalInput(); // refresh day tabs to show checkmarks
+  });
+}
+
+// ─── FAMILY DEVOTIONAL DISPLAY (Boys' Training tab) ───
+
+function renderFamilyDevotionalDisplay(){
+  const el = document.getElementById('family-devotional-display');
+  if(!el||!_db) return;
+
+  const weekKey = getDevotionalWeekKey();
+  _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
+    const data = snap.val();
+    if(!data||!data.title){
+      el.innerHTML = `<div class="empty" style="color:rgba(255,255,255,.3);">This week's devotional hasn't been posted yet.<br>Check back soon, Agent.</div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,var(--dark2),#0a140a);border:1px solid rgba(12,200,200,.2);border-radius:10px;padding:16px;margin-bottom:2px;">
+
+        ${data.title ? `
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:4px;">THIS WEEK'S DEVOTIONAL</div>
+        <div style="font-family:'Exo 2',sans-serif;font-size:16px;font-weight:700;color:var(--white);margin-bottom:14px;line-height:1.3;">${data.title}</div>` : ''}
+
+        ${data.scriptureRef ? `
+        <div style="background:rgba(232,184,74,.1);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:14px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:5px;">${data.scriptureRef}</div>
+          ${data.scriptureText?`<div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.7;font-style:italic;">&ldquo;${data.scriptureText}&rdquo;</div>`:''}
+        </div>` : ''}
+
+        ${data.narrative ? `
+        <div style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.8;margin-bottom:14px;white-space:pre-wrap;">${data.narrative}</div>` : ''}
+
+        ${data.question ? `
+        <div style="background:rgba(12,200,200,.08);border:1px solid rgba(12,200,200,.2);border-radius:8px;padding:11px 13px;margin-bottom:12px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">&#9654; DISCUSSION</div>
+          <div style="font-size:13px;color:var(--white);line-height:1.6;">${data.question}</div>
+        </div>` : ''}
+
+        ${data.prayer ? `
+        <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:12px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:rgba(255,255,255,.4);margin-bottom:5px;">&#9679; PRAYER</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.7;font-style:italic;">${data.prayer}</div>
+        </div>` : ''}
+
+      </div>`;
+  });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const pi = document.getElementById('private-input');
+  if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter') sendPrivateMessage(); });
+  initFirebase();
+});
+</script>
+</body>
+</html>
