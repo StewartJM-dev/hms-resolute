@@ -510,7 +510,7 @@ async function handleCard(token){
   muster({who:person, method:'qr', ok:true});
   setSession({person, role:'boy', assist:null});
   stopScan();
-  setTimeout(()=>{ location.href = 'boys/'; }, 900);
+  setTimeout(()=>{ location.href = 'boys/map.html'; }, 900);
 }
 
 // ───────────────────────── Officer password ─────────────────────────
@@ -542,7 +542,7 @@ async function doPinLogin(){
     muster({who, method:'pin-fallback', ok:true});
     setSession({person:who, role:'boy', assist:null});
     say('loginMsg','ok','Welcome aboard, '+CREW[who].name+'.');
-    setTimeout(()=>{ location.href='boys/'; }, 700);
+    setTimeout(()=>{ location.href='boys/map.html'; }, 700);
   }else{
     muster({who, method:'pin-fallback', ok:false});
     say('loginMsg','err','PIN incorrect.');
