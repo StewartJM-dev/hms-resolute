@@ -125,6 +125,7 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
     <nav>
       <div class="tab on" data-p="muster" onclick="go('muster')">📜 Muster Roll</div>
       <div class="tab" data-p="cards" onclick="go('cards')">🪪 ID Cards</div>
+      <div class="tab" data-p="creds" onclick="go('creds')">🔑 Credentials</div>
     </nav>
 
     <!-- MUSTER -->
@@ -153,6 +154,38 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
       <div class="print-note">Print on cardstock, cut, laminate. Standard ID size (3.37" × 2.125"). Reissuing a card voids the old one immediately.</div>
       <div class="cards-wrap" id="cardsWrap"></div>
       <button class="btn" style="margin-top:16px;" onclick="window.print()">🖨 Print All Cards</button>
+    </div>
+
+    <!-- CREDENTIALS -->
+    <div class="pane" id="p-creds">
+      <div class="card">
+        <h3>🔑 CREW FALLBACK PIN</h3>
+        <div class="print-note" style="margin:0 0 10px;">Used by any boy who's misplaced their card. Changing it takes effect immediately — the old PIN stops working the moment you save.</div>
+        <label>Current password (confirm it's you)</label>
+        <input type="password" id="credGatePw2">
+        <label>New PIN (4–6 digits)</label>
+        <input type="tel" id="newPin" inputmode="numeric" maxlength="6">
+        <button class="btn" onclick="changePin()">Update Crew PIN</button>
+        <div class="err" id="pinErr" style="display:none;"></div>
+        <div class="allclear" id="pinOk" style="display:none;">PIN updated. ✓</div>
+      </div>
+
+      <div class="card">
+        <h3>🔑 OFFICER PASSWORD</h3>
+        <div class="print-note" style="margin:0 0 10px;">Change your own password, or Dawn's (if you know it — otherwise have her do her own).</div>
+        <label>Which officer</label>
+        <select id="credWho">
+          <option value="john">John — Captain</option>
+          <option value="dawn">Dawn — Executive Officer</option>
+        </select>
+        <label>Current password for that officer</label>
+        <input type="password" id="credOldPw">
+        <label>New password</label>
+        <input type="password" id="credNewPw">
+        <button class="btn" onclick="changeOfficerPw()">Update Password</button>
+        <div class="err" id="pwErr" style="display:none;"></div>
+        <div class="allclear" id="pwOk" style="display:none;">Password updated. ✓</div>
+      </div>
     </div>
   </div>
 </main>
@@ -192,6 +225,7 @@ async function unlock(){
   if(hash===v.john || hash===v.dawn){
     document.getElementById('gate').style.display='none';
     document.getElementById('inner').style.display='block';
+    window.__unlockedHash = hash;
     loadMuster(); loadCards();
   }else{
     document.getElementById('gateErr').style.display='block';
@@ -319,6 +353,40 @@ async function reissue(id){
   await db.ref('resolute/auth/cards/'+genToken()).set({person:id, issued:Date.now()});
   db.ref('resolute/muster').push({t:firebase.database.ServerValue.TIMESTAMP, who:id, method:'card-reissue', ok:true, device:'registry'});
   loadCards();
+}
+
+// ── Change crew PIN ──
+async function changePin(){
+  const confirmPw = document.getElementById('credGatePw2').value;
+  const newPin = document.getElementById('newPin').value;
+  const err = document.getElementById('pinErr'), ok = document.getElementById('pinOk');
+  err.style.display='none'; ok.style.display='none';
+  if(!/^\d{4,6}$/.test(newPin)){ err.textContent='PIN must be 4–6 digits.'; err.style.display='block'; return; }
+  const hash = await sha256(confirmPw);
+  if(hash !== window.__unlockedHash){ err.textContent='That password is incorrect.'; err.style.display='block'; return; }
+  await db.ref('resolute/auth/crewPin').set(await sha256(newPin));
+  db.ref('resolute/muster').push({t:firebase.database.ServerValue.TIMESTAMP, who:'unknown', method:'pin-changed', ok:true, device:'registry'});
+  ok.style.display='block';
+  document.getElementById('credGatePw2').value=''; document.getElementById('newPin').value='';
+  setTimeout(()=>ok.style.display='none', 4000);
+}
+
+// ── Change an officer's password ──
+async function changeOfficerPw(){
+  const who = document.getElementById('credWho').value;
+  const oldPw = document.getElementById('credOldPw').value;
+  const newPw = document.getElementById('credNewPw').value;
+  const err = document.getElementById('pwErr'), ok = document.getElementById('pwOk');
+  err.style.display='none'; ok.style.display='none';
+  if(!newPw || newPw.length<4){ err.textContent='New password too short.'; err.style.display='block'; return; }
+  const snap = await db.ref('resolute/auth/parents/'+who).get();
+  const oldHash = await sha256(oldPw);
+  if(!snap.exists() || snap.val() !== oldHash){ err.textContent='Current password for that officer is incorrect.'; err.style.display='block'; return; }
+  await db.ref('resolute/auth/parents/'+who).set(await sha256(newPw));
+  db.ref('resolute/muster').push({t:firebase.database.ServerValue.TIMESTAMP, who, method:'password-changed', ok:true, device:'registry'});
+  ok.style.display='block';
+  document.getElementById('credOldPw').value=''; document.getElementById('credNewPw').value='';
+  setTimeout(()=>ok.style.display='none', 4000);
 }
 </script>
 </body>
