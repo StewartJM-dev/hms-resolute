@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HMS Resolute · Gangway</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+:root{
+  --navy:#0b1d33;--navy2:#12294a;--navy3:#1b3a63;
+  --brass:#b08d3e;--brass2:#d4af5a;--brass3:#8a6d2e;
+  --steel:#5d6b7a;--steel2:#8494a5;
+  --signal:#f2efe6;--paper:#e9e4d5;
+  --alert:#a63d40;--go:#3d8a5e;
+  --ink:#101820;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Crimson Pro',Georgia,serif;
+  background:
+    radial-gradient(ellipse at 50% -10%,rgba(212,175,90,.10),transparent 55%),
+    linear-gradient(170deg,var(--navy) 0%,#081426 60%,#060f1d 100%);
+  color:var(--signal);
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+}
+.hero{
+  width:100%; max-height:46vh; overflow:hidden; position:relative;
+}
+.hero img{
+  width:100%; height:100%; object-fit:cover; object-position:center 40%;
+  display:block; opacity:.88;
+}
+.hero::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(180deg,rgba(6,15,29,0) 0%,rgba(6,15,29,.55) 65%,var(--navy) 100%);
+}
+.masthead{ text-align:center; padding:30px 20px 10px; margin-top:-64px; position:relative; z-index:2;}
+.crest{ width:78px; height:78px; border-radius:50%; margin:0 auto 12px;
+  box-shadow:0 4px 18px rgba(0,0,0,.55), 0 0 0 2px rgba(212,175,90,.4); display:block;}
+.pennant{
+  font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.35em;
+  text-transform:uppercase;color:var(--brass2);margin-bottom:10px;
+}
+h1{
+  font-family:'Cinzel',serif;font-weight:900;font-size:clamp(30px,8vw,46px);
+  letter-spacing:.06em;color:var(--signal);line-height:1.05;
+}
+h1 .hms{ font-size:.45em; display:block; letter-spacing:.5em; color:var(--brass2); font-weight:600; margin-bottom:6px;}
+.motto{ font-style:italic; color:var(--steel2); margin-top:10px; font-size:15px; }
+.verse{ font-style:italic; color:var(--brass2); font-size:13px; margin-top:4px; opacity:.85;}
+
+.card{
+  width:min(480px,92vw);
+  background:linear-gradient(180deg,rgba(18,41,74,.85),rgba(11,29,51,.92));
+  border:1px solid rgba(212,175,90,.35);
+  border-radius:10px;
+  box-shadow:0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(242,239,230,.06);
+  margin:26px 0 40px; overflow:hidden;
+}
+.card-head{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:14px; border-bottom:1px solid rgba(212,175,90,.25);
+  font-family:'Cinzel',serif;font-size:14px;letter-spacing:.25em;color:var(--brass2);
+  background:rgba(0,0,0,.2);
+}
+.card-head::before,.card-head::after{content:"⚓";font-size:12px;opacity:.7;}
+.card-body{ padding:22px; }
+
+.modes{ display:flex; gap:8px; margin-bottom:18px; }
+.mode-btn{
+  flex:1; padding:11px 6px; border-radius:6px; cursor:pointer;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  background:rgba(0,0,0,.25); color:var(--steel2);
+  border:1px solid rgba(132,148,165,.3); transition:all .15s;
+}
+.mode-btn.active{ background:rgba(176,141,62,.18); color:var(--brass2); border-color:var(--brass);}
+
+.pane{ display:none; }
+.pane.on{ display:block; }
+
+/* QR scan pane */
+#scanBox{
+  position:relative; width:100%; aspect-ratio:4/3; border-radius:8px; overflow:hidden;
+  background:#000; border:1px solid rgba(212,175,90,.3);
+}
+#scanVideo{ width:100%; height:100%; object-fit:cover; }
+.scan-reticle{
+  position:absolute; inset:14%; border:2px solid rgba(212,175,90,.7); border-radius:8px;
+  box-shadow:0 0 0 999px rgba(0,0,0,.35); pointer-events:none;
+}
+.scan-hint{ text-align:center; font-size:14px; color:var(--steel2); margin-top:12px; }
+.big-btn{
+  width:100%; margin-top:14px; padding:14px; border:none; border-radius:6px; cursor:pointer;
+  font-family:'Cinzel',serif; font-size:15px; letter-spacing:.12em;
+  background:linear-gradient(180deg,var(--brass2),var(--brass)); color:var(--ink);
+  box-shadow:0 3px 10px rgba(0,0,0,.4);
+}
+.big-btn:disabled{ opacity:.5; }
+.ghost-btn{
+  width:100%; margin-top:10px; padding:11px; border-radius:6px; cursor:pointer;
+  background:transparent; color:var(--steel2); border:1px solid rgba(132,148,165,.35);
+  font-family:'Lato',sans-serif; font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+}
+
+label{ display:block; font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--steel2); margin:12px 0 6px; }
+input,select{
+  width:100%; padding:13px; border-radius:6px; font-size:17px;
+  background:rgba(0,0,0,.3); color:var(--signal);
+  border:1px solid rgba(132,148,165,.35); font-family:'Crimson Pro',serif;
+}
+input:focus,select:focus{ outline:none; border-color:var(--brass); }
+
+.msg{ margin-top:14px; padding:11px; border-radius:6px; font-size:14px; text-align:center; display:none; }
+.msg.err{ display:block; background:rgba(166,61,64,.18); border:1px solid rgba(166,61,64,.5); color:#e8a0a2; }
+.msg.ok{ display:block; background:rgba(61,138,94,.15); border:1px solid rgba(61,138,94,.5); color:#8fd4ad; }
+
+/* Deck chooser (post-login for parents) */
+.deck-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* ship map */
+.shipmap-wrap{ margin-bottom:6px; }
+.shipmap-svg{ width:100%; height:auto; display:block; }
+.hot{ cursor:pointer; transition:fill-opacity .15s, filter .15s; }
+.hot .hz{ fill:rgba(212,175,90,.10); stroke:rgba(212,175,90,.55); stroke-width:1.5; }
+.hot:hover .hz, .hot:active .hz{ fill:rgba(212,175,90,.30); filter:drop-shadow(0 0 6px rgba(212,175,90,.5)); }
+.hot .hlabel{ font-family:'Cinzel',serif; font-size:13px; fill:var(--brass2); text-anchor:middle; pointer-events:none; letter-spacing:.5px; }
+.hot .hicon{ font-size:20px; text-anchor:middle; pointer-events:none; }
+.hot.small .hlabel{ font-size:10px; }
+.hot.reg .hz{ stroke:rgba(132,148,165,.5); fill:rgba(93,107,122,.12); }
+.hot.reg:hover .hz{ fill:rgba(132,148,165,.28); }
+.mapcaption{
+  text-align:center; min-height:38px; margin-top:10px; padding:8px;
+  font-family:'Lato',sans-serif; font-size:12.5px; color:var(--steel2);
+  border-top:1px dashed rgba(132,148,165,.3);
+}
+.mapcaption b{ color:var(--brass2); font-family:'Cinzel',serif; letter-spacing:.05em; }
+.deck{
+  padding:16px 12px; border-radius:8px; cursor:pointer; text-align:center;
+  background:rgba(0,0,0,.25); border:1px solid rgba(212,175,90,.25);
+  transition:all .15s; text-decoration:none; color:var(--signal); display:block;
+}
+.deck:hover{ background:rgba(176,141,62,.14); border-color:var(--brass); }
+.deck .d-ico{ font-size:26px; }
+.deck .d-name{ font-family:'Cinzel',serif; font-size:13px; letter-spacing:.1em; margin-top:6px; color:var(--brass2);}
+.deck .d-sub{ font-size:11.5px; color:var(--steel2); margin-top:2px; font-style:italic;}
+.wide{ grid-column:1/-1; }
+.assist-row{ margin-top:16px; padding-top:14px; border-top:1px dashed rgba(132,148,165,.3); }
+.assist-flag{
+  display:none; margin:-6px 0 14px; padding:9px; text-align:center; border-radius:6px;
+  background:rgba(176,141,62,.18); border:1px solid var(--brass); color:var(--brass2);
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+}
+.whoami{
+  text-align:center; font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--steel2); margin-bottom:16px;
+}
+.whoami b{ color:var(--brass2); }
+
+/* setup */
+.setup-note{ font-size:14px; color:var(--steel2); line-height:1.55; margin-bottom:6px;}
+.foot{ text-align:center; font-size:11.5px; color:var(--steel); padding-bottom:30px; font-style:italic;}
+</style>
+</head>
+<body>
+
+<div class="hero"><img src="assets/hero-battleship.jpg" alt="HMS Resolute underway" loading="eager"></div>
+
+<div class="masthead">
+  <img class="crest" src="assets/crest.png" alt="HMS Resolute crest">
+  <div class="pennant">His Majesty's Service</div>
+  <h1><span class="hms">H·M·S</span>RESOLUTE</h1>
+  <div class="motto">Seven systems. One ship. One Majesty served.</div>
+  <div class="verse">"Be ye stedfast, unmoveable" — 1 Cor. 15:58</div>
+</div>
+
+<!-- ═══════════ LOGIN CARD ═══════════ -->
+<div class="card" id="loginCard">
+  <div class="card-head">GANGWAY · PRESENT IDENTIFICATION</div>
+  <div class="card-body">
+    <div class="modes">
+      <button class="mode-btn active" data-mode="qr" onclick="setMode('qr')">🪪 ID Card</button>
+      <button class="mode-btn" data-mode="pw" onclick="setMode('pw')">🔑 Officer</button>
+      <button class="mode-btn" data-mode="pin" onclick="setMode('pin')"># Fallback</button>
+    </div>
+
+    <!-- QR scan -->
+    <div class="pane on" id="pane-qr">
+      <div id="scanBox">
+        <video id="scanVideo" playsinline muted></video>
+        <div class="scan-reticle"></div>
+      </div>
+      <div class="scan-hint">Hold your ID card steady inside the frame.</div>
+      <button class="big-btn" id="camBtn" onclick="startScan()">Activate Scanner</button>
+    </div>
+
+    <!-- Officer password -->
+    <div class="pane" id="pane-pw">
+      <label>Officer</label>
+      <select id="pwWho">
+        <option value="john">John — Captain</option>
+        <option value="dawn">Dawn — Executive Officer</option>
+      </select>
+      <label>Password</label>
+      <input type="password" id="pwInput" autocomplete="current-password" onkeydown="if(event.key==='Enter')doPwLogin()">
+      <button class="big-btn" onclick="doPwLogin()">Come Aboard</button>
+    </div>
+
+    <!-- PIN fallback (boys) -->
+    <div class="pane" id="pane-pin">
+      <label>Crew Member</label>
+      <select id="pinWho">
+        <option value="samuel">Samuel — First Mate 🦅</option>
+        <option value="johnjr">John Jr. — Boatswain 🦁</option>
+        <option value="stephen">Stephen — Quartermaster 🦖</option>
+        <option value="daniel">Daniel — Gunner's Mate 🐘</option>
+      </select>
+      <label>Fallback PIN</label>
+      <input type="tel" id="pinInput" inputmode="numeric" maxlength="6" onkeydown="if(event.key==='Enter')doPinLogin()">
+      <button class="big-btn" onclick="doPinLogin()">Come Aboard</button>
+      <div class="scan-hint" style="margin-top:10px;">Lost card? Tell the Captain — a new one can be issued.</div>
+    </div>
+
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- ═══════════ DECK CHOOSER (parents) ═══════════ -->
+<div class="card" id="deckCard" style="display:none;">
+  <div class="card-head">ALL DECKS · UNIVERSAL CLEARANCE</div>
+  <div class="card-body">
+    <div class="whoami">Aboard: <b id="whoName">—</b></div>
+    <div class="shipmap-wrap">
+      <svg class="shipmap-svg" viewBox="0 0 1000 380" xmlns="http://www.w3.org/2000/svg">
+        <!-- waterline -->
+        <line x1="10" y1="330" x2="990" y2="330" stroke="rgba(132,148,165,.25)" stroke-dasharray="4 5"/>
+        <!-- hull silhouette (decorative, non-interactive) -->
+        <path d="M30,300 Q15,290 20,270 L40,150 Q45,138 60,138 L940,138 Q955,138 960,150 L975,265 Q980,288 955,300 Q900,318 500,318 Q120,318 30,300 Z"
+          fill="rgba(11,29,51,.35)" stroke="rgba(212,175,90,.35)" stroke-width="2"/>
+        <!-- mast -->
+        <line x1="200" y1="40" x2="200" y2="90" stroke="rgba(212,175,90,.5)" stroke-width="3"/>
+
+        <!-- CROW'S NEST -->
+        <g class="hot" data-name="Crow's Nest" data-sub="Spotted providence · the family watch-log" onclick="location.href='crowsnest/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <circle class="hz" cx="200" cy="34" r="26"/>
+          <text class="hicon" x="200" y="30">🔭</text>
+          <text class="hlabel small" x="200" y="50">Nest</text>
+        </g>
+
+        <!-- BRIDGE -->
+        <g class="hot" data-name="The Bridge" data-sub="Captain's station · instruments, devotional, planning" onclick="location.href='bridge/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="120" y="90" width="160" height="60" rx="6"/>
+          <text class="hicon" x="200" y="118">🧭</text>
+          <text class="hlabel" x="200" y="140">Bridge</text>
+        </g>
+
+        <!-- AGENT HQ (forward hull) -->
+        <g class="hot" data-name="Agent HQ" data-sub="Ship's boys' quarters · missions, devotional voting" onclick="location.href='boys/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="55" y="165" width="175" height="140" rx="6"/>
+          <text class="hicon" x="142" y="225">🫡</text>
+          <text class="hlabel" x="142" y="250">Agent HQ</text>
+        </g>
+
+        <!-- WAR ROOM -->
+        <g class="hot" data-name="War Room" data-sub="Prayer requests · daily sheet · Wall of Valor" onclick="location.href='warroom/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="245" y="175" width="150" height="130" rx="6"/>
+          <text class="hicon" x="320" y="230">⚔️</text>
+          <text class="hlabel" x="320" y="255">War Room</text>
+        </g>
+
+        <!-- HOMESTEAD (largest, amidships) -->
+        <g class="hot" data-name="The Homestead" data-sub="XO's station · Rounds, Quartermaster, Quarterdeck" onclick="location.href='dashboard/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="410" y="160" width="260" height="145" rx="6"/>
+          <text class="hicon" x="510" y="220">🏡</text>
+          <text class="hlabel" x="510" y="245">Homestead</text>
+        </g>
+        <!-- GALLEY (nested sub-station within Homestead) -->
+        <g class="hot small" data-name="The Galley" data-sub="Provisions · meals, recipes, planning" onclick="event.stopPropagation();location.href='kitchen/'" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="598" y="245" width="62" height="52" rx="5"/>
+          <text class="hicon" x="629" y="270" style="font-size:15px;">🍳</text>
+          <text class="hlabel small" x="629" y="288">Galley</text>
+        </g>
+
+        <!-- WARDROOM -->
+        <g class="hot" data-name="Wardroom" data-sub="Off-duty · the Adamah Saga, family annotations" onclick="location.href='saga/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="685" y="175" width="150" height="130" rx="6"/>
+          <text class="hicon" x="760" y="230">📖</text>
+          <text class="hlabel" x="760" y="255">Wardroom</text>
+        </g>
+
+        <!-- VINEYARD (aft, private) -->
+        <g class="hot" data-name="The Vineyard" data-sub="Private deck · date nights, shared devotional (own PIN)" onclick="location.href='vineyard/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="850" y="180" width="110" height="115" rx="6"/>
+          <text class="hicon" x="905" y="230">🍇</text>
+          <text class="hlabel small" x="905" y="252">Vineyard</text>
+        </g>
+
+        <!-- REGISTRY (utility, officers only, secondary styling) -->
+        <g class="hot reg" data-name="Ship's Registry" data-sub="Officers only · muster roll, ID cards" onclick="location.href='registry.html'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+          <rect class="hz" x="20" y="30" width="90" height="34" rx="5"/>
+          <text class="hlabel small" x="65" y="52">📜 Registry</text>
+        </g>
+      </svg>
+      <div class="mapcaption" id="mapCaption">Hover or tap a deck to see what's aboard.</div>
+    </div>
+    <div class="assist-row">
+      <label>Assist a crew member (flagged &amp; logged)</label>
+      <select id="assistWho">
+        <option value="">— select —</option>
+        <option value="samuel">Samuel 🦅</option>
+        <option value="johnjr">John Jr. 🦁</option>
+        <option value="stephen">Stephen 🦖</option>
+        <option value="daniel">Daniel 🐘</option>
+      </select>
+      <button class="ghost-btn" onclick="startAssist()">Board Agent HQ as Assisting Officer</button>
+    </div>
+    <button class="ghost-btn" style="margin-top:16px;" onclick="logout()">Depart Ship (log out)</button>
+  </div>
+</div>
+
+<!-- ═══════════ FIRST-RUN SETUP ═══════════ -->
+<div class="card" id="setupCard" style="display:none;">
+  <div class="card-head">COMMISSIONING · FIRST RUN</div>
+  <div class="card-body">
+    <p class="setup-note">No ship's records found. Set the officers' passwords and the crew fallback PIN. Card codes for the four crew members will be generated automatically — print their ID cards afterward from the Ship's Registry.</p>
+    <label>Captain (John) — password</label>
+    <input type="password" id="suJohn">
+    <label>Executive Officer (Dawn) — password</label>
+    <input type="password" id="suDawn">
+    <label>Crew fallback PIN (4–6 digits, shared)</label>
+    <input type="tel" id="suPin" inputmode="numeric" maxlength="6">
+    <button class="big-btn" onclick="commission()">Commission the Ship</button>
+    <div class="msg" id="setupMsg"></div>
+  </div>
+</div>
+
+<div class="foot">"Except the LORD build the house, they labour in vain that build it." — Psalm 127:1</div>
+
+<script>
+// ───────────────────────── Firebase ─────────────────────────
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+firebase.initializeApp(FB_CONFIG);
+const db = firebase.database();
+
+const CREW = {
+  samuel:{name:'Samuel', pos:'First Mate', icon:'🦅'},
+  johnjr:{name:'John Jr.', pos:'Boatswain', icon:'🦁'},
+  stephen:{name:'Stephen', pos:'Quartermaster', icon:'🦖'},
+  daniel:{name:'Daniel', pos:"Gunner's Mate", icon:'🐘'}
+};
+const OFFICERS = { john:{name:'John', pos:'Captain'}, dawn:{name:'Dawn', pos:'Executive Officer'} };
+
+// ───────────────────────── Helpers ─────────────────────────
+async function sha256(s){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function deviceTag(){
+  const ua = navigator.userAgent;
+  let d = 'Unknown device';
+  if(/iPhone/.test(ua)) d='iPhone'; else if(/iPad/.test(ua)) d='iPad';
+  else if(/Macintosh/.test(ua)) d='Mac'; else if(/Windows/.test(ua)) d='Windows laptop';
+  else if(/Android/.test(ua)) d='Android'; else if(/CrOS/.test(ua)) d='Chromebook';
+  return d;
+}
+function muster(entry){
+  db.ref('resolute/muster').push({ t: firebase.database.ServerValue.TIMESTAMP, device: deviceTag(), ...entry });
+}
+function say(id, kind, text){
+  const el = document.getElementById(id);
+  el.className = 'msg ' + kind; el.textContent = text;
+  if(kind==='err') setTimeout(()=>{ el.className='msg'; }, 5000);
+}
+function setSession(sess){
+  localStorage.setItem('resolute.session', JSON.stringify({...sess, ts: Date.now()}));
+}
+function getSession(){
+  try{ return JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){ return null; }
+}
+function logout(){
+  const s = getSession();
+  if(s) muster({who:s.person, method:'logout', ok:true});
+  localStorage.removeItem('resolute.session');
+  location.reload();
+}
+
+function mapSay(el){
+  document.getElementById('mapCaption').innerHTML =
+    '<b>'+el.dataset.name+'</b> — '+el.dataset.sub;
+}
+function mapClear(){
+  document.getElementById('mapCaption').textContent = "Hover or tap a deck to see what's aboard.";
+}
+
+// ───────────────────────── Mode switching ─────────────────────────
+function setMode(m){
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pane-'+m).classList.add('on');
+  if(m!=='qr') stopScan();
+}
+
+// ───────────────────────── QR scanning ─────────────────────────
+let scanStream=null, scanRAF=null;
+const video = document.getElementById('scanVideo');
+const canvas = document.createElement('canvas');
+
+async function startScan(){
+  const btn = document.getElementById('camBtn');
+  btn.disabled = true; btn.textContent = 'Opening camera…';
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});
+    video.srcObject = scanStream;
+    await video.play();
+    btn.textContent = 'Scanner Active — present card';
+    tick();
+  }catch(e){
+    btn.disabled=false; btn.textContent='Activate Scanner';
+    say('loginMsg','err','Camera unavailable. Use the Fallback PIN.');
+  }
+}
+function stopScan(){
+  if(scanRAF) cancelAnimationFrame(scanRAF);
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+  const btn = document.getElementById('camBtn');
+  btn.disabled=false; btn.textContent='Activate Scanner';
+}
+let lastScanHandled = 0;
+function tick(){
+  if(!scanStream) return;
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code = jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
+    if(code && code.data && Date.now()-lastScanHandled > 2500){
+      lastScanHandled = Date.now();
+      handleCard(code.data.trim());
+    }
+  }
+  scanRAF = requestAnimationFrame(tick);
+}
+async function handleCard(token){
+  if(!/^RSLT-/.test(token)){ say('loginMsg','err','Not a Resolute ID card.');
+    muster({who:'unknown', method:'qr', ok:false, note:'foreign QR'}); return; }
+  const snap = await db.ref('resolute/auth/cards/'+token).get();
+  if(!snap.exists()){
+    say('loginMsg','err','Card not recognized. See the Captain.');
+    muster({who:'unknown', method:'qr', ok:false, note:'unknown card '+token.slice(0,14)});
+    return;
+  }
+  const person = snap.val().person;
+  const c = CREW[person];
+  say('loginMsg','ok','Welcome aboard, '+(c?c.name:person)+'. Proceeding to quarters…');
+  muster({who:person, method:'qr', ok:true});
+  setSession({person, role:'boy', assist:null});
+  stopScan();
+  setTimeout(()=>{ location.href = 'boys/'; }, 900);
+}
+
+// ───────────────────────── Officer password ─────────────────────────
+async function doPwLogin(){
+  const who = document.getElementById('pwWho').value;
+  const pw = document.getElementById('pwInput').value;
+  if(!pw) return;
+  const hash = await sha256(pw);
+  const snap = await db.ref('resolute/auth/parents/'+who).get();
+  if(snap.exists() && snap.val() === hash){
+    muster({who, method:'password', ok:true});
+    setSession({person:who, role:'parent', assist:null});
+    showDecks(who);
+  }else{
+    muster({who, method:'password', ok:false});
+    say('loginMsg','err','Password incorrect.');
+  }
+  document.getElementById('pwInput').value='';
+}
+
+// ───────────────────────── PIN fallback ─────────────────────────
+async function doPinLogin(){
+  const who = document.getElementById('pinWho').value;
+  const pin = document.getElementById('pinInput').value;
+  if(!pin) return;
+  const hash = await sha256(pin);
+  const snap = await db.ref('resolute/auth/crewPin').get();
+  if(snap.exists() && snap.val() === hash){
+    muster({who, method:'pin-fallback', ok:true});
+    setSession({person:who, role:'boy', assist:null});
+    say('loginMsg','ok','Welcome aboard, '+CREW[who].name+'.');
+    setTimeout(()=>{ location.href='boys/'; }, 700);
+  }else{
+    muster({who, method:'pin-fallback', ok:false});
+    say('loginMsg','err','PIN incorrect.');
+  }
+  document.getElementById('pinInput').value='';
+}
+
+// ───────────────────────── Parent deck view & assist ─────────────────────────
+function showDecks(who){
+  document.getElementById('loginCard').style.display='none';
+  document.getElementById('deckCard').style.display='block';
+  document.getElementById('whoName').textContent = OFFICERS[who].name + ' · ' + OFFICERS[who].pos;
+}
+function startAssist(){
+  const s = getSession();
+  const as = document.getElementById('assistWho').value;
+  if(!s || s.role!=='parent' || !as) return;
+  setSession({...s, assist:{parent:s.person, as}});
+  muster({who:s.person, method:'assist-start', ok:true, assist:{parent:s.person, as}});
+  location.href = 'boys/?assist=' + s.person + '&as=' + as;
+}
+
+// ───────────────────────── First-run commissioning ─────────────────────────
+function genToken(){
+  const a = new Uint8Array(6); crypto.getRandomValues(a);
+  return 'RSLT-' + [...a].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+async function commission(){
+  const j = document.getElementById('suJohn').value;
+  const d = document.getElementById('suDawn').value;
+  const p = document.getElementById('suPin').value;
+  if(!j || !d || !/^\d{4,6}$/.test(p)){ say('setupMsg','err','Fill all three (PIN must be 4–6 digits).'); return; }
+  const cards = {};
+  Object.keys(CREW).forEach(k=>{ cards[genToken()] = {person:k, issued: Date.now()}; });
+  await db.ref('resolute/auth').set({
+    parents:{ john: await sha256(j), dawn: await sha256(d) },
+    crewPin: await sha256(p),
+    cards
+  });
+  muster({who:'john', method:'commissioning', ok:true});
+  say('setupMsg','ok','Ship commissioned. Print the crew ID cards from the Ship\'s Registry.');
+  setTimeout(()=>location.reload(), 1600);
+}
+
+// ───────────────────────── Boot ─────────────────────────
+(async function boot(){
+  const auth = await db.ref('resolute/auth/parents').get();
+  if(!auth.exists()){
+    document.getElementById('loginCard').style.display='none';
+    document.getElementById('setupCard').style.display='block';
+    return;
+  }
+  const s = getSession();
+  if(s && s.role==='parent' && Date.now()-s.ts < 1000*60*60*12){
+    showDecks(s.person);
+  }
+})();
+</script>
+</body>
+</html>
