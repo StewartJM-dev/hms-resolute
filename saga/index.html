@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>The Adamah Saga</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --ink:#16120c;--ink2:#241c12;--parch:#f4ecd8;--parch2:#ece0c8;
+  --gold:#b8893a;--gold2:#d9b36a;--deep:#0e0a06;
+  --cream:#f6efe0;--muted:#9a8a6f;--rule:#3a2e1d;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'EB Garamond',Georgia,serif;
+  background:
+    radial-gradient(ellipse at top,rgba(184,137,58,.12),transparent 55%),
+    linear-gradient(170deg,#16120c,#0e0a06);
+  background-attachment:fixed;color:var(--cream);min-height:100vh;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:680px;margin:0 auto;padding:0 18px 70px;}
+
+/* interior banner */
+.saga-banner{width:100%;max-height:180px;overflow:hidden;border-radius:12px;margin:14px 0 4px;position:relative;
+  border:1px solid rgba(184,137,58,.3);box-shadow:0 6px 22px rgba(0,0,0,.4);}
+.saga-banner img{width:100%;height:100%;object-fit:cover;object-position:center 50%;display:block;opacity:.9;}
+.saga-banner::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(14,10,6,0) 45%,rgba(14,10,6,.7) 100%);}
+
+/* lock */
+#lock{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;
+  background:radial-gradient(ellipse at 50% 30%,rgba(184,137,58,.18),transparent 60%),linear-gradient(170deg,#16120c,#0e0a06);}
+#lock .orn{color:var(--gold2);letter-spacing:7px;font-size:14px;opacity:.6;margin-bottom:14px;}
+#lock h1{font-family:'Cinzel',serif;font-weight:900;font-size:30px;text-align:center;
+  background:linear-gradient(180deg,#f0dcae,var(--gold) 70%,#7a531c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;}
+#lock .sub{font-style:italic;color:var(--gold2);opacity:.75;margin:10px 0 30px;text-align:center;font-size:15px;}
+.pin-dots{display:flex;gap:13px;margin-bottom:24px;}
+.pdot{width:14px;height:14px;border-radius:50%;border:2px solid var(--gold);opacity:.4;transition:.2s;}
+.pdot.filled{opacity:1;background:var(--gold);}
+.keypad{display:grid;grid-template-columns:repeat(3,70px);gap:13px;}
+.key{width:70px;height:70px;border-radius:50%;background:rgba(184,137,58,.12);border:1px solid rgba(184,137,58,.3);
+  color:var(--cream);font-family:'EB Garamond',serif;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.1s;}
+.key:active{background:rgba(184,137,58,.3);transform:scale(.94);}
+.key.blank{background:none;border:none;}
+#lock .err{color:var(--gold2);min-height:20px;margin-top:14px;font-style:italic;}
+
+/* masthead */
+.mast{text-align:center;padding:22px 0 6px;}
+.mast .orn{color:var(--gold2);letter-spacing:6px;font-size:12px;opacity:.55;margin-bottom:10px;}
+.mast h1{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(26px,7vw,40px);
+  background:linear-gradient(180deg,#f0dcae,var(--gold) 72%,#7a531c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;}
+.mast .by{font-family:'Lato',sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold2);opacity:.7;margin-top:10px;}
+.mast .book{font-style:italic;opacity:.7;font-size:15px;margin-top:12px;}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px 0;opacity:.4;}
+
+/* chapter list */
+.toc-intro{text-align:center;font-style:italic;opacity:.65;font-size:15px;margin-bottom:20px;line-height:1.5;}
+.chap{display:block;width:100%;text-align:left;cursor:pointer;
+  background:linear-gradient(145deg,rgba(184,137,58,.1),rgba(36,28,18,.4));
+  border:1px solid rgba(184,137,58,.22);border-radius:11px;padding:15px 17px;margin-bottom:11px;transition:.15s;color:inherit;font-family:inherit;}
+.chap:active{transform:scale(.99);}
+.chap .cnum{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold2);opacity:.8;}
+.chap .ctitle{font-family:'Cinzel',serif;font-size:18px;color:var(--cream);margin-top:4px;}
+.chap .cmeta{font-size:13px;opacity:.6;margin-top:5px;font-style:italic;}
+.chap.unread .cnum::after{content:" • new";color:var(--gold2);opacity:.9;}
+.empty{text-align:center;opacity:.55;font-style:italic;padding:40px 20px;line-height:1.6;}
+
+/* reader */
+#reader{display:none;}
+.reader-bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;padding:12px 0;
+  background:linear-gradient(180deg,#16120c 70%,transparent);margin-bottom:10px;}
+.reader-bar button{background:none;border:1px solid var(--gold);color:var(--gold2);border-radius:8px;
+  width:34px;height:34px;font-size:16px;cursor:pointer;flex-shrink:0;}
+.reader-bar .rtitle{font-family:'Cinzel',serif;font-size:15px;color:var(--cream);flex:1;line-height:1.2;}
+.chapter-body{font-size:19px;line-height:1.75;letter-spacing:.2px;}
+.chapter-body .chnum{text-align:center;font-family:'Lato',sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold2);opacity:.75;margin-bottom:6px;}
+.chapter-body .chttl{text-align:center;font-family:'Cinzel',serif;font-size:26px;color:var(--gold2);margin-bottom:26px;font-weight:700;}
+.chapter-body p{margin-bottom:1.1em;text-indent:1.6em;}
+.chapter-body p:first-of-type{text-indent:0;}
+.chapter-body p:first-of-type::first-letter{font-family:'Cinzel',serif;font-size:3.1em;float:left;line-height:.82;margin:.02em .08em 0 0;color:var(--gold);}
+.chapter-end{text-align:center;color:var(--gold2);opacity:.5;letter-spacing:6px;margin:34px 0;}
+.reader-nav{display:flex;gap:10px;margin:24px 0 10px;}
+.reader-nav button{flex:1;padding:12px;border-radius:9px;border:1px solid rgba(184,137,58,.35);
+  background:rgba(184,137,58,.1);color:var(--cream);font-family:'Cinzel',serif;font-size:14px;cursor:pointer;}
+.reader-nav button:disabled{opacity:.3;}
+
+.sync{text-align:center;font-size:10px;letter-spacing:1px;color:var(--muted);opacity:.5;margin-top:24px;font-family:'Lato',sans-serif;}
+.foot{text-align:center;margin-top:18px;font-size:12px;opacity:.4;font-style:italic;}
+.foot .v{font-family:'Cinzel',serif;font-style:normal;letter-spacing:1px;color:var(--gold2);opacity:.6;}
+</style>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lock">
+  <div class="orn">✦ ✦ ✦</div>
+  <h1>The Adamah Saga</h1>
+  <div class="sub">by Noah Elias</div>
+  <div class="pin-dots" id="pin-dots"></div>
+  <div class="keypad" id="keypad"></div>
+  <div class="err" id="lock-err"></div>
+</div>
+
+<!-- APP -->
+<div class="wrap" id="app" style="display:none;">
+
+  <!-- TABLE OF CONTENTS -->
+  <div id="toc">
+    <div class="saga-banner"><img src="assets/wardroom-interior.jpg" alt="" loading="lazy"></div>
+    <div class="mast">
+      <div class="orn">✦ ✦ ✦</div>
+      <h1>The Adamah Saga</h1>
+      <div class="by">by Noah Elias</div>
+      <div class="book" id="book-title">Book Four · The Ascension</div>
+    </div>
+    <div class="rule"></div>
+    <div class="toc-intro">The chapters released so far. New ones arrive as they are finished.</div>
+    <div id="chapter-list"></div>
+    <div class="sync" id="sync">connecting…</div>
+    <div class="foot"><div class="v">Jude 14</div>"And Enoch also… prophesied of these…"</div>
+  </div>
+
+  <!-- READER -->
+  <div id="reader">
+    <div class="reader-bar">
+      <button onclick="closeChapter()">&#8592;</button>
+      <div class="rtitle" id="reader-title"></div>
+    </div>
+    <div class="chapter-body" id="chapter-body"></div>
+    <div class="chapter-end">✦ ✦ ✦</div>
+    <div class="reader-nav">
+      <button id="prev-btn" onclick="navChapter(-1)">‹ Previous</button>
+      <button id="next-btn" onclick="navChapter(1)">Next ›</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// THE ADAMAH SAGA — reader (PIN-locked). Family-facing.
+// Reads released chapters from Firebase. Released/managed from the Bridge.
+// ════════════════════════════════════════════════════
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+const PIN = "1982";
+let _db=null;
+let CHAPTERS=[];   // released chapters, ordered
+let currentIdx=-1;
+
+// ---- lock ----
+let pinEntry="";
+function buildLock(){
+  const dots=document.getElementById('pin-dots');
+  dots.innerHTML=[0,1,2,3].map(i=>`<div class="pdot" id="pd${i}"></div>`).join('');
+  const keys=['1','2','3','4','5','6','7','8','9','blank','0','del'];
+  document.getElementById('keypad').innerHTML=keys.map(k=>{
+    if(k==='blank')return '<div class="key blank"></div>';
+    if(k==='del')return '<button class="key" data-k="del">⌫</button>';
+    return `<button class="key" data-k="${k}">${k}</button>`;
+  }).join('');
+  document.querySelectorAll('.key[data-k]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.k;
+    if(k==='del')pinEntry=pinEntry.slice(0,-1);
+    else if(pinEntry.length<4)pinEntry+=k;
+    for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinEntry.length);
+    if(pinEntry.length===4)checkPin();
+  }));
+}
+function checkPin(){
+  if(pinEntry===PIN){
+    document.getElementById('lock').style.display='none';
+    document.getElementById('app').style.display='block';
+    startApp();
+  }else{
+    document.getElementById('lock-err').textContent='Not quite.';
+    pinEntry="";setTimeout(()=>{for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.remove('filled');document.getElementById('lock-err').textContent='';},800);
+  }
+}
+
+function startApp(){
+  try{
+    firebase.initializeApp(FB_CONFIG);
+    _db=firebase.database();
+    _db.ref('.info/connected').on('value',s=>{
+      document.getElementById('sync').textContent=s.val()?'':'○ offline';
+      if(s.val())loadChapters();
+    });
+  }catch(e){document.getElementById('sync').textContent='○ offline';}
+}
+
+function loadChapters(){
+  // saga/meta holds book title; saga/chapters holds all; only released show in reader
+  _db.ref('saga/meta/bookTitle').once('value',s=>{ if(s.val()) document.getElementById('book-title').textContent=s.val(); });
+  _db.ref('saga/chapters').on('value',s=>{
+    const v=s.val()||{};
+    CHAPTERS=Object.entries(v).map(([k,c])=>({k,...c}))
+      .filter(c=>c.released)
+      .sort((a,b)=>(a.order||0)-(b.order||0));
+    renderTOC();
+  });
+}
+
+function renderTOC(){
+  const el=document.getElementById('chapter-list');
+  if(!CHAPTERS.length){
+    el.innerHTML='<div class="empty">No chapters released yet.<br>The first will arrive soon.</div>';
+    return;
+  }
+  let seen={};
+  try{ seen=JSON.parse(localStorage.getItem('saga-read')||'{}'); }catch(e){}
+  el.innerHTML=CHAPTERS.map((c,i)=>`
+    <button class="chap ${seen[c.k]?'':'unread'}" onclick="openChapter(${i})">
+      <div class="cnum">Chapter ${c.number||(i+1)}</div>
+      <div class="ctitle">${esc(c.title||'Untitled')}</div>
+      ${c.released_at?`<div class="cmeta">Released ${new Date(c.released_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>`:''}
+    </button>`).join('');
+}
+
+function openChapter(i){
+  currentIdx=i;
+  const c=CHAPTERS[i];
+  document.getElementById('toc').style.display='none';
+  document.getElementById('reader').style.display='block';
+  document.getElementById('reader-title').textContent='Chapter '+(c.number||(i+1));
+  // render paragraphs
+  const paras=(c.text||'').split(/\n\s*\n/).filter(p=>p.trim());
+  document.getElementById('chapter-body').innerHTML=
+    `<div class="chnum">Chapter ${c.number||(i+1)}</div><div class="chttl">${esc(c.title||'')}</div>`+
+    paras.map(p=>`<p>${esc(p.trim())}</p>`).join('');
+  document.getElementById('prev-btn').disabled=(i===0);
+  document.getElementById('next-btn').disabled=(i===CHAPTERS.length-1);
+  // mark read
+  try{ const seen=JSON.parse(localStorage.getItem('saga-read')||'{}'); seen[c.k]=true; localStorage.setItem('saga-read',JSON.stringify(seen)); }catch(e){}
+  window.scrollTo(0,0);
+}
+function navChapter(d){ const n=currentIdx+d; if(n>=0&&n<CHAPTERS.length) openChapter(n); }
+function closeChapter(){
+  document.getElementById('reader').style.display='none';
+  document.getElementById('toc').style.display='block';
+  renderTOC();
+  window.scrollTo(0,0);
+}
+
+function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+buildLock();
+</script>
+</body>
+</html>
