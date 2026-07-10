@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Systems Seven — The Bridge</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Systems Seven">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --green:#1a4a2e;--green2:#2d6a47;--green3:#3d8a5e;
+  --indigo:#1e2d5a;--indigo2:#2e3f7a;--indigo3:#3a4f95;
+  --gold:#c8922a;--gold2:#e8b84a;
+  --white:#f9f7f2;--offwhite:#ede9e0;--cream:#f7f2ea;
+  --black:#0e0e0e;--ink:#1a1410;--brown:#5c3d1e;
+  --rust:#b5451b;--muted:#8a7a65;--border:#e0d5c0;
+  --card:#ffffff;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Crimson Pro',Georgia,serif;
+  background:
+    radial-gradient(ellipse at top,rgba(46,63,122,.18),transparent 60%),
+    linear-gradient(160deg,#0c1326 0%,#0e1a2e 45%,#0a1422 100%);
+  color:var(--white);
+  min-height:100vh;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:760px;margin:0 auto;padding:22px 16px 60px;}
+
+/* ===== Interior banner ===== */
+.bridge-banner{
+  width:100%; max-height:190px; overflow:hidden; border-radius:14px;
+  margin-bottom:18px; position:relative; box-shadow:0 6px 24px rgba(0,0,0,.4);
+  border:1px solid rgba(200,146,42,.3);
+}
+.bridge-banner img{ width:100%; height:100%; object-fit:cover; object-position:center 55%; display:block; opacity:.92;}
+.bridge-banner::after{ content:""; position:absolute; inset:0;
+  background:linear-gradient(180deg,rgba(10,20,34,0) 40%,rgba(10,20,34,.65) 100%); }
+
+/* ===== Masthead ===== */
+.mast{text-align:center;padding:18px 0 10px;position:relative;}
+.mast .star{font-size:13px;color:var(--gold2);letter-spacing:6px;margin-bottom:8px;}
+.mast h1{
+  font-family:'Cinzel',serif;font-weight:900;
+  font-size:clamp(30px,9vw,46px);line-height:1;
+  background:linear-gradient(180deg,#f2e3b8,var(--gold) 70%,#9a6c1c);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  letter-spacing:2px;
+}
+.mast .sub{
+  font-family:'Lato',sans-serif;font-weight:300;
+  font-size:12px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--gold2);opacity:.8;margin-top:10px;
+}
+.mast .verse{
+  font-style:italic;color:var(--offwhite);opacity:.7;
+  font-size:14px;margin-top:14px;
+}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px 0;opacity:.5;}
+
+/* ===== Today banner ===== */
+.today{
+  background:linear-gradient(135deg,rgba(46,63,122,.5),rgba(26,74,46,.35));
+  border:1px solid rgba(200,146,42,.35);
+  border-radius:14px;padding:18px 20px;text-align:center;
+  box-shadow:0 4px 24px rgba(0,0,0,.3);
+}
+.today .label{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold2);opacity:.85;}
+.today .day{font-family:'Cinzel',serif;font-weight:700;font-size:28px;margin:4px 0 2px;color:var(--white);}
+.today .watch{font-size:17px;color:var(--gold2);font-weight:600;}
+.today .focus{font-size:15px;opacity:.85;margin-top:8px;font-style:italic;}
+
+/* ===== Section heads ===== */
+.shead{
+  font-family:'Cinzel',serif;font-weight:700;font-size:13px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--gold2);
+  margin:30px 0 12px;display:flex;align-items:center;gap:10px;
+}
+.shead::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(200,146,42,.4),transparent);}
+
+/* ===== Week grid ===== */
+.week{display:flex;flex-direction:column;gap:8px;}
+.dayrow{
+  display:flex;align-items:stretch;gap:0;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:11px;overflow:hidden;
+  transition:.2s;
+}
+.dayrow.is-today{
+  border-color:var(--gold);
+  background:linear-gradient(135deg,rgba(200,146,42,.16),rgba(46,63,122,.2));
+  box-shadow:0 2px 16px rgba(200,146,42,.15);
+}
+.dayrow .dname{
+  flex:0 0 92px;display:flex;flex-direction:column;justify-content:center;
+  padding:12px 10px;background:rgba(0,0,0,.18);
+}
+.dayrow .dname b{font-family:'Cinzel',serif;font-size:15px;color:var(--white);}
+.dayrow .dname span{font-family:'Lato',sans-serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2);opacity:.75;margin-top:2px;}
+.dayrow .dbody{flex:1;padding:11px 14px;display:flex;flex-direction:column;justify-content:center;}
+.dayrow .dsys{font-weight:600;font-size:15px;color:var(--gold2);}
+.dayrow .dnote{font-size:13.5px;opacity:.82;margin-top:2px;line-height:1.35;}
+
+/* ===== Systems list ===== */
+.systems{display:grid;grid-template-columns:1fr;gap:8px;}
+.sys{
+  display:flex;align-items:flex-start;gap:13px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-left:3px solid var(--gold);
+  border-radius:10px;padding:13px 15px;
+}
+.sys .ico{font-size:22px;flex-shrink:0;line-height:1.1;}
+.sys .stext b{font-family:'Cinzel',serif;font-size:14px;letter-spacing:.5px;color:var(--white);display:block;}
+.sys .stext .role{font-size:13.5px;opacity:.8;margin-top:3px;line-height:1.4;}
+
+/* ===== Subsystem links (the fleet) ===== */
+.fleet{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:520px){.fleet{grid-template-columns:1fr;}}
+.port{
+  display:block;text-decoration:none;color:inherit;
+  background:linear-gradient(135deg,rgba(46,63,122,.35),rgba(0,0,0,.15));
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;padding:16px;transition:.2s;position:relative;
+}
+.port:active{transform:scale(.98);}
+.port.live{border-color:rgba(61,138,94,.5);}
+.port.soon{opacity:.62;}
+.port .pico{font-size:24px;}
+.port .pname{font-family:'Cinzel',serif;font-weight:700;font-size:16px;margin:8px 0 3px;color:var(--white);}
+.port .pdesc{font-size:13px;opacity:.78;line-height:1.4;}
+.port .badge{
+  position:absolute;top:12px;right:12px;
+  font-family:'Lato',sans-serif;font-size:8.5px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:10px;
+}
+.port.live .badge{background:var(--green3);color:#fff;}
+.port.soon .badge{background:rgba(200,146,42,.25);color:var(--gold2);border:1px solid rgba(200,146,42,.4);}
+
+/* ===== Crew status ===== */
+.crew{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media(max-width:520px){.crew{grid-template-columns:1fr 1fr;}}
+.crew-loading{grid-column:1/-1;text-align:center;opacity:.5;font-style:italic;padding:14px;}
+.crewcard{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  border-left:3px solid var(--gold);
+  border-radius:10px;padding:12px 13px;
+}
+.crewcard .cname{font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--white);display:flex;align-items:center;gap:7px;}
+.crewcard .cmiss{font-size:13px;opacity:.85;margin-top:5px;}
+.crewcard .cbar{height:6px;border-radius:4px;background:rgba(255,255,255,.12);margin-top:7px;overflow:hidden;}
+.crewcard .cbar i{display:block;height:100%;background:linear-gradient(90deg,var(--green3),var(--gold));border-radius:4px;transition:width .4s;}
+.crewcard .cscore{font-size:12px;opacity:.7;margin-top:5px;font-family:'Lato',sans-serif;}
+
+/* ===== Transmission composer ===== */
+.transmit{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;padding:14px;
+}
+.tx-row{display:flex;gap:8px;margin-bottom:9px;}
+.transmit select{
+  flex:1;padding:9px 10px;border-radius:8px;
+  background:rgba(0,0,0,.25);color:var(--white);
+  border:1px solid rgba(255,255,255,.15);
+  font-family:'Crimson Pro',serif;font-size:14px;
+}
+.transmit textarea{
+  width:100%;min-height:70px;resize:vertical;
+  padding:11px 12px;border-radius:8px;
+  background:rgba(0,0,0,.25);color:var(--white);
+  border:1px solid rgba(255,255,255,.15);
+  font-family:'Crimson Pro',serif;font-size:15px;line-height:1.4;
+}
+.transmit textarea::placeholder{color:rgba(255,255,255,.4);}
+#tx-send{
+  margin-top:9px;width:100%;padding:11px;border:none;border-radius:8px;
+  background:linear-gradient(135deg,var(--gold),#9a6c1c);
+  color:#1a1410;font-family:'Cinzel',serif;font-weight:700;font-size:15px;
+  letter-spacing:1px;cursor:pointer;transition:.15s;
+}
+#tx-send:active{transform:scale(.98);}
+.tx-stat{text-align:center;font-size:13px;margin-top:9px;min-height:18px;opacity:.85;}
+
+/* ===== Footer ===== */
+.foot{text-align:center;margin-top:40px;font-size:12px;opacity:.4;font-style:italic;line-height:1.6;}
+/* ===== Saga station ===== */
+.saga-progress{background:rgba(255,255,255,.04);border:1px solid rgba(200,146,42,.25);border-radius:12px;padding:15px 16px;margin-bottom:12px;}
+.saga-progress .sp-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;}
+.saga-progress .sp-pct{font-family:'Cinzel',serif;font-size:22px;color:var(--gold2);font-weight:700;}
+.saga-progress .sp-label{font-size:13px;opacity:.75;}
+.saga-progress .sp-bar{height:9px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;}
+.saga-progress .sp-bar i{display:block;height:100%;background:linear-gradient(90deg,#3d8a5e,var(--gold2));border-radius:5px;transition:width .5s;}
+.saga-progress .sp-counts{font-size:12.5px;opacity:.7;margin-top:9px;font-family:'Lato',sans-serif;letter-spacing:.3px;}
+.saga-next{background:linear-gradient(135deg,rgba(46,63,122,.4),rgba(26,40,80,.3));border:1px solid rgba(200,146,42,.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;}
+.saga-next .sn-label{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold2);opacity:.85;}
+.saga-next .sn-title{font-family:'Cinzel',serif;font-size:17px;color:var(--white);margin-top:5px;}
+.saga-next .sn-none{font-style:italic;opacity:.7;font-size:14px;margin-top:4px;}
+.saga-next .sn-beat{font-size:15px;line-height:1.45;margin-top:7px;opacity:.92;font-style:italic;color:#e8d9c0;}
+.saga-next .sn-beat-empty{opacity:.5;font-style:italic;}
+.saga-next .sn-cadence{font-family:'Lato',sans-serif;font-size:12px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(200,146,42,.2);opacity:.85;}
+.saga-next .sn-cadence.sn-overdue{color:#e8b84a;opacity:1;font-weight:700;}
+.saga-chapters{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.sch{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-left:3px solid var(--muted);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+.sch.s-written{border-left-color:#3d8a5e;}
+.sch.s-drafting{border-left-color:var(--gold2);}
+.sch.s-released{border-left-color:#7faf89;background:rgba(61,138,94,.1);}
+.sch .sc-main{flex:1;}
+.sch .sc-num{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2);opacity:.8;}
+.sch .sc-title{font-family:'Cinzel',serif;font-size:15px;color:var(--white);margin-top:2px;}
+.sch .sc-status{font-size:12px;opacity:.7;margin-top:3px;font-style:italic;}
+.sch .sc-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0;}
+.sch .sc-actions button{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:5px 10px;border-radius:7px;border:1px solid rgba(200,146,42,.4);background:rgba(200,146,42,.12);color:var(--gold2);cursor:pointer;white-space:nowrap;}
+.sch .sc-actions button.release{background:linear-gradient(135deg,#3d8a5e,#2d6a47);color:#fff;border-color:transparent;}
+.sch .sc-actions button.released{background:rgba(61,138,94,.2);color:#7faf89;}
+.saga-add-btn{width:100%;padding:13px;border:1px dashed rgba(200,146,42,.4);border-radius:11px;background:rgba(200,146,42,.06);color:var(--gold2);font-family:'Cinzel',serif;font-size:14px;cursor:pointer;margin-bottom:14px;}
+.saga-add-btn:active{transform:scale(.99);}
+#chapter-editor{background:rgba(255,255,255,.04);border:1px solid rgba(200,146,42,.25);border-radius:12px;padding:16px;margin-bottom:14px;}
+.ce-field{margin-bottom:11px;}
+.ce-field label{display:block;font-family:'Lato',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2);opacity:.8;margin-bottom:5px;}
+.ce-field input,.ce-field select,.ce-field textarea{width:100%;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.3);color:var(--white);border:1px solid rgba(200,146,42,.25);font-family:'Crimson Pro',serif;font-size:15px;}
+.ce-field textarea{resize:vertical;line-height:1.5;}
+.ce-btns{display:flex;gap:9px;}
+.ce-save{flex:1;padding:11px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--gold),#9a6c1c);color:#1a1410;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;}
+.ce-cancel{padding:11px 18px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:transparent;color:var(--white);font-family:'Cinzel',serif;cursor:pointer;}
+.ce-stat{text-align:center;font-size:13px;margin-top:9px;min-height:16px;opacity:.85;font-style:italic;color:var(--gold2);}
+.foot .motto{font-family:'Cinzel',serif;font-style:normal;letter-spacing:1px;color:var(--gold2);opacity:.6;}
+/* ===== Tabs & bottom nav ===== */
+.btab{display:none;}
+.btab.active{display:block;animation:bfade .25s;}
+@keyframes bfade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.wrap{padding-bottom:90px;}
+.bbotnav{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;justify-content:space-around;
+  background:linear-gradient(180deg,rgba(20,30,46,.97),rgba(10,16,26,.99));border-top:1px solid rgba(200,160,70,.3);
+  padding:8px 4px calc(8px + env(safe-area-inset-bottom));backdrop-filter:blur(10px);}
+.bnav{background:none;border:none;color:rgba(220,210,180,.5);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-family:'Lato',sans-serif;font-size:9px;letter-spacing:.5px;text-transform:uppercase;flex:1;padding:4px 0;transition:.15s;}
+.bnav .bni{font-size:20px;}
+.bnav.active{color:var(--gold2,#e8b84a);}
+
+/* ===== Daily banner ===== */
+.daily-banner{background:linear-gradient(135deg,rgba(46,63,122,.45),rgba(26,40,80,.35));border:1px solid rgba(200,160,70,.3);
+  border-radius:14px;padding:16px;margin-bottom:16px;}
+.daily-banner .db-date{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold2,#e8b84a);opacity:.85;}
+.daily-banner .db-greet{font-family:'Cinzel',serif;font-size:18px;color:#fff;margin:5px 0 12px;}
+.daily-banner .db-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid rgba(200,160,70,.12);}
+.daily-banner .db-item:last-child{border-bottom:none;}
+.daily-banner .db-check{width:24px;height:24px;border-radius:7px;border:2px solid var(--gold,#c8922a);background:transparent;color:transparent;cursor:pointer;flex-shrink:0;font-size:14px;transition:.15s;}
+.daily-banner .db-check.on{background:var(--gold,#c8922a);color:#16120c;}
+.daily-banner .db-label{flex:1;font-size:16px;}
+.daily-banner .db-label.done{opacity:.5;text-decoration:line-through;}
+.daily-banner .db-link{font-size:11px;color:var(--gold2,#e8b84a);text-decoration:none;opacity:.8;border:1px solid rgba(200,160,70,.3);border-radius:7px;padding:4px 9px;flex-shrink:0;}
+
+/* ===== Family chat on Bridge ===== */
+.bchat-thread{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;padding:4px 2px;margin-bottom:12px;}
+.bchat-msg{max-width:80%;padding:9px 13px;border-radius:13px;font-size:15px;line-height:1.4;}
+.bchat-msg .bcm-from{font-size:10px;letter-spacing:.5px;text-transform:uppercase;opacity:.65;margin-bottom:3px;font-family:'Lato',sans-serif;}
+.bchat-msg.me{align-self:flex-end;background:linear-gradient(135deg,var(--gold,#c8922a),#9a6c1c);color:#16120c;border-bottom-right-radius:4px;}
+.bchat-msg.them{align-self:flex-start;background:rgba(255,255,255,.08);border-bottom-left-radius:4px;}
+.bchat-msg .bcm-time{font-size:10px;opacity:.5;margin-top:3px;}
+.bchat-empty{text-align:center;opacity:.5;font-style:italic;padding:24px;}
+.bchat-input-row{display:flex;gap:8px;}
+.bchat-input-row input{flex:1;padding:11px 13px;border-radius:9px;background:rgba(0,0,0,.3);color:#f6efe0;border:1px solid rgba(200,160,70,.25);font-family:'Crimson Pro',serif;font-size:15px;}
+.bchat-input-row button{padding:11px 18px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--gold,#c8922a),#9a6c1c);color:#16120c;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;}
+
+/* instruments placeholder */
+.instruments-soon{text-align:center;padding:40px 20px;opacity:.8;line-height:1.7;}
+.instruments-soon p{margin-top:8px;}
+/* ===== Word / devotional ===== */
+.word-weeklabel{text-align:center;font-family:'Lato',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold2,#e8b84a);opacity:.8;margin-bottom:14px;}
+.card-dev{background:rgba(255,255,255,.04);border:1px solid rgba(200,160,70,.25);border-radius:14px;padding:16px;}
+.dev-label{display:block;font-family:'Lato',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2,#e8b84a);opacity:.8;margin:12px 0 5px;}
+.dev-label:first-child{margin-top:0;}
+.dev-in{width:100%;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.3);color:#f6efe0;border:1px solid rgba(200,160,70,.25);font-family:'Crimson Pro',serif;font-size:15px;line-height:1.5;resize:vertical;}
+.btn-dev{width:100%;margin-top:14px;padding:13px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--gold,#c8922a),#9a6c1c);color:#16120c;font-family:'Cinzel',serif;font-weight:700;font-size:15px;letter-spacing:1px;cursor:pointer;}
+.dev-stat{text-align:center;font-size:13px;margin-top:9px;min-height:16px;font-style:italic;color:var(--gold2,#e8b84a);}
+.word-input-from{background:linear-gradient(135deg,rgba(46,63,122,.35),rgba(26,40,80,.28));border:1px solid rgba(200,160,70,.22);border-radius:11px;padding:13px 15px;margin-bottom:12px;}
+.word-input-from .wf-label{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2,#e8b84a);opacity:.85;margin-bottom:7px;}
+.word-input-from .wf-item{font-size:15px;padding:4px 0;opacity:.92;}
+.word-input-from .wf-empty{font-size:14px;opacity:.6;font-style:italic;}
+.word-input-from .wf-votes{font-size:13px;opacity:.7;margin-left:6px;}
+.word-suggest-note{text-align:center;font-size:13px;opacity:.7;font-style:italic;line-height:1.5;padding:0 10px;}
+
+/* ===== Instrument gauges ===== */
+.master-gauge{display:flex;justify-content:center;margin-bottom:8px;}
+.gauge-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;}
+.gauge-card{background:radial-gradient(ellipse at 50% 30%,rgba(46,63,122,.3),rgba(10,16,26,.5));
+  border:1px solid rgba(200,160,70,.25);border-radius:14px;padding:14px 10px 12px;text-align:center;}
+.gauge-card .gc-name{font-family:'Cinzel',serif;font-size:14px;color:#f6efe0;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:6px;}
+.gauge-card .gc-readout{font-family:'Lato',sans-serif;font-size:12px;color:var(--gold2,#e8b84a);margin-top:6px;letter-spacing:.5px;}
+.gauge-card .gc-sub{font-size:11px;opacity:.65;margin-top:2px;}
+.gauge-svg{width:100%;max-width:130px;height:auto;}
+.gauge-track{fill:none;stroke:rgba(255,255,255,.1);stroke-width:9;stroke-linecap:round;}
+.gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease,stroke .4s;}
+.gauge-num{font-family:'Cinzel',serif;font-weight:700;fill:#fff;}
+.gauge-pct{font-family:'Lato',sans-serif;fill:var(--gold2,#e8b84a);}
+
+/* ===== Submarine status board (Christmas tree) ===== */
+.xmas-tree{background:linear-gradient(180deg,#0a0e16,#12182400);border:1px solid rgba(200,160,70,.25);border-radius:14px;padding:8px 6px;margin-bottom:10px;}
+.tree-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.05);}
+.tree-row:last-child{border-bottom:none;}
+.tree-row .tr-label{flex:1;font-size:15px;color:#e8e2d4;}
+.tree-row .tr-status{font-size:11px;font-family:'Lato',sans-serif;letter-spacing:.5px;opacity:.7;text-align:right;}
+.lamp{display:inline-block;width:15px;height:15px;border-radius:50%;flex-shrink:0;position:relative;}
+.lamp.green{background:radial-gradient(circle at 35% 30%,#9affb4,#1c8a3a);box-shadow:0 0 9px #2fd45f,0 0 3px #2fd45f;}
+.lamp.amber{background:radial-gradient(circle at 35% 30%,#ffe08a,#c8922a);box-shadow:0 0 9px #e8b84a,0 0 3px #e8b84a;}
+.lamp.red{background:radial-gradient(circle at 35% 30%,#ff9b9b,#b02a2a);box-shadow:0 0 9px #e05050,0 0 3px #e05050;}
+.lamp.off{background:radial-gradient(circle at 35% 30%,#3a3a44,#1a1a22);box-shadow:none;}
+.tree-legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;font-size:11px;font-family:'Lato',sans-serif;opacity:.7;margin-bottom:8px;}
+.tree-legend span{display:flex;align-items:center;gap:6px;}
+.tree-legend .lamp{width:11px;height:11px;}
+/* bridge chore log grid */
+.bwg{width:100%;border-collapse:collapse;font-size:12px;}
+.bwg th,.bwg td{border:1px solid rgba(200,160,70,.2);padding:6px 3px;text-align:center;}
+.bwg th{font-family:'Cinzel',serif;font-size:10px;color:var(--gold2,#e8b84a);font-weight:700;}
+.bwg th.bwg-agent,.bwg td.bwg-agent{text-align:left;padding-left:7px;white-space:nowrap;font-family:'Cinzel',serif;font-size:12px;color:#f6efe0;}
+.bwg td.bwg-cell{font-weight:700;font-family:'Lato',sans-serif;}
+.bwg td.bwg-hi{background:rgba(47,212,95,.22);color:#9affb4;}
+.bwg td.bwg-mid{background:rgba(232,184,74,.18);color:#ffe08a;}
+.bwg td.bwg-lo{background:rgba(224,80,80,.16);color:#ff9b9b;}
+.bwg td.bwg-future{background:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.03) 4px,rgba(255,255,255,.03) 8px);color:rgba(255,255,255,.3);}
+.bwg td.bwg-today{outline:2px solid var(--gold2,#e8b84a);outline-offset:-2px;}
+.bwg .bwg-mini{display:block;font-size:9px;opacity:.6;font-weight:400;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bridge-banner"><img src="assets/bridge-interior.jpg" alt="" loading="eager"></div>
+
+  <!-- MASTHEAD -->
+  <div class="mast">
+    <div class="star">✦ ✦ ✦</div>
+    <h1>Systems Seven</h1>
+    <div class="sub">The Bridge</div>
+    <div class="verse">"The LORD shall fight for you, and ye shall hold your peace." — Exodus 14:14</div>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <a href="../" style="font-family:'Lato',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold2);opacity:.75;text-decoration:none;border:1px solid rgba(200,146,42,.35);border-radius:6px;padding:7px 12px;">⚓ Gangway</a>
+      <a href="../registry.html" style="font-family:'Lato',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold2);opacity:.75;text-decoration:none;border:1px solid rgba(200,146,42,.35);border-radius:6px;padding:7px 12px;">📜 Registry &amp; Muster</a>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="rule"></div>
+
+  <!-- ===== HELM TAB ===== -->
+  <div class="btab active" id="btab-helm">
+    <!-- DAILY BANNER -->
+    <div class="daily-banner" id="daily-banner"></div>
+
+    <!-- TODAY -->
+  <div class="today" id="today">
+    <div class="label">Today's Watch <span id="sync-dot" style="font-size:9px;letter-spacing:1px;margin-left:8px;opacity:.7;">connecting…</span></div>
+    <div class="day" id="t-day">—</div>
+    <div class="watch" id="t-watch">—</div>
+    <div class="focus" id="t-focus">—</div>
+  </div>
+
+    <!-- CREW STATUS (live from family app) -->
+  <div class="shead">Crew Status — Today</div>
+  <div class="crew" id="crew"><div class="crew-loading">Reading the family channel…</div></div>
+  </div>
+
+  <!-- ===== COMMS TAB ===== -->
+  <div class="btab" id="btab-comms">
+    <!-- CAPTAIN'S TRANSMISSION -->
+  <div class="shead">Captain's Transmission</div>
+  <div class="transmit">
+    <div class="tx-row">
+      <select id="tx-target">
+        <option value="group">📢 Whole crew (group chat)</option>
+        <option value="samuel">🦅 Samuel</option>
+        <option value="johnjr">🦁 John Jr.</option>
+        <option value="stephen">🦖 Stephen</option>
+        <option value="daniel">🐘 Daniel</option>
+      </select>
+      <select id="tx-from">
+        <option value="Dad">From: Dad</option>
+        <option value="HQ">From: HQ</option>
+      </select>
+    </div>
+    <textarea id="tx-msg" placeholder="Send a message to the crew from the Bridge…" maxlength="280"></textarea>
+    <button id="tx-send" onclick="sendTransmission()">Transmit ▸</button>
+    <div id="tx-status" class="tx-stat"></div>
+  </div>
+
+    <!-- FAMILY CHAT -->
+    <div class="shead">Family Channel</div>
+    <div class="bchat-thread" id="bchat-thread"></div>
+    <div class="bchat-input-row">
+      <input type="text" id="bchat-input" placeholder="Message the family…" maxlength="280">
+      <button onclick="sendBridgeChat()">Send</button>
+    </div>
+  </div>
+
+  <!-- ===== INSTRUMENTS TAB ===== -->
+  <div class="btab" id="btab-instruments">
+    <div class="shead">Fleet Readiness</div>
+    <div class="master-gauge" id="master-gauge"></div>
+
+    <div class="shead">Crew Instruments — Today</div>
+    <div class="gauge-grid" id="gauge-grid"></div>
+
+    <div class="shead">Status Board</div>
+    <div class="xmas-tree" id="xmas-tree"></div>
+    <div class="tree-legend">
+      <span><i class="lamp green"></i> Rigged / on course</span>
+      <span><i class="lamp amber"></i> Needs attention</span>
+      <span><i class="lamp red"></i> Off course</span>
+    </div>
+
+    <div class="shead">This Week — Chore Log</div>
+    <div id="bridge-week-grid"></div>
+    <div style="font-size:11px;opacity:.55;text-align:center;margin-top:6px;">Chores completed each day. Fills as the week goes.</div>
+  </div>
+
+  <!-- ===== SAGA TAB ===== -->
+  <div class="btab" id="btab-saga">
+    <!-- THE SAGA STATION (writing cockpit) -->
+  <div class="shead">The Saga — The Ascension</div>
+  <div class="saga-progress" id="saga-progress"></div>
+  <div class="saga-next" id="saga-next"></div>
+  <div class="saga-chapters" id="saga-chapters"></div>
+  <button class="saga-add-btn" onclick="openChapterEditor()">＋ Add / Draft a Chapter</button>
+
+  <!-- chapter editor (hidden until opened) -->
+  <div id="chapter-editor" style="display:none;">
+    <div class="ce-field">
+      <label>Chapter number</label>
+      <input type="number" id="ce-number" placeholder="e.g. 1">
+    </div>
+    <div class="ce-field">
+      <label>Title</label>
+      <input type="text" id="ce-title" placeholder="Chapter title…">
+    </div>
+    <div class="ce-field">
+      <label>Status</label>
+      <select id="ce-status">
+        <option value="notstarted">Not started</option>
+        <option value="drafting">Drafting</option>
+        <option value="written">Written</option>
+      </select>
+    </div>
+    <div class="ce-field">
+      <label>The beat — what happens in this chapter (your bearing)</label>
+      <input type="text" id="ce-beat" placeholder="e.g. Corvin makes his kill demand on Day Seven…">
+    </div>
+    <div class="ce-field">
+      <label>Chapter text (paste from Scrivener)</label>
+      <textarea id="ce-text" rows="8" placeholder="Paste the chapter here when it's ready…"></textarea>
+    </div>
+    <div class="ce-btns">
+      <button class="ce-save" onclick="saveChapter()">Save</button>
+      <button class="ce-cancel" onclick="closeChapterEditor()">Cancel</button>
+    </div>
+    <div class="ce-stat" id="ce-stat"></div>
+  </div>
+  </div>
+
+  <!-- ===== WORD TAB (devotional ministry) ===== -->
+  <div class="btab" id="btab-word">
+    <div class="shead">The Family Devotional</div>
+    <div class="word-weeklabel" id="word-weeklabel"></div>
+
+    <!-- what the boys voted + Dawn suggested, shown while you write -->
+    <div class="word-input-from" id="word-votes"></div>
+    <div class="word-input-from" id="word-dawn-suggest"></div>
+
+    <div class="card-dev">
+      <label class="dev-label">Title / Theme</label>
+      <input type="text" id="wdev-title" class="dev-in" placeholder="e.g. Patience Under Fire">
+      <label class="dev-label">Scripture reference</label>
+      <input type="text" id="wdev-ref" class="dev-in" placeholder="e.g. James 1:2-4 (KJV)">
+      <label class="dev-label">Scripture text (KJV)</label>
+      <textarea id="wdev-scripture" class="dev-in" rows="3" placeholder="The verse…"></textarea>
+      <label class="dev-label">Narrative / story</label>
+      <textarea id="wdev-narrative" class="dev-in" rows="7" placeholder="The OWCA story, the lesson, the vignette…"></textarea>
+      <label class="dev-label">Discussion question</label>
+      <textarea id="wdev-question" class="dev-in" rows="2" placeholder="A question for the table…"></textarea>
+      <label class="dev-label">Prayer prompt</label>
+      <textarea id="wdev-prayer" class="dev-in" rows="2" placeholder="Close with…"></textarea>
+      <button class="btn-dev" onclick="saveFamilyDevotional()">Send to the family ✝️</button>
+      <div class="dev-stat" id="wdev-stat"></div>
+    </div>
+
+    <div class="shead">Next Week — What They Want</div>
+    <div class="word-suggest-note">The boys vote in O.W.C.A.; Dawn suggests in the Homestead. Their picks gather here to guide next week's study.</div>
+  </div>
+
+  <!-- ===== SYSTEMS TAB ===== -->
+  <div class="btab" id="btab-systems">
+    <!-- THE WEEK -->
+  <div class="shead">The Seven-Day Cycle</div>
+  <div class="week" id="week"></div>
+
+    <!-- THE SYSTEMS -->
+  <div class="shead">The Seven Systems</div>
+  <div class="systems" id="systems"></div>
+
+    <!-- THE FLEET -->
+  <div class="shead">The Fleet</div>
+  <div class="fleet" id="fleet"></div>
+  </div>
+
+  <div class="foot">
+    <div class="motto">Virescit vulnere virtus</div>
+    Courage grows strong at a wound.<br>
+    Systems Seven · the vessel and its course
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// SYSTEMS SEVEN — the Bridge
+// A whole-life operating system on a 7-day cycle.
+// Each day foregrounds certain systems so the captain
+// never has to run all seven at once.
+// ════════════════════════════════════════════
+
+// ----- Firebase (same backend as the family app) -----
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+let _db = null;
+
+const AGENTS = [
+  {id:'samuel',  name:'Samuel',   icon:'🦅'},
+  {id:'johnjr',  name:'John Jr.', icon:'🦁'},
+  {id:'stephen', name:'Stephen',  icon:'🦖'},
+  {id:'daniel',  name:'Daniel',   icon:'🐘'}
+];
+
+function localDateStr(date){
+  const d = date ? new Date(date) : new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(FB_CONFIG);
+    _db = firebase.database();
+    const dot = document.getElementById('sync-dot');
+    _db.ref('.info/connected').on('value', snap => {
+      const live = !!snap.val();
+      if(dot){ dot.textContent = live ? '● live' : '○ offline'; dot.style.color = live ? '#7ad19a' : '#c89'; }
+      if(live){ loadCrewStatus(); loadSaga(); loadCadence(); loadDailyBanner(); }
+    });
+  }catch(e){
+    const dot = document.getElementById('sync-dot');
+    if(dot){ dot.textContent = '○ offline'; }
+  }
+}
+
+// ----- Crew status: read each boy's completed missions + score for today -----
+function loadCrewStatus(){
+  if(!_db) return;
+  const today = localDateStr();
+  const el = document.getElementById('crew');
+  Promise.all(AGENTS.map(a => Promise.all([
+    _db.ref('stewart/missions/'+a.id+'/'+today).once('value'),
+    _db.ref('stewart/scores/'+a.id+'/'+today).once('value')
+  ]))).then(results => {
+    el.innerHTML = AGENTS.map((a,i) => {
+      const done = results[i][0].val() || {};
+      const completed = Object.values(done).filter(Boolean).length;
+      const score = results[i][1].val();
+      const scoreTxt = (score===null||score===undefined) ? 'No score yet' : (score+' pts · $'+(score/100).toFixed(2));
+      // We show completed count; total isn't recomputed here (engine lives in the app), so show count + a soft bar capped at 12
+      const pct = Math.min(100, Math.round((completed/12)*100));
+      return `<div class="crewcard">
+        <div class="cname">${a.icon} ${a.name}</div>
+        <div class="cmiss">${completed} mission${completed===1?'':'s'} done today</div>
+        <div class="cbar"><i style="width:${pct}%"></i></div>
+        <div class="cscore">${scoreTxt}</div>
+      </div>`;
+    }).join('');
+  }).catch(()=>{ el.innerHTML = '<div class="crew-loading">Could not read the family channel.</div>'; });
+}
+
+// ----- Captain's Transmission: post to group chat or a boy's thread -----
+function sendTransmission(){
+  if(!_db){ txStat('Not connected yet — try again in a moment.'); return; }
+  const target = document.getElementById('tx-target').value;
+  const from = document.getElementById('tx-from').value;
+  const box = document.getElementById('tx-msg');
+  const text = box.value.trim();
+  if(!text){ txStat('Write a message first.'); return; }
+  const payload = { text, from, timestamp: Date.now() };
+  let ref;
+  if(target === 'group'){
+    payload.agentId = 'parent';
+    ref = _db.ref('stewart/groupchat');
+  }else{
+    ref = _db.ref('stewart/messages/'+target);
+  }
+  ref.push(payload).then(()=>{
+    box.value='';
+    txStat(target==='group' ? 'Transmitted to the whole crew. ✦' : 'Transmitted. ✦');
+    setTimeout(()=>txStat(''), 3500);
+  }).catch(()=>txStat('Transmission failed — check connection.'));
+}
+function txStat(msg){ const e=document.getElementById('tx-status'); if(e) e.textContent=msg; }
+
+
+// THE SEVEN-DAY CYCLE  (tune the watches/notes to John's real week)
+const WEEK = [
+  {day:"Sunday",    abbr:"Helm",   sys:"Command & Power",      note:"Worship, rest, recalibrate the heading. Tend the captain and the power plant."},
+  {day:"Monday",    abbr:"Nav",    sys:"Navigation",           note:"Set the week's course. Where are we sailing? Review priorities and plot the route."},
+  {day:"Tuesday",   abbr:"Engine", sys:"Propulsion",           note:"Engines turning — work, daily family rhythms, a saga writing block."},
+  {day:"Wednesday", abbr:"Engine", sys:"Propulsion + Crew",    note:"Midweek drive. Work, family rhythms, church midweek."},
+  {day:"Thursday",  abbr:"Engine", sys:"Propulsion",           note:"Keep the engines turning. Work and a saga writing block."},
+  {day:"Friday",    abbr:"Crew",   sys:"Communications & Crew",note:"Family, the boys, troop & ministry prep. Connection."},
+  {day:"Saturday",  abbr:"Repair", sys:"Damage Control",       note:"Keep the vessel seaworthy — troop activities, the body, the household, the marriage."}
+];
+
+// THE SEVEN SYSTEMS
+const SYSTEMS = [
+  {ico:"⚓", name:"Command / Bridge",     role:"You & your faith. Where the whole vessel is sailing. Vision, values, the man at the helm. Cannot be delegated."},
+  {ico:"🧭", name:"Navigation",           role:"The plan. Where you are, where you're going, the route. Lives outside your head so it stops getting lost."},
+  {ico:"🔥", name:"Propulsion (Starfire)",role:"The engines. Daily rhythms and standing structures that move you forward without fresh willpower."},
+  {ico:"⚡", name:"Power",                role:"What runs everything else — faith, rest, energy. When this browns out, every other system fails."},
+  {ico:"🎚️", name:"Steering / Helm",      role:"Priorities & boundaries. Course-correction. Saying no. Keeping the ship on its heading."},
+  {ico:"🛠️", name:"Damage Control",       role:"Keeping the vessel seaworthy. Health, maintenance, fixing the small things before they sink you."},
+  {ico:"📡", name:"Communications / Crew", role:"Dawn, the boys, troop, ministry, friendships. The crew you sail with and lead."}
+];
+
+// THE FLEET — linked subsystem sites (update hrefs as they're built)
+const FLEET = [
+  {ico:"🏡", name:"The Homestead", desc:"Dawn's command — household, kitchen & the boys' oversight.", href:"../dashboard/", status:"live"},
+  {ico:"🍇", name:"The Vineyard", desc:"Just for John & Dawn — tend the marriage together.", href:"../vineyard/", status:"live"},
+  {ico:"🛡️", name:"O.W.C.A.", desc:"The boys' command center — missions, pay, agents.", href:"../boys/", status:"live"},
+  {ico:"🍲", name:"The Kitchen", desc:"Meals, recipes & the family cookbook.", href:"../kitchen/", status:"live"},
+  {ico:"📖", name:"The Saga", desc:"Adamah — the reader. Released chapters for the family.", href:"../saga/", status:"live"},
+  {ico:"🧭", name:"Navigation", desc:"The week's course and this season's heading.", href:"#", status:"soon"},
+  {ico:"⛪", name:"Ministry & Troop", desc:"Trail Life PA-1997, men's ministry, church.", href:"#", status:"soon"},
+  {ico:"🛠️", name:"Maintenance", desc:"The captain's own upkeep — health, rest, faith.", href:"#", status:"soon"}
+];
+
+// ----- render -----
+function renderWeek(){
+  const todayIdx = new Date().getDay(); // 0 = Sunday
+  const el = document.getElementById('week');
+  el.innerHTML = WEEK.map((d,i)=>`
+    <div class="dayrow ${i===todayIdx?'is-today':''}">
+      <div class="dname"><b>${d.day.slice(0,3)}</b><span>${d.abbr}</span></div>
+      <div class="dbody">
+        <div class="dsys">${d.sys}</div>
+        <div class="dnote">${d.note}</div>
+      </div>
+    </div>`).join('');
+
+  // Today banner
+  const t = WEEK[todayIdx];
+  document.getElementById('t-day').textContent = t.day;
+  document.getElementById('t-watch').textContent = t.sys;
+  document.getElementById('t-focus').textContent = t.note;
+}
+function renderSystems(){
+  document.getElementById('systems').innerHTML = SYSTEMS.map(s=>`
+    <div class="sys">
+      <div class="ico">${s.ico}</div>
+      <div class="stext"><b>${s.name}</b><div class="role">${s.role}</div></div>
+    </div>`).join('');
+}
+function renderFleet(){
+  document.getElementById('fleet').innerHTML = FLEET.map(f=>`
+    <a class="port ${f.status}" href="${f.href}" ${f.status==='soon'?'onclick="return false;"':''}>
+      <span class="badge">${f.status==='live'?'Live':'Soon'}</span>
+      <div class="pico">${f.ico}</div>
+      <div class="pname">${f.name}</div>
+      <div class="pdesc">${f.desc}</div>
+    </a>`).join('');
+}
+
+// ════════════════════════════════════════════
+// THE SAGA STATION — writing cockpit
+// Stores chapters in saga/chapters; reader shows only released ones.
+// ════════════════════════════════════════════
+let SAGA_CHAPTERS = [];
+let editingChapterKey = null;
+
+function loadSaga(){
+  if(!_db) return;
+  _db.ref('saga/chapters').on('value', s=>{
+    const v = s.val() || {};
+    SAGA_CHAPTERS = Object.entries(v).map(([k,c])=>({k,...c}))
+      .sort((a,b)=>(a.order||a.number||0)-(b.order||b.number||0));
+    renderSaga();
+  });
+}
+
+function renderSaga(){
+  const total = SAGA_CHAPTERS.length;
+  const written = SAGA_CHAPTERS.filter(c=>c.status==='written'||c.released).length;
+  const released = SAGA_CHAPTERS.filter(c=>c.released).length;
+  const drafting = SAGA_CHAPTERS.filter(c=>c.status==='drafting').length;
+  const pct = total ? Math.round((written/total)*100) : 0;
+  const pe=document.getElementById('saga-progress');
+  if(pe) pe.innerHTML = '<div class="sp-top"><div class="sp-pct">'+pct+'%</div><div class="sp-label">of charted chapters written</div></div>'+
+    '<div class="sp-bar"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="sp-counts">'+written+' written · '+drafting+' drafting · '+released+' released · '+total+' charted</div>';
+
+  const next = SAGA_CHAPTERS.find(c=>c.status!=='written' && !c.released);
+  const nextEl = document.getElementById('saga-next');
+  if(nextEl){
+    if(next){
+      const beatLine = next.beat ? '<div class="sn-beat">'+esc(next.beat)+'</div>' : '<div class="sn-beat sn-beat-empty">No beat noted yet — tap Edit to set what happens here.</div>';
+      nextEl.innerHTML = '<div class="sn-label">Your bearing — write this next</div>'+
+        '<div class="sn-title">Ch. '+(next.number||'?')+' — '+esc(next.title||'Untitled')+'</div>'+
+        beatLine + renderCadenceLine();
+    }else if(total){
+      nextEl.innerHTML = '<div class="sn-label">Your bearing</div><div class="sn-none">All charted chapters are written. Chart the next one to set your heading.</div>'+renderCadenceLine();
+    }else{
+      nextEl.innerHTML = '<div class="sn-label">Your bearing</div><div class="sn-none">No chapters charted yet. Add the first to set your heading.</div>';
+    }
+  }
+
+  const el = document.getElementById('saga-chapters');
+  if(el) el.innerHTML = SAGA_CHAPTERS.map(c=>{
+    const statusClass = c.released ? 's-released' : (c.status==='written'?'s-written':(c.status==='drafting'?'s-drafting':''));
+    const statusTxt = c.released ? 'Released to the family' : (c.status==='written'?'Written — ready to release':(c.status==='drafting'?'Drafting':'Not started'));
+    const canRelease = (c.status==='written' || c.released) && (c.text&&c.text.trim());
+    return '<div class="sch '+statusClass+'">'+
+      '<div class="sc-main"><div class="sc-num">Chapter '+(c.number||'?')+'</div>'+
+      '<div class="sc-title">'+esc(c.title||'Untitled')+'</div>'+
+      '<div class="sc-status">'+statusTxt+'</div></div>'+
+      '<div class="sc-actions"><button onclick="editChapter(\''+c.k+'\')">Edit</button>'+
+      (c.released
+        ? '<button class="released" onclick="unreleaseChapter(\''+c.k+'\')">Unrelease</button>'
+        : (canRelease ? '<button class="release" onclick="releaseChapter(\''+c.k+'\')">Release</button>' : ''))+
+      '</div></div>';
+  }).join('');
+}
+
+function openChapterEditor(){
+  editingChapterKey=null;
+  document.getElementById('ce-number').value = SAGA_CHAPTERS.length ? (Math.max.apply(null,SAGA_CHAPTERS.map(c=>c.number||0))+1) : 1;
+  document.getElementById('ce-title').value='';
+  document.getElementById('ce-status').value='notstarted';
+  document.getElementById('ce-beat').value='';
+  document.getElementById('ce-text').value='';
+  document.getElementById('chapter-editor').style.display='block';
+  document.getElementById('ce-stat').textContent='';
+  document.getElementById('chapter-editor').scrollIntoView({behavior:'smooth'});
+}
+function editChapter(k){
+  const c=SAGA_CHAPTERS.find(x=>x.k===k); if(!c) return;
+  editingChapterKey=k;
+  document.getElementById('ce-number').value=c.number||'';
+  document.getElementById('ce-title').value=c.title||'';
+  document.getElementById('ce-status').value=c.status||'notstarted';
+  document.getElementById('ce-beat').value=c.beat||'';
+  document.getElementById('ce-text').value=c.text||'';
+  document.getElementById('chapter-editor').style.display='block';
+  document.getElementById('ce-stat').textContent='';
+  document.getElementById('chapter-editor').scrollIntoView({behavior:'smooth'});
+}
+function closeChapterEditor(){ document.getElementById('chapter-editor').style.display='none'; }
+function saveChapter(){
+  if(!_db){ ceStat('Not connected.'); return; }
+  const number=parseInt(document.getElementById('ce-number').value,10);
+  const title=document.getElementById('ce-title').value.trim();
+  const status=document.getElementById('ce-status').value;
+  const beat=document.getElementById('ce-beat').value.trim();
+  const text=document.getElementById('ce-text').value;
+  if(!number){ ceStat('Give it a chapter number.'); return; }
+  const data={number:number,order:number,title:title,status:status,beat:beat,text:text};
+  if(editingChapterKey){
+    _db.ref('saga/chapters/'+editingChapterKey).update(data).then(()=>{ ceStat('Saved'); setTimeout(closeChapterEditor,700); });
+  }else{
+    data.released=false; data.created_at=Date.now();
+    _db.ref('saga/chapters').push(data).then(()=>{ ceStat('Charted'); setTimeout(closeChapterEditor,700); });
+  }
+}
+function releaseChapter(k){
+  if(!_db) return;
+  if(confirm('Release this chapter to the family? They will be able to read it.')){
+    _db.ref('saga/chapters/'+k).update({released:true, released_at:Date.now(), status:'written'});
+  }
+}
+function unreleaseChapter(k){
+  if(!_db) return;
+  if(confirm('Pull this chapter back? It will disappear from the family reader.')){
+    _db.ref('saga/chapters/'+k).update({released:false});
+  }
+}
+function ceStat(m){ const e=document.getElementById('ce-stat'); if(e) e.textContent=m; }
+
+// ----- Release cadence (item 3) -----
+let SAGA_CADENCE = 0; // days between releases; 0 = no cadence set
+function loadCadence(){
+  if(!_db) return;
+  _db.ref('saga/meta/cadenceDays').on('value', s=>{ SAGA_CADENCE = s.val()||0; renderSaga(); });
+}
+function setCadence(){
+  if(!_db) return;
+  const v = prompt('Release one chapter every how many days? (e.g. 14 for every two weeks. Enter 0 to turn off.)', SAGA_CADENCE||14);
+  if(v===null) return;
+  const n = parseInt(v,10);
+  if(isNaN(n)||n<0) return;
+  _db.ref('saga/meta/cadenceDays').set(n);
+}
+function renderCadenceLine(){
+  if(!SAGA_CADENCE){
+    return '<div class="sn-cadence"><span onclick="setCadence()" style="cursor:pointer;text-decoration:underline;">Set a release rhythm</span> to keep the family turning pages.</div>';
+  }
+  // find most recent release date
+  const releases = SAGA_CHAPTERS.filter(c=>c.released && c.released_at).map(c=>c.released_at);
+  const lastRelease = releases.length ? Math.max.apply(null,releases) : 0;
+  const hasWrittenUnreleased = SAGA_CHAPTERS.some(c=>(c.status==='written')&&!c.released&&c.text&&c.text.trim());
+  if(!lastRelease){
+    return '<div class="sn-cadence">Rhythm: one chapter every '+SAGA_CADENCE+' days. '+(hasWrittenUnreleased?'You have one ready — release it to start the clock.':'')+' <span onclick="setCadence()" style="cursor:pointer;text-decoration:underline;opacity:.7;">change</span></div>';
+  }
+  const due = lastRelease + SAGA_CADENCE*86400000;
+  const now = Date.now();
+  const daysLeft = Math.ceil((due-now)/86400000);
+  let msg;
+  if(daysLeft>1) msg='Next release due in '+daysLeft+' days ('+new Date(due).toLocaleDateString('en-US',{month:'short',day:'numeric'})+').';
+  else if(daysLeft===1) msg='Next release due tomorrow.';
+  else if(daysLeft===0) msg='Next release due today.';
+  else msg='Release overdue by '+Math.abs(daysLeft)+' day'+(Math.abs(daysLeft)===1?'':'s')+' — the family is waiting.';
+  return '<div class="sn-cadence'+(daysLeft<=0?' sn-overdue':'')+'">'+msg+' <span onclick="setCadence()" style="cursor:pointer;text-decoration:underline;opacity:.7;">change</span></div>';
+}
+function esc(s){ return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+// ════════════════════════════════════════════
+// TAB SWITCHING
+// ════════════════════════════════════════════
+function showBTab(name, btn){
+  document.querySelectorAll('.btab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='comms'){ loadBridgeChat(); }
+  if(name==='instruments'){ loadInstruments(); }
+  if(name==='word'){ loadWord(); }
+  window.scrollTo(0,0);
+}
+
+// ════════════════════════════════════════════
+// FAMILY CHAT (Bridge side) — same stewart/groupchat the boys use
+// ════════════════════════════════════════════
+function loadBridgeChat(){
+  if(!_db) return;
+  _db.ref('stewart/groupchat').limitToLast(60).on('value', s=>{
+    const v=s.val()||{};
+    const items=Object.values(v).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+    const el=document.getElementById('bchat-thread');
+    if(!el) return;
+    if(!items.length){ el.innerHTML='<div class="bchat-empty">No messages yet. Open the channel.</div>'; return; }
+    el.innerHTML=items.map(m=>{
+      const mine=(m.agentId==='parent');
+      const time=m.timestamp?new Date(m.timestamp).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}):'';
+      return '<div class="bchat-msg '+(mine?'me':'them')+'">'+
+        '<div class="bcm-from">'+esc(m.from||'')+'</div>'+esc(m.text||'')+
+        '<div class="bcm-time">'+time+'</div></div>';
+    }).join('');
+    el.scrollTop=el.scrollHeight;
+  });
+}
+function sendBridgeChat(){
+  if(!_db) return;
+  const inp=document.getElementById('bchat-input');
+  const text=inp.value.trim(); if(!text) return;
+  _db.ref('stewart/groupchat').push({ text, from:'Dad', agentId:'parent', timestamp:Date.now() }).then(()=>{ inp.value=''; });
+}
+
+// ════════════════════════════════════════════
+// DAILY BANNER — shared daily rhythm with check-offs
+// ════════════════════════════════════════════
+const DAILY_ITEMS = [
+  {key:'devotions', label:'Morning devotions', link:null},
+  {key:'vineyard',  label:'Tend the Vineyard', link:'../vineyard/'},
+  {key:'saga',      label:"Write today's bearing", link:null},
+  {key:'family',    label:'Check in with the family', link:null}
+];
+function dayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function loadDailyBanner(){
+  if(!_db) return;
+  _db.ref('bridge/daily/'+dayKey()).on('value', s=>{ renderDailyBanner(s.val()||{}); });
+}
+function renderDailyBanner(done){
+  done=done||{};
+  const el=document.getElementById('daily-banner'); if(!el) return;
+  const h=new Date().getHours();
+  const greet=h<12?'Good morning, Captain.':h<17?'Good afternoon, Captain.':'Good evening, Captain.';
+  const dateStr=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const items=DAILY_ITEMS.map(it=>{
+    const on=!!done[it.key];
+    return '<div class="db-item">'+
+      '<button class="db-check '+(on?'on':'')+'" onclick="toggleDaily(\''+it.key+'\','+(!on)+')">\u2713</button>'+
+      '<div class="db-label '+(on?'done':'')+'">'+it.label+'</div>'+
+      (it.link?'<a class="db-link" href="'+it.link+'">Open</a>':'')+
+    '</div>';
+  }).join('');
+  el.innerHTML='<div class="db-date">'+dateStr+'</div><div class="db-greet">'+greet+'</div>'+items;
+}
+
+// ════════════════════════════════════════════
+// WORD — family devotional (created here, read by the boys)
+// Path: stewart/devotional/family/{weekKey}; suggestions/votes at stewart/devotional/suggestions
+// ════════════════════════════════════════════
+function devWeekKey(){
+  // Monday of current week, YYYY-MM-DD
+  const d=new Date(); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function loadWord(){
+  if(!_db) return;
+  const wk=devWeekKey();
+  const d=new Date(wk);
+  document.getElementById('word-weeklabel').textContent='Week of '+d.toLocaleDateString('en-US',{month:'long',day:'numeric'});
+  // load existing devotional for this week
+  _db.ref('stewart/devotional/family/'+wk).once('value', s=>{
+    const v=s.val()||{};
+    if(document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+      document.getElementById('wdev-title').value=v.title||'';
+      document.getElementById('wdev-ref').value=v.scriptureRef||'';
+      document.getElementById('wdev-scripture').value=v.scriptureText||'';
+      document.getElementById('wdev-narrative').value=v.narrative||'';
+      document.getElementById('wdev-question').value=v.question||'';
+      document.getElementById('wdev-prayer').value=v.prayer||'';
+    }
+  });
+  loadWordVotes();
+  loadDawnSuggest();
+}
+function saveFamilyDevotional(){
+  if(!_db){ wdevStat('Not connected.'); return; }
+  const wk=devWeekKey();
+  const entry={
+    title:document.getElementById('wdev-title').value.trim(),
+    scriptureRef:document.getElementById('wdev-ref').value.trim(),
+    scriptureText:document.getElementById('wdev-scripture').value.trim(),
+    narrative:document.getElementById('wdev-narrative').value.trim(),
+    question:document.getElementById('wdev-question').value.trim(),
+    prayer:document.getElementById('wdev-prayer').value.trim(),
+    timestamp:Date.now()
+  };
+  _db.ref('stewart/devotional/family/'+wk).set(entry).then(()=>{ wdevStat('Sent — the boys will see it in their Training tab ✝️'); });
+}
+function wdevStat(m){ const e=document.getElementById('wdev-stat'); if(e){ e.textContent=m; setTimeout(()=>{e.textContent='';},4000); } }
+
+function loadWordVotes(){
+  _db.ref('stewart/devotional/suggestions').on('value', s=>{
+    const v=s.val()||{};
+    // tally votes per topic
+    const topics={};
+    Object.values(v).forEach(sug=>{
+      if(!sug||!sug.topic) return;
+      if(!topics[sug.topic]) topics[sug.topic]={topic:sug.topic, votes:0, by:sug.by||''};
+      topics[sug.topic].votes += (sug.votes? Object.keys(sug.votes).length : 0);
+    });
+    const ranked=Object.values(topics).sort((a,b)=>b.votes-a.votes);
+    const el=document.getElementById('word-votes');
+    if(!ranked.length){
+      el.innerHTML='<div class="wf-label">🛡️ The boys\' suggestions</div><div class="wf-empty">No suggestions yet — the boys can add topics in O.W.C.A.</div>';
+      return;
+    }
+    el.innerHTML='<div class="wf-label">🛡️ The boys want to study</div>'+
+      ranked.map(t=>'<div class="wf-item">'+esc(t.topic)+'<span class="wf-votes">'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>').join('');
+  });
+}
+function loadDawnSuggest(){
+  _db.ref('stewart/devotional/dawn').on('value', s=>{
+    const v=s.val()||{};
+    const items=Object.values(v).filter(x=>x&&x.topic);
+    const el=document.getElementById('word-dawn-suggest');
+    if(!items.length){
+      el.innerHTML='<div class="wf-label">💗 Dawn\'s wishes</div><div class="wf-empty">Nothing yet — Dawn can suggest from the Homestead.</div>';
+      return;
+    }
+    el.innerHTML='<div class="wf-label">💗 Dawn would like to study</div>'+
+      items.map(t=>'<div class="wf-item">'+esc(t.topic)+(t.note?' <span class="wf-votes">'+esc(t.note)+'</span>':'')+'</div>').join('');
+  });
+}
+
+function toggleDaily(key,val){ if(_db) _db.ref('bridge/daily/'+dayKey()+'/'+key).set(val); }
+
+// ════════════════════════════════════════════
+// INSTRUMENTS — gauges + submarine status board
+// ════════════════════════════════════════════
+const MISSION_TARGET = 12; // soft denominator for the gauge
+
+// build an SVG arc gauge. pct 0-100. returns svg string.
+function gaugeSVG(pct, label, big){
+  const size = big ? 200 : 130;
+  const r = big ? 80 : 52;
+  const cx = size/2, cy = size/2;
+  const circ = 2*Math.PI*r;
+  // use 270° arc (gap at bottom)
+  const arcFrac = 0.75;
+  const dash = circ*arcFrac;
+  const offset = dash*(1 - pct/100);
+  const color = pct>=100 ? '#2fd45f' : pct>=60 ? '#e8b84a' : pct>=30 ? '#e8922a' : '#e05050';
+  const rot = 135; // start angle so the gap is at the bottom
+  const numSize = big ? 38 : 26;
+  const pctSize = big ? 13 : 11;
+  return `<svg class="gauge-svg" viewBox="0 0 ${size} ${size}" style="${big?'max-width:200px;':''}">
+    <circle class="gauge-track" cx="${cx}" cy="${cy}" r="${r}"
+      stroke-dasharray="${dash} ${circ}" transform="rotate(${rot} ${cx} ${cy})"/>
+    <circle class="gauge-fill" cx="${cx}" cy="${cy}" r="${r}" stroke="${color}"
+      stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${offset}" transform="rotate(${rot} ${cx} ${cy})"/>
+    <text class="gauge-num" x="${cx}" y="${cy+ (big?6:4)}" text-anchor="middle" font-size="${numSize}">${pct}</text>
+    <text class="gauge-pct" x="${cx}" y="${cy+(big?26:20)}" text-anchor="middle" font-size="${pctSize}">${label||'%'}</text>
+  </svg>`;
+}
+
+function loadInstruments(){
+  if(!_db) return;
+  const today = localDateStr();
+  Promise.all(AGENTS.map(a => Promise.all([
+    _db.ref('stewart/missions/'+a.id+'/'+today).once('value'),
+    _db.ref('stewart/scores/'+a.id+'/'+today).once('value')
+  ]))).then(results => {
+    const crew = AGENTS.map((a,i)=>{
+      const done = results[i][0].val() || {};
+      const completed = Object.values(done).filter(Boolean).length;
+      const score = results[i][1].val();
+      const pct = Math.min(100, Math.round((completed/MISSION_TARGET)*100));
+      return {a, completed, score, pct};
+    });
+    renderGauges(crew);
+    renderStatusBoard(crew);
+    renderBridgeWeekGrid();
+  }).catch(()=>{});
+}
+
+function renderGauges(crew){
+  // master = average of crew pct
+  const avg = crew.length ? Math.round(crew.reduce((s,c)=>s+c.pct,0)/crew.length) : 0;
+  const mg = document.getElementById('master-gauge');
+  if(mg) mg.innerHTML = '<div class="gauge-card" style="grid-column:1/-1;max-width:240px;margin:0 auto;border-color:rgba(200,160,70,.4);">'+
+    '<div class="gc-name">⚓ Whole Crew</div>'+gaugeSVG(avg,'ready',true)+
+    '<div class="gc-readout">Fleet readiness today</div></div>';
+  const gg = document.getElementById('gauge-grid');
+  if(gg) gg.innerHTML = crew.map(c=>{
+    const scoreTxt = (c.score===null||c.score===undefined)?'—':('$'+(c.score/100).toFixed(2));
+    return '<div class="gauge-card"><div class="gc-name">'+c.a.icon+' '+c.a.name+'</div>'+
+      gaugeSVG(c.pct,'%',false)+
+      '<div class="gc-readout">'+c.completed+' of '+MISSION_TARGET+' missions</div>'+
+      '<div class="gc-sub">'+scoreTxt+'</div></div>';
+  }).join('');
+}
+
+
+// ════════════════════════════════════════════
+// BRIDGE CHORE LOG — completed chores per boy per day, 7-day week
+// (Bridge has no mission engine, so it shows completed counts directly)
+// ════════════════════════════════════════════
+function getGridWeekDays(){
+  const now=new Date();
+  const day=(now.getDay()+6)%7; // 0=Mon
+  const monday=new Date(now); monday.setDate(now.getDate()-day);
+  const days=[];
+  for(let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); days.push(localDateStr(d)); }
+  return days;
+}
+function renderBridgeWeekGrid(){
+  if(!_db) return;
+  const days=getGridWeekDays();
+  const today=localDateStr();
+  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  Promise.all(AGENTS.map(a =>
+    Promise.all(days.map(d => _db.ref('stewart/missions/'+a.id+'/'+d).once('value')))
+  )).then(all=>{
+    // find the week's max completed count to scale color thresholds sensibly
+    let maxDone=0;
+    const counts=AGENTS.map((a,ai)=>days.map((d,di)=>{
+      const v=all[ai][di].val()||{};
+      const n=Object.keys(v).filter(k=>v[k]).length;
+      if(n>maxDone) maxDone=n;
+      return n;
+    }));
+    const hiThresh=Math.max(6, Math.round(maxDone*0.75)); // "high" if near the week's best
+    const midThresh=1;
+    let html='<table class="bwg"><thead><tr><th class="bwg-agent">Crew</th>';
+    days.forEach((d,i)=>{ html+='<th>'+dayNames[i]+'<span class="bwg-mini">'+d.slice(5).replace('-','/')+'</span></th>'; });
+    html+='</tr></thead><tbody>';
+    AGENTS.forEach((a,ai)=>{
+      html+='<tr><td class="bwg-agent">'+a.icon+' '+a.name+'</td>';
+      days.forEach((d,di)=>{
+        const isFuture = d>today;
+        if(isFuture){ html+='<td class="bwg-cell bwg-future">—</td>'; return; }
+        const n=counts[ai][di];
+        const cls = n>=hiThresh?'bwg-hi':(n>=midThresh?'bwg-mid':'bwg-lo');
+        const todayCls = d===today?' bwg-today':'';
+        html+='<td class="bwg-cell '+cls+todayCls+'">'+n+'</td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+    const el=document.getElementById('bridge-week-grid');
+    if(el) el.innerHTML=html;
+  }).catch(()=>{});
+}
+
+function renderStatusBoard(crew){
+  // pull family-night, saga cadence, daily banner
+  Promise.all([
+    _db.ref('stewart/familynight').once('value'),
+    _db.ref('bridge/daily/'+dayKey()).once('value')
+  ]).then(([fnSnap, dailySnap])=>{
+    const rows = [];
+    // each boy: green if 100%, amber if some, red if none
+    crew.forEach(c=>{
+      const lamp = c.pct>=100?'green':(c.completed>0?'amber':'red');
+      const status = c.pct>=100?'All clear':(c.completed>0?c.completed+'/'+MISSION_TARGET:'None yet');
+      rows.push({label:c.a.icon+' '+c.a.name, lamp, status});
+    });
+    // Saga cadence lamp
+    let sagaLamp='off', sagaStatus='no rhythm';
+    if(typeof SAGA_CADENCE!=='undefined' && SAGA_CADENCE){
+      const releases=(SAGA_CHAPTERS||[]).filter(x=>x.released&&x.released_at).map(x=>x.released_at);
+      const last=releases.length?Math.max.apply(null,releases):0;
+      if(!last){ sagaLamp='amber'; sagaStatus='not started'; }
+      else{
+        const due=last+SAGA_CADENCE*86400000;
+        const daysLeft=Math.ceil((due-Date.now())/86400000);
+        if(daysLeft<0){ sagaLamp='red'; sagaStatus='overdue '+Math.abs(daysLeft)+'d'; }
+        else if(daysLeft<=2){ sagaLamp='amber'; sagaStatus='due in '+daysLeft+'d'; }
+        else { sagaLamp='green'; sagaStatus='on course'; }
+      }
+    }
+    rows.push({label:'📖 The Saga', lamp:sagaLamp, status:sagaStatus});
+    // Daily banner: green if all done, amber if some
+    const daily=dailySnap.val()||{};
+    const dailyDone=Object.values(daily).filter(Boolean).length;
+    const dailyTotal=(typeof DAILY_ITEMS!=='undefined')?DAILY_ITEMS.length:4;
+    const dLamp=dailyDone>=dailyTotal?'green':(dailyDone>0?'amber':'off');
+    rows.push({label:"⚓ Captain's daily watch", lamp:dLamp, status:dailyDone+'/'+dailyTotal});
+    // Family night this week
+    const fn=fnSnap.val();
+    let fnLamp='off', fnStatus='not set';
+    if(fn){ fnLamp='green'; fnStatus='held'; }
+    rows.push({label:'🕯️ Family night', lamp:fnLamp, status:fnStatus});
+
+    const el=document.getElementById('xmas-tree');
+    if(el) el.innerHTML=rows.map(r=>'<div class="tree-row"><i class="lamp '+r.lamp+'"></i>'+
+      '<div class="tr-label">'+r.label+'</div><div class="tr-status">'+r.status+'</div></div>').join('');
+  }).catch(()=>{});
+}
+
+renderWeek();
+renderSystems();
+renderFleet();
+initFirebase();
+</script>
+
+<!-- BRIDGE BOTTOM NAV -->
+<div class="bbotnav">
+  <button class="bnav active" data-btab="helm" onclick="showBTab('helm',this)"><span class="bni">⚓</span>Helm</button>
+  <button class="bnav" data-btab="comms" onclick="showBTab('comms',this)"><span class="bni">📡</span>Comms</button>
+  <button class="bnav" data-btab="instruments" onclick="showBTab('instruments',this)"><span class="bni">🎛️</span>Instruments</button>
+  <button class="bnav" data-btab="saga" onclick="showBTab('saga',this)"><span class="bni">📖</span>Saga</button>
+  <button class="bnav" data-btab="word" onclick="showBTab('word',this)"><span class="bni">✝️</span>Word</button>
+  <button class="bnav" data-btab="systems" onclick="showBTab('systems',this)"><span class="bni">🧭</span>Systems</button>
+</div>
+</body>
+</html>
