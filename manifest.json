@@ -1,0 +1,16 @@
+{
+  "name": "Systems Seven — HMS Resolute",
+  "short_name": "HMS Resolute",
+  "description": "Systems Seven, Version 2 — the Stewart family operating system.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0b1d33",
+  "background_color": "#060f1d",
+  "lang": "en",
+  "icons": [
+    { "src": "assets/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
