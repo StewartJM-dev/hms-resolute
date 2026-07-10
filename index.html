@@ -141,6 +141,23 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
   border-top:1px dashed rgba(132,148,165,.3);
 }
 .mapcaption b{ color:var(--brass2); font-family:'Cinzel',serif; letter-spacing:.05em; }
+
+/* preview panel */
+.preview{
+  display:none; margin-top:14px; border:1px solid rgba(212,175,90,.35); border-radius:10px;
+  overflow:hidden; background:rgba(0,0,0,.25);
+}
+.preview.on{ display:flex; flex-direction:column; }
+.preview-img{ width:100%; height:150px; object-fit:cover; display:block; background:linear-gradient(135deg,rgba(176,141,62,.25),rgba(11,29,51,.6)); }
+.preview-img.placeholder{ display:flex; align-items:center; justify-content:center; font-size:44px; opacity:.5; }
+.preview-body{ padding:16px; }
+.preview-name{ font-family:'Cinzel',serif; font-size:18px; color:var(--brass2); letter-spacing:.05em; }
+.preview-desc{ font-size:13.5px; color:var(--steel2); margin-top:6px; line-height:1.5; }
+.preview-enter{
+  margin-top:14px; width:100%; padding:13px; border:none; border-radius:6px; cursor:pointer;
+  font-family:'Cinzel',serif; font-size:14px; letter-spacing:.1em;
+  background:linear-gradient(180deg,var(--brass2),var(--brass)); color:var(--ink);
+}
 .deck{
   padding:16px 12px; border-radius:8px; cursor:pointer; text-align:center;
   background:rgba(0,0,0,.25); border:1px solid rgba(212,175,90,.25);
@@ -247,67 +264,76 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
         <line x1="200" y1="40" x2="200" y2="90" stroke="rgba(212,175,90,.5)" stroke-width="3"/>
 
         <!-- CROW'S NEST -->
-        <g class="hot" data-name="Crow's Nest" data-sub="Spotted providence · the family watch-log" onclick="location.href='crowsnest/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="Crow's Nest" data-sub="Spotted providence · the family watch-log" onclick="selectDeck('Crow\'s Nest','crowsnest/','Spotted providence — the family watch-log of God\'s hand at work.',null,'🔭')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <circle class="hz" cx="200" cy="34" r="26"/>
           <text class="hicon" x="200" y="30">🔭</text>
           <text class="hlabel small" x="200" y="50">Nest</text>
         </g>
 
         <!-- BRIDGE -->
-        <g class="hot" data-name="The Bridge" data-sub="Captain's station · instruments, devotional, planning" onclick="location.href='bridge/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="The Bridge" data-sub="Captain's station · instruments, devotional, planning" onclick="selectDeck('The Bridge','bridge/','Captain\'s station. Instruments, devotional, planning, and the Registry.','bridge/assets/bridge-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="120" y="90" width="160" height="60" rx="6"/>
           <text class="hicon" x="200" y="118">🧭</text>
           <text class="hlabel" x="200" y="140">Bridge</text>
         </g>
 
         <!-- AGENT HQ (forward hull) -->
-        <g class="hot" data-name="Agent HQ" data-sub="Ship's boys' quarters · missions, devotional voting" onclick="location.href='boys/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="Agent HQ" data-sub="Ship's boys' quarters · missions, devotional voting" onclick="selectDeck('Agent HQ','boys/','Ship\'s boys\' quarters. Missions, devotional voting, and training.',null,'🫡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="55" y="165" width="175" height="140" rx="6"/>
           <text class="hicon" x="142" y="225">🫡</text>
           <text class="hlabel" x="142" y="250">Agent HQ</text>
         </g>
 
         <!-- WAR ROOM -->
-        <g class="hot" data-name="War Room" data-sub="Prayer requests · daily sheet · Wall of Valor" onclick="location.href='warroom/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="War Room" data-sub="Prayer requests · daily sheet · Wall of Valor" onclick="selectDeck('War Room','warroom/','Prayer requests, the daily sheet, and the Wall of Valor.','warroom/assets/warroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="245" y="175" width="150" height="130" rx="6"/>
           <text class="hicon" x="320" y="230">⚔️</text>
           <text class="hlabel" x="320" y="255">War Room</text>
         </g>
 
         <!-- HOMESTEAD (largest, amidships) -->
-        <g class="hot" data-name="The Homestead" data-sub="XO's station · Rounds, Quartermaster, Quarterdeck" onclick="location.href='dashboard/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="The Homestead" data-sub="XO's station · Rounds, Quartermaster, Quarterdeck" onclick="selectDeck('The Homestead','dashboard/','Executive Officer\'s station. Rounds, Quartermaster, Quarterdeck.',null,'🏡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="410" y="160" width="260" height="145" rx="6"/>
           <text class="hicon" x="510" y="220">🏡</text>
           <text class="hlabel" x="510" y="245">Homestead</text>
         </g>
         <!-- GALLEY (nested sub-station within Homestead) -->
-        <g class="hot small" data-name="The Galley" data-sub="Provisions · meals, recipes, planning" onclick="event.stopPropagation();location.href='kitchen/'" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot small" data-name="The Galley" data-sub="Provisions · meals, recipes, planning" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="598" y="245" width="62" height="52" rx="5"/>
           <text class="hicon" x="629" y="270" style="font-size:15px;">🍳</text>
           <text class="hlabel small" x="629" y="288">Galley</text>
         </g>
 
         <!-- WARDROOM -->
-        <g class="hot" data-name="Wardroom" data-sub="Off-duty · the Adamah Saga, family annotations" onclick="location.href='saga/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="Wardroom" data-sub="Off-duty · the Adamah Saga, family annotations" onclick="selectDeck('Wardroom','saga/','Off-duty rest. The Adamah Saga and family annotations.','saga/assets/wardroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="685" y="175" width="150" height="130" rx="6"/>
           <text class="hicon" x="760" y="230">📖</text>
           <text class="hlabel" x="760" y="255">Wardroom</text>
         </g>
 
         <!-- VINEYARD (aft, private) -->
-        <g class="hot" data-name="The Vineyard" data-sub="Private deck · date nights, shared devotional (own PIN)" onclick="location.href='vineyard/'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot" data-name="The Vineyard" data-sub="Private deck · date nights, shared devotional (own PIN)" onclick="selectDeck('The Vineyard','vineyard/','Private deck. Date nights and shared devotional (own PIN).',null,'🍇')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="850" y="180" width="110" height="115" rx="6"/>
           <text class="hicon" x="905" y="230">🍇</text>
           <text class="hlabel small" x="905" y="252">Vineyard</text>
         </g>
 
         <!-- REGISTRY (utility, officers only, secondary styling) -->
-        <g class="hot reg" data-name="Ship's Registry" data-sub="Officers only · muster roll, ID cards" onclick="location.href='registry.html'" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
+        <g class="hot reg" data-name="Ship's Registry" data-sub="Officers only · muster roll, ID cards" onclick="selectDeck('Ship\'s Registry','registry.html','Officers only. Muster roll, ID cards, credentials.',null,'📜')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
           <rect class="hz" x="20" y="30" width="90" height="34" rx="5"/>
           <text class="hlabel small" x="65" y="52">📜 Registry</text>
         </g>
       </svg>
-      <div class="mapcaption" id="mapCaption">Hover or tap a deck to see what's aboard.</div>
+      <div class="mapcaption" id="mapCaption">Tap a deck to see what's aboard.</div>
+      <div class="preview" id="preview">
+        <img class="preview-img" id="previewImg" src="" alt="">
+        <div class="preview-img placeholder" id="previewPlaceholder" style="display:none;"></div>
+        <div class="preview-body">
+          <div class="preview-name" id="previewName"></div>
+          <div class="preview-desc" id="previewDesc"></div>
+          <button class="preview-enter" id="previewBtn">Enter →</button>
+        </div>
+      </div>
     </div>
     <div class="assist-row">
       <label>Assist a crew member (flagged &amp; logged)</label>
@@ -403,7 +429,23 @@ function mapSay(el){
     '<b>'+el.dataset.name+'</b> — '+el.dataset.sub;
 }
 function mapClear(){
-  document.getElementById('mapCaption').textContent = "Hover or tap a deck to see what's aboard.";
+  document.getElementById('mapCaption').textContent = "Tap a deck to see what's aboard.";
+}
+function selectDeck(name, href, desc, img, icon){
+  const panel = document.getElementById('preview');
+  const imgEl = document.getElementById('previewImg');
+  const ph = document.getElementById('previewPlaceholder');
+  if(img){
+    imgEl.src = img; imgEl.style.display='block'; ph.style.display='none';
+  }else{
+    imgEl.style.display='none'; ph.style.display='flex'; ph.textContent = icon||'⚓';
+  }
+  document.getElementById('previewName').textContent = name;
+  document.getElementById('previewDesc').textContent = desc;
+  document.getElementById('previewBtn').textContent = 'Enter ' + name.replace(/^The /,'') + ' →';
+  document.getElementById('previewBtn').onclick = () => location.href = href;
+  panel.classList.add('on');
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 // ───────────────────────── Mode switching ─────────────────────────
