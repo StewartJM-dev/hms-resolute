@@ -549,15 +549,27 @@ async function commission(){
 
 // ───────────────────────── Boot ─────────────────────────
 (async function boot(){
-  const auth = await db.ref('resolute/auth/parents').get();
-  if(!auth.exists()){
+  try{
+    const auth = await db.ref('resolute/auth/parents').get();
+    if(!auth.exists()){
+      document.getElementById('loginCard').style.display='none';
+      document.getElementById('setupCard').style.display='block';
+      return;
+    }
+    const s = getSession();
+    if(s && s.role==='parent' && Date.now()-s.ts < 1000*60*60*12){
+      showDecks(s.person);
+    }
+  }catch(e){
     document.getElementById('loginCard').style.display='none';
-    document.getElementById('setupCard').style.display='block';
-    return;
-  }
-  const s = getSession();
-  if(s && s.role==='parent' && Date.now()-s.ts < 1000*60*60*12){
-    showDecks(s.person);
+    document.getElementById('setupCard').style.display='none';
+    const errBox = document.createElement('div');
+    errBox.className = 'card';
+    errBox.innerHTML = '<div class="card-body"><div class="msg err" style="display:block;">'
+      + 'Could not reach the ship\'s database.<br><br><b>Error:</b> ' + (e.message||e)
+      + '<br><br>This usually means a Firebase permissions rule is blocking the <code>resolute</code> path. '
+      + 'Check Realtime Database → Rules in the Firebase console.</div></div>';
+    document.body.appendChild(errBox);
   }
 })();
 </script>
