@@ -1021,6 +1021,9 @@ let transmissionsData = [];
 // ══════════════════════════════════════════════════════
 function initFirebase(){
   try {
+    if(typeof firebase === 'undefined'){
+      throw new Error('Firebase library never loaded (script blocked or failed)');
+    }
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
     setSyncStatus('live');
@@ -1032,6 +1035,14 @@ function initFirebase(){
   } catch(e){
     setSyncStatus('offline');
     console.log('Firebase init error:', e);
+    const el = document.getElementById('sync-status');
+    if(el){
+      el.title = 'Firebase error: ' + (e && e.message ? e.message : e);
+      el.style.cursor = 'help';
+    }
+    // Surface the real error on the Rations screen instead of just "Connect to WiFi"
+    const tm = document.getElementById('tonight-meal');
+    if(tm) tm.innerHTML = '<div class="empty">Connection error: '+(e&&e.message?e.message:'unknown')+'<br><span style="opacity:.6;font-size:11px;">Tap the sync dot at top for details.</span></div>';
   }
 }
 
@@ -4425,8 +4436,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!card.classList.contains(profile.card)) card.remove();
   });
 
-  selectAgent(lockedId, profile.codename, profile.name, profile.rank, profile.theme, profile.icon);
   initFirebase();
+  selectAgent(lockedId, profile.codename, profile.name, profile.rank, profile.theme, profile.icon);
 });
 </script>
 </body>
