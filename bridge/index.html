@@ -499,7 +499,7 @@ body{
     </div>
 
     <div class="shead">Next Week — What They Want</div>
-    <div class="word-suggest-note">The boys vote in O.W.C.A.; Dawn suggests in the Homestead. Their picks gather here to guide next week's study.</div>
+    <div class="word-suggest-note">The boys vote in O.W.C.A.; Dawn suggests in Officers' Country. Their picks gather here to guide next week's study.</div>
   </div>
 
   <!-- ===== SYSTEMS TAB ===== -->
@@ -648,8 +648,8 @@ const SYSTEMS = [
 
 // THE FLEET — linked subsystem sites (update hrefs as they're built)
 const FLEET = [
-  {ico:"🏡", name:"The Homestead", desc:"Dawn's command — household, kitchen & the boys' oversight.", href:"../dashboard/", status:"live"},
-  {ico:"🍇", name:"The Vineyard", desc:"Just for John & Dawn — tend the marriage together.", href:"../vineyard/", status:"live"},
+  {ico:"🏡", name:"Officers' Country", desc:"Dawn's command — household, kitchen & the boys' oversight.", href:"../dashboard/", status:"live"},
+  {ico:"🍇", name:"Captain's Quarters", desc:"Private, just for John & Dawn — the way to the Vineyard.", href:"../vineyard/", status:"live"},
   {ico:"🛡️", name:"O.W.C.A.", desc:"The boys' command center — missions, pay, agents.", href:"../boys/", status:"live"},
   {ico:"🍲", name:"The Kitchen", desc:"Meals, recipes & the family cookbook.", href:"../kitchen/", status:"live"},
   {ico:"📖", name:"The Saga", desc:"Adamah — the reader. Released chapters for the family.", href:"../saga/", status:"live"},
@@ -989,7 +989,7 @@ function loadDawnSuggest(){
     const items=Object.values(v).filter(x=>x&&x.topic);
     const el=document.getElementById('word-dawn-suggest');
     if(!items.length){
-      el.innerHTML='<div class="wf-label">💗 Dawn\'s wishes</div><div class="wf-empty">Nothing yet — Dawn can suggest from the Homestead.</div>';
+      el.innerHTML='<div class="wf-label">💗 Dawn\'s wishes</div><div class="wf-empty">Nothing yet — Dawn can suggest from Officers' Country.</div>';
       return;
     }
     el.innerHTML='<div class="wf-label">💗 Dawn would like to study</div>'+
