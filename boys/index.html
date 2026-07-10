@@ -194,6 +194,7 @@ body::before{
   background:transparent;cursor:pointer;
   color:var(--teal2);font-size:12px;
   display:flex;align-items:center;justify-content:center;
+  text-decoration:none;
 }
 .topbar-codename{
   font-family:'Orbitron',sans-serif;
@@ -651,8 +652,7 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="topbar-left">
-      <div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid var(--teal);color:var(--teal2);font-size:14px;flex-shrink:0;" title="O.W.C.A.">&#128737;</div>
-      <button class="topbar-back" onclick="backToSelect()">&#8592;</button>
+      <a href="../" class="topbar-back" title="Back to Gangway">&#8592;</a>
       <div>
         <div class="topbar-codename" id="topbar-codename">AGENT</div>
         <div class="topbar-name" id="topbar-name">Loading...</div>
