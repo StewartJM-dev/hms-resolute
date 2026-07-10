@@ -1,0 +1,3889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>HMS Resolute · The Homestead</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="The Homestead">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --green:#1a4a2e;--green2:#2d6a47;--green3:#3d8a5e;
+  --indigo:#1e2d5a;--indigo2:#2e3f7a;
+  --gold:#c8922a;--gold2:#e8b84a;
+  --white:#f9f7f2;--offwhite:#ede9e0;--cream:#f7f2ea;
+  --black:#0e0e0e;--ink:#1a1410;--brown:#5c3d1e;
+  --rust:#b5451b;--muted:#8a7a65;--border:#e0d5c0;
+  --card:#ffffff;
+  --alpha:#1e3a6e;--bravo:#6e1e1e;--dino:#1e5c2a;--wild:#7a5c1e;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{height:-webkit-fill-available;}
+body{
+  font-family:'Lato',sans-serif;
+  background:var(--cream);color:var(--ink);
+  min-height:100vh;min-height:-webkit-fill-available;
+  font-size:14px;
+}
+
+/* ── PIN SCREEN ── */
+.pin-screen{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  min-height:100vh;min-height:-webkit-fill-available;
+  background:linear-gradient(160deg,var(--green) 0%,#0f2e1a 100%);
+  padding:32px 24px;
+}
+.pin-logo{
+  font-family:'Cinzel',serif;font-size:13px;
+  letter-spacing:4px;text-transform:uppercase;
+  color:var(--gold2);margin-bottom:6px;text-align:center;
+}
+.pin-title{
+  font-family:'Cinzel',serif;font-size:26px;font-weight:900;
+  color:var(--white);text-align:center;margin-bottom:4px;
+}
+.pin-sub{
+  font-family:'Crimson Pro',serif;font-size:14px;
+  font-style:italic;color:rgba(255,255,255,.6);
+  margin-bottom:32px;text-align:center;
+}
+.pin-dots{
+  display:flex;gap:14px;margin-bottom:28px;
+}
+.pin-dot{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.4);
+  transition:all .2s;
+}
+.pin-dot.filled{background:var(--gold2);border-color:var(--gold2);}
+.pin-pad{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:10px;width:240px;
+}
+.pin-btn{
+  height:64px;border-radius:12px;
+  background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.15);
+  color:var(--white);font-family:'Cinzel',serif;
+  font-size:22px;font-weight:700;cursor:pointer;
+  transition:background .15s;
+}
+.pin-btn:active{background:rgba(255,255,255,.25);}
+.pin-btn.del{font-size:16px;color:rgba(255,255,255,.6);}
+.pin-btn.zero{grid-column:2;}
+.pin-error{
+  color:#ff6b6b;font-size:12px;font-style:italic;
+  margin-top:14px;text-align:center;
+  min-height:18px;
+}
+
+/* ── MAIN APP ── */
+.app{display:none;flex-direction:column;min-height:100vh;min-height:-webkit-fill-available;}
+.app.active{display:flex;}
+
+/* TOP BAR */
+.topbar{
+  background:var(--green);
+  border-bottom:3px solid var(--gold);
+  padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.topbar-logo{
+  font-family:'Cinzel',serif;font-size:14px;font-weight:900;
+  color:var(--white);letter-spacing:1px;
+}
+.topbar-logo span{color:var(--gold2);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.topbar-sync{font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+.topbar-home{
+  font-size:16px;color:var(--gold2);text-decoration:none;
+}
+.topbar-lock{
+  font-size:12px;color:rgba(255,255,255,.5);
+  border:none;background:transparent;cursor:pointer;
+  letter-spacing:.5px;
+}
+
+/* BOTTOM NAV */
+.botnav{
+  background:var(--green);
+  border-top:3px solid var(--gold);
+  display:flex;flex-shrink:0;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.botnav{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.bnb{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  border:none;background:transparent;cursor:pointer;
+  color:rgba(255,255,255,.4);font-family:'Lato',sans-serif;
+  font-size:7px;letter-spacing:.2px;text-transform:uppercase;
+  padding:7px 1px;transition:color .2s;
+  min-width:44px;
+}
+.bnb.active{color:var(--gold2);}
+.bnb svg{width:16px;height:16px;flex-shrink:0;}
+
+/* CONTENT */
+.content{
+  flex:1;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;min-height:0;
+}
+.tab{display:none;padding:14px 13px 24px;}
+.tab.active{display:block;}
+
+/* SECTION HEADERS */
+.sec-hd{
+  font-family:'Cinzel',serif;font-size:9px;
+  letter-spacing:2.5px;text-transform:uppercase;
+  color:var(--green2);margin-bottom:8px;
+  display:flex;align-items:center;gap:8px;
+}
+.sec-hd::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* CARDS */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;margin-bottom:10px;
+}
+.card-hd{
+  padding:9px 13px;
+  display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid var(--border);
+}
+.card-hd-icon{font-size:14px;flex-shrink:0;}
+.card-hd-title{
+  font-family:'Cinzel',serif;font-size:10px;
+  font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--white);flex:1;
+}
+.card-bd{padding:12px 13px;}
+
+.green-hd .card-hd{background:var(--green);}
+.indigo-hd .card-hd{background:var(--indigo);}
+.brown-hd .card-hd{background:var(--brown);}
+.rust-hd .card-hd{background:var(--rust);}
+
+/* AGENT CARDS */
+.agent-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px;}
+.agent-card{
+  background:var(--card);border:2px solid var(--border);
+  border-radius:10px;overflow:hidden;
+}
+.agent-card-hd{
+  padding:8px 11px;display:flex;
+  align-items:center;justify-content:space-between;
+}
+.agent-card-name{
+  font-family:'Cinzel',serif;font-size:11px;
+  font-weight:700;color:var(--white);
+}
+.agent-card-sub{font-size:9px;color:rgba(255,255,255,.6);}
+.agent-card-bd{padding:9px 11px;}
+.agent-prog-bar{
+  height:5px;border-radius:3px;background:#e8e0d0;
+  overflow:hidden;margin-bottom:5px;
+}
+.agent-prog-fill{height:100%;border-radius:3px;}
+.agent-stat{
+  display:flex;justify-content:space-between;
+  align-items:center;
+}
+.agent-missions{font-size:11px;color:var(--muted);}
+.agent-pay{font-size:12px;font-weight:700;}
+
+/* MESSENGER */
+.msg-identity{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:8px;margin-bottom:14px;
+}
+.msg-id-btn{
+  padding:10px;border-radius:8px;
+  border:2px solid var(--border);
+  background:var(--card);cursor:pointer;
+  text-align:center;transition:all .2s;
+}
+.msg-id-btn.active{border-color:var(--green2);background:#edf7f0;}
+.msg-id-btn-name{
+  font-family:'Cinzel',serif;font-size:10px;
+  font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--ink);
+}
+.msg-id-btn-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+
+.thread-list{margin-bottom:12px;}
+.thread-item{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:10px 13px;margin-bottom:6px;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:10px;
+}
+.thread-item:active{background:var(--offwhite);}
+.thread-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+}
+.thread-name{
+  font-family:'Cinzel',serif;font-size:11px;
+  font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;flex:1;
+}
+.thread-preview{font-size:11px;color:var(--muted);font-style:italic;}
+.thread-arrow{font-size:12px;color:var(--muted);}
+
+.msg-thread{display:none;flex-direction:column;height:100%;}
+.msg-thread.active{display:flex;}
+.msg-thread-header{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 13px;border-bottom:1px solid var(--border);
+  background:var(--card);flex-shrink:0;
+}
+.msg-back{
+  border:none;background:transparent;cursor:pointer;
+  font-size:16px;color:var(--green2);
+}
+.msg-thread-name{
+  font-family:'Cinzel',serif;font-size:12px;
+  font-weight:700;text-transform:uppercase;flex:1;
+}
+.msg-messages{
+  flex:1;overflow-y:auto;padding:12px 13px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.msg-bubble{
+  max-width:80%;padding:9px 12px;
+  border-radius:12px;line-height:1.4;font-size:13px;
+}
+.msg-bubble.sent{
+  align-self:flex-end;background:var(--green);color:var(--white);
+  border-bottom-right-radius:4px;
+}
+.msg-bubble.received{
+  align-self:flex-start;background:var(--offwhite);color:var(--ink);
+  border-bottom-left-radius:4px;
+}
+.msg-bubble-from{font-size:9px;opacity:.7;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
+.msg-bubble-time{font-size:9px;opacity:.6;margin-top:4px;text-align:right;}
+.msg-compose{
+  display:flex;gap:8px;padding:10px 13px;
+  border-top:1px solid var(--border);background:var(--card);
+  flex-shrink:0;
+}
+.msg-input{
+  flex:1;padding:8px 11px;border:1px solid var(--border);
+  border-radius:20px;font-family:'Lato',sans-serif;
+  font-size:13px;background:var(--cream);color:var(--ink);
+}
+.msg-input:focus{outline:none;border-color:var(--green2);}
+.msg-send{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--green);border:none;cursor:pointer;
+  color:var(--white);font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+
+/* FAMILY BOARD */
+.board-compose{margin-bottom:12px;}
+.board-input{
+  width:100%;padding:9px 12px;border:1px solid var(--border);
+  border-radius:8px;font-family:'Lato',sans-serif;font-size:13px;
+  background:var(--card);color:var(--ink);margin-bottom:8px;resize:none;height:70px;
+}
+.board-input:focus{outline:none;border-color:var(--green2);}
+.board-controls{display:flex;gap:8px;align-items:center;}
+.board-from{
+  flex:1;padding:8px 10px;border:1px solid var(--border);
+  border-radius:7px;font-family:'Lato',sans-serif;
+  font-size:12px;background:var(--card);color:var(--ink);
+}
+.board-send{
+  padding:8px 16px;border:none;border-radius:7px;
+  background:var(--green);color:var(--white);
+  font-family:'Cinzel',serif;font-size:11px;
+  font-weight:700;cursor:pointer;
+}
+
+/* LUNCH DROP */
+.lunch-day-tabs{
+  display:flex;gap:6px;margin-bottom:12px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+}
+.lunch-tab-btn{
+  padding:6px 12px;border-radius:20px;
+  border:1px solid var(--border);background:var(--card);
+  font-family:'Cinzel',serif;font-size:9px;
+  letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;color:var(--muted);white-space:nowrap;flex-shrink:0;
+}
+.lunch-tab-btn.active{background:var(--green);color:var(--white);border-color:var(--green);}
+.lunch-option-row{
+  display:flex;gap:8px;align-items:center;
+  margin-bottom:7px;
+}
+.lunch-opt-input{
+  flex:1;padding:8px 10px;border:1px solid var(--border);
+  border-radius:7px;font-family:'Lato',sans-serif;font-size:13px;
+  background:var(--card);color:var(--ink);
+}
+.lunch-opt-qty{
+  width:56px;padding:8px 8px;border:1px solid var(--border);
+  border-radius:7px;font-family:'Lato',sans-serif;font-size:13px;
+  background:var(--card);color:var(--ink);text-align:center;
+}
+.lunch-opt-remove{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--offwhite);border:1px solid var(--border);
+  cursor:pointer;font-size:14px;color:var(--rust);
+  display:flex;align-items:center;justify-content:center;
+}
+.lunch-add-btn{
+  width:100%;padding:9px;border:1px dashed var(--border);
+  border-radius:7px;background:transparent;cursor:pointer;
+  font-family:'Lato',sans-serif;font-size:12px;color:var(--muted);
+  margin-bottom:8px;
+}
+.lunch-save-btn{
+  width:100%;padding:10px;border:none;border-radius:8px;
+  background:var(--green);color:var(--white);
+  font-family:'Cinzel',serif;font-size:12px;font-weight:700;cursor:pointer;
+}
+
+/* UTILITIES */
+.filter-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;}
+.filter-btn.active{background:var(--green2);color:white;border-color:var(--green2);}
+.btn-primary{
+  width:100%;padding:11px;border:none;border-radius:9px;
+  background:var(--green);color:var(--white);
+  font-family:'Cinzel',serif;font-size:12px;font-weight:700;
+  cursor:pointer;margin-bottom:8px;
+}
+.btn-secondary{
+  width:100%;padding:9px;border:1px solid var(--border);
+  border-radius:9px;background:transparent;color:var(--muted);
+  font-family:'Lato',sans-serif;font-size:12px;cursor:pointer;
+}
+.empty-state{
+  text-align:center;padding:24px;
+  color:var(--muted);font-style:italic;font-size:13px;
+}
+.badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 7px;border-radius:20px;
+  font-size:9px;font-weight:700;letter-spacing:.3px;
+  text-transform:uppercase;
+}
+.badge-green{background:#edf7f0;color:var(--green2);}
+.badge-amber{background:#fdf6e3;color:#a07000;}
+.badge-red{background:#fdf0eb;color:var(--rust);}
+/* weekly chore grid */
+.bwc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
+.bwc-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fff;}
+.bwc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border);}
+.bwc-name{font-family:'Cinzel',serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
+.bwc-total{font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.bwc-total.bwc-t-full{background:rgba(45,138,94,.18);color:#1a4a2e;}
+.bwc-total.bwc-t-partial{background:rgba(200,146,42,.16);color:#8a5e18;}
+.bwc-total.bwc-t-none{background:rgba(200,80,77,.12);color:#a03028;}
+.bwc-day{margin-bottom:9px;}
+.bwc-day:last-child{margin-bottom:0;}
+.bwc-day-hd{display:flex;align-items:baseline;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;}
+.bwc-day-hd .bwc-day-count{font-weight:700;}
+.bwc-day.bwc-today .bwc-day-hd{color:var(--ink);}
+.bwc-day.bwc-today{background:rgba(200,160,42,.06);border-radius:6px;padding:5px 6px;margin-left:-6px;margin-right:-6px;}
+.bwc-day.bwc-future .bwc-day-hd{opacity:.5;}
+.bwc-checklist{list-style:none;margin:0;padding:0;font-size:12px;line-height:1.55;}
+.bwc-checklist li{opacity:.85;}
+.bwc-checklist li.bwc-done{color:#1a4a2e;font-weight:600;}
+.bwc-day.bwc-future .bwc-checklist li{opacity:.45;}
+.bwc-day-hd .bwc-upcoming{font-style:italic;font-weight:400;}
+.bwc-upcoming-note{font-style:italic;opacity:.6;}
+</style>
+</head>
+<body>
+
+<!-- ═══ PIN SCREEN ═══ -->
+<div class="pin-screen" id="pin-screen">
+  <div class="pin-logo">Stewart Family</div>
+  <h1 class="pin-title">Parent <span style="color:var(--gold2)">HQ</span></h1>
+  <p class="pin-sub">Command &amp; Control</p>
+  <div class="pin-dots">
+    <div class="pin-dot" id="dot-0"></div>
+    <div class="pin-dot" id="dot-1"></div>
+    <div class="pin-dot" id="dot-2"></div>
+    <div class="pin-dot" id="dot-3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinPress('1')">1</button>
+    <button class="pin-btn" onclick="pinPress('2')">2</button>
+    <button class="pin-btn" onclick="pinPress('3')">3</button>
+    <button class="pin-btn" onclick="pinPress('4')">4</button>
+    <button class="pin-btn" onclick="pinPress('5')">5</button>
+    <button class="pin-btn" onclick="pinPress('6')">6</button>
+    <button class="pin-btn" onclick="pinPress('7')">7</button>
+    <button class="pin-btn" onclick="pinPress('8')">8</button>
+    <button class="pin-btn" onclick="pinPress('9')">9</button>
+    <button class="pin-btn del" onclick="pinDelete()">&#9003;</button>
+    <button class="pin-btn zero" onclick="pinPress('0')">0</button>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+</div>
+
+<!-- ═══ MAIN APP ═══ -->
+<div class="app" id="main-app">
+
+  <div class="topbar">
+    <div>
+      <div class="topbar-logo">The <span>Homestead</span></div>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-sync" id="sync-status" style="color:rgba(255,255,255,.5);">&#9675; Connecting</span>
+      <a href="../kitchen/" class="topbar-home" title="The Galley">&#127858;</a>
+      <a href="../bridge/" class="topbar-home" title="The Bridge">&#9875;</a>
+      <a href="../vineyard/" class="topbar-home" title="The Vineyard">&#127815;</a>
+      <button class="topbar-lock" onclick="lockApp()">Lock</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- TAB: OVERVIEW -->
+    <div class="tab active" id="tab-overview">
+      <div id="overview-day-banner" style="margin-bottom:12px;"></div>
+      <a href="../saga/" style="display:block;text-decoration:none;color:inherit;margin-bottom:14px;">
+        <div class="card" style="background:linear-gradient(135deg,#1e2d5a,#1a4a2e);border:1px solid var(--gold);">
+          <div class="card-bd" style="display:flex;align-items:center;gap:14px;padding:14px 16px;">
+            <div style="font-size:30px;flex-shrink:0;">&#128214;</div>
+            <div style="flex:1;">
+              <div style="font-family:'Cinzel',serif;font-weight:700;font-size:16px;color:var(--gold2,#e8b84a);">The Adamah Saga</div>
+              <div style="font-size:13.5px;color:#f0ece2;opacity:.9;margin-top:3px;line-height:1.4;">Book One is coming soon &mdash; John is writing it for you to read first. Tap to follow along.</div>
+            </div>
+            <div style="font-family:'Lato',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:rgba(200,146,42,.25);color:var(--gold2,#e8b84a);border:1px solid rgba(200,146,42,.5);padding:4px 9px;border-radius:10px;flex-shrink:0;">Soon</div>
+          </div>
+        </div>
+      </a>
+      <div class="sec-hd">Agent Status Today</div>
+      <div class="agent-grid" id="overview-agents"></div>
+      <div class="sec-hd">Weekly Pay</div>
+      <div id="overview-pay" style="margin-bottom:12px;"></div>
+      <div id="overview-familynight" style="margin-bottom:12px;"></div>
+      <div class="sec-hd">Field Library This Week</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd" id="reading-overview"></div>
+      </div>
+      <div class="sec-hd">Quick Transmission</div>
+      <div class="card indigo-hd">
+        <div class="card-hd"><div class="card-hd-icon">&#128225;</div><div class="card-hd-title">Send to Agents</div></div>
+        <div class="card-bd">
+          <textarea id="quick-trans-text" placeholder="Message to all agents..." style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:7px;font-family:'Lato',sans-serif;font-size:13px;background:var(--cream);resize:none;height:60px;margin-bottom:8px;" maxlength="280"></textarea>
+          <div style="display:flex;gap:8px;">
+            <select id="quick-trans-from" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-family:'Lato',sans-serif;font-size:12px;background:var(--card);">
+              <option value="HQ">From: HQ</option>
+              <option value="Dad">From: Dad</option>
+              <option value="Mom">From: Mom</option>
+            </select>
+            <button onclick="sendQuickTransmission()" style="padding:8px 16px;border:none;border-radius:7px;background:var(--indigo);color:white;font-family:'Cinzel',serif;font-size:11px;font-weight:700;cursor:pointer;">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: HOMESTEAD (Dawn's household home base) -->
+    <div class="tab" id="tab-homestead">
+      <a href="../vineyard/" style="display:block;text-decoration:none;color:inherit;margin-bottom:14px;">
+        <div class="card" style="background:linear-gradient(135deg,#3d1f47,#5a2e6b);border:1px solid #e87fa8;">
+          <div class="card-bd" style="display:flex;align-items:center;gap:14px;padding:14px 16px;">
+            <div style="font-size:28px;flex-shrink:0;">&#127815;</div>
+            <div style="flex:1;">
+              <div style="font-family:'Cinzel',serif;font-weight:700;font-size:16px;color:#f4a7c4;">The Vineyard</div>
+              <div style="font-size:13.5px;color:#f0ece2;opacity:.9;margin-top:3px;">Ours alone &mdash; tend it together. Tap to open.</div>
+            </div>
+            <div style="color:#f4a7c4;font-size:18px;">&#8250;</div>
+          </div>
+        </div>
+      </a>
+
+      <div class="sec-hd">The Homestead</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <a href="../kitchen/" style="text-decoration:none;color:inherit;" class="card"><div class="card-bd" style="text-align:center;padding:16px;"><div style="font-size:26px;">&#127858;</div><div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;margin-top:6px;">The Galley</div><div style="font-size:12px;opacity:.7;margin-top:2px;">Meals, recipes, cookbook</div></div></a>
+        <a href="../bridge/" style="text-decoration:none;color:inherit;" class="card"><div class="card-bd" style="text-align:center;padding:16px;"><div style="font-size:26px;">&#9875;</div><div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;margin-top:6px;">The Bridge</div><div style="font-size:12px;opacity:.7;margin-top:2px;">Systems Seven</div></div></a>
+      </div>
+
+      <div class="sec-hd">Homestead Manager</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-bd">
+          <div style="font-family:'Cinzel',serif;font-weight:600;font-size:14px;margin-bottom:6px;">💗 Devotional Wishes</div>
+          <div style="font-size:12.5px;opacity:.72;margin-bottom:10px;line-height:1.5;">Suggest something you'd like to study — for the family, or just for you and John. It shows up on his Bridge.</div>
+          <div style="display:flex;gap:7px;">
+            <input type="text" id="dawn-dev-input" placeholder="A topic, book, or verse…" style="flex:1;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+            <button onclick="addDawnDevWish()" style="padding:9px 14px;border:none;border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;">＋</button>
+          </div>
+          <div id="dawn-dev-list" style="margin-top:10px;"></div>
+        </div>
+      </div>
+      <div id="segs-hs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
+      <div class="card">
+        <div class="card-bd">
+          <div id="hs-list"></div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <input type="text" id="hs-input" placeholder="Add to this list…" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--border);font-size:15px;">
+            <button onclick="addHsItem()" style="padding:10px 16px;border:none;border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:18px;">&#43;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: MESSENGER -->
+    <div class="tab" id="tab-messenger">
+      <!-- Thread list view -->
+      <div id="messenger-list-view">
+        <div class="sec-hd">Family Board</div>
+        <div class="card green-hd" style="margin-bottom:14px;">
+          <div class="card-hd"><div class="card-hd-icon">&#128227;</div><div class="card-hd-title">Post to All Agents</div></div>
+          <div class="card-bd">
+            <textarea class="board-input" id="board-msg" placeholder="Post a message all boys can see..." maxlength="280"></textarea>
+            <div class="board-controls">
+              <select class="board-from" id="board-from">
+                <option value="HQ">From: HQ</option>
+                <option value="Dad">From: Dad</option>
+                <option value="Mom">From: Mom</option>
+              </select>
+              <button class="board-send" onclick="sendBoardMessage()">Post</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-hd">Group Chat</div>
+        <div class="thread-list" style="margin-bottom:14px;">
+          <div class="thread-item" onclick="openGroupChat()">
+            <div class="thread-dot" style="background:var(--gold,#c8922a);"></div>
+            <div><div class="thread-name">&#128172; Agent Group Chat <span id="group-new-tag" style="display:none;background:var(--gold,#c8922a);color:#000;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;">NEW</span></div><div class="thread-preview" id="preview-group">All agents can see this</div></div>
+            <div class="thread-arrow">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="sec-hd">Chat Moderation</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-bd">
+            <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
+            <div id="mod-list"></div>
+          </div>
+        </div>
+
+        <div class="sec-hd">Private Threads</div>
+        <div class="thread-list">
+          <div class="thread-item" onclick="openThread('samuel','Samuel','Agent Alpha','var(--alpha)')">
+            <div class="thread-dot" style="background:#1e3a6e;"></div>
+            <div><div class="thread-name">Samuel</div><div class="thread-preview" id="preview-samuel">Agent Alpha</div></div>
+            <div class="thread-arrow">&#8250;</div>
+          </div>
+          <div class="thread-item" onclick="openThread('johnjr','John Jr.','Agent Bravo','var(--bravo)')">
+            <div class="thread-dot" style="background:#6e1e1e;"></div>
+            <div><div class="thread-name">John Jr.</div><div class="thread-preview" id="preview-johnjr">Agent Bravo</div></div>
+            <div class="thread-arrow">&#8250;</div>
+          </div>
+          <div class="thread-item" onclick="openThread('stephen','Stephen','Agent Dino','var(--dino)')">
+            <div class="thread-dot" style="background:#1e5c2a;"></div>
+            <div><div class="thread-name">Stephen</div><div class="thread-preview" id="preview-stephen">Agent Dino</div></div>
+            <div class="thread-arrow">&#8250;</div>
+          </div>
+          <div class="thread-item" onclick="openThread('daniel','Daniel','Agent Wildcard','var(--wild)')">
+            <div class="thread-dot" style="background:#7a5c1e;"></div>
+            <div><div class="thread-name">Daniel</div><div class="thread-preview" id="preview-daniel">Agent Wildcard</div></div>
+            <div class="thread-arrow">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="sec-hd">Recent Board Posts</div>
+        <div id="board-messages"></div>
+      </div>
+
+      <!-- Thread detail view -->
+      <div id="messenger-thread-view" style="display:none;flex-direction:column;height:calc(100vh - 120px);">
+        <div class="msg-thread-header">
+          <button class="msg-back" onclick="closeThread()">&#8592;</button>
+          <div class="msg-thread-name" id="thread-title">Thread</div>
+          <div style="font-size:10px;color:var(--muted);" id="thread-sub"></div>
+        </div>
+        <div class="msg-messages" id="thread-messages"></div>
+        <div class="msg-compose">
+          <input class="msg-input" type="text" id="thread-input" placeholder="Message..." maxlength="280">
+          <button class="msg-send" onclick="sendThreadMessage()">&#10148;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: LUNCH DROP -->
+    <div class="tab" id="tab-lunch">
+      <div class="sec-hd">Load Lunch Options</div>
+      <div class="card green-hd" style="margin-bottom:12px;">
+        <div class="card-hd"><div class="card-hd-icon">&#127857;</div><div class="card-hd-title">Weekly Lunch Drop</div></div>
+        <div class="card-bd">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Load available lunch options for each day. Boys pick from the shared pool — first come first served. Include quantities so the app tracks what's left.</p>
+          <div class="lunch-day-tabs" id="lunch-day-tabs-parent"></div>
+          <div id="lunch-options-parent"></div>
+          <button class="lunch-add-btn" onclick="addLunchOption()">+ Add Option</button>
+          <button class="lunch-save-btn" onclick="saveLunchDay()">Save This Day's Options</button>
+        </div>
+      </div>
+      <div class="sec-hd">Boys' Picks This Week</div>
+      <div id="lunch-picks-overview"></div>
+    </div>
+
+    <!-- TAB: MISSIONS -->
+    <div class="tab" id="tab-missions">
+      <div id="missions-day-header" style="margin-bottom:12px;"></div>
+
+      <div class="sec-hd">This Week — Chore Grid</div>
+      <div id="week-grid-wrap" style="margin-bottom:8px;"></div>
+      <div style="font-size:11px;opacity:.6;text-align:center;margin-bottom:18px;">Every chore, every day this week, at a glance.</div>
+
+      <div class="sec-hd">Detailed Mission Status</div>
+      <div id="missions-detail"></div>
+    </div>
+
+
+    <!-- TAB: COMMANDER DAWN -->
+    <div class="tab" id="tab-dawn">
+      <div id="dawn-day-banner" style="margin-bottom:12px;"></div>
+
+      <div class="sec-hd">Today's Missions</div>
+      <div id="dawn-daily-missions" style="margin-bottom:14px;"></div>
+
+      <div id="dawn-special-section"></div>
+
+      <div class="sec-hd">Family Devotional</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd" id="family-devotional-input">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+
+      <div class="sec-hd">Dawn's Personal Devotional</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd" id="dawn-devotional-input">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+
+      <div class="sec-hd">Weekly Rhythm</div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-bd" style="font-size:12px;color:var(--muted);line-height:2;">
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span><strong style="color:var(--ink);">Monday</strong></span><span>Sam &amp; John laundry day</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span><strong style="color:var(--ink);">Tuesday</strong></span><span>Your laundry day (yours, John's, Trail Life uniforms)</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span><strong style="color:var(--ink);">Wednesday</strong></span><span>Trash day</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span><strong style="color:var(--ink);">Thursday</strong></span><span>Stephen &amp; Daniel laundry day</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span><strong style="color:var(--ink);">Friday</strong></span><span>Deep clean with rotating agent</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);"><span><strong style="color:var(--ink);">Saturday</strong></span><span>Inventory, shopping, Family Night</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;"><span><strong style="color:var(--ink);">Sunday</strong></span><span>Rest</span></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- TAB: PARENT GROWTH -->
+    <div class="tab" id="tab-growth">
+      <div class="sec-hd">Art of Parenting &mdash; Session Tracker</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">FamilyLife's Art of Parenting &mdash; 8 sessions. Mark your current session and log what you're applying this week.</p>
+          <select id="growth-session" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Lato',sans-serif;font-size:13px;background:var(--card);margin-bottom:10px;">
+            <option value="0">Not started yet</option>
+            <option value="1">Session 1 &mdash; The Goal of Parenting</option>
+            <option value="2">Session 2 &mdash; Forming Character</option>
+            <option value="3">Session 3 &mdash; Applying Discipline</option>
+            <option value="4">Session 4 &mdash; Building Relationships</option>
+            <option value="5">Session 5 &mdash; Understanding Identity</option>
+            <option value="6">Session 6 &mdash; Nurturing Identity</option>
+            <option value="7">Session 7 &mdash; Preparing for Mission</option>
+            <option value="8">Session 8 &mdash; The Power of Family</option>
+          </select>
+          <button onclick="saveGrowthSession()" class="btn-primary">Update Current Session</button>
+        </div>
+      </div>
+
+      <div class="sec-hd">This Week's Application</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">What from your session are you and Dawn focusing on applying this week? One or two concrete things.</p>
+          <textarea id="growth-application" placeholder="e.g. This week we're focusing on responding instead of reacting when the boys argue..." style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Lato',sans-serif;font-size:13px;background:var(--cream);resize:none;height:80px;margin-bottom:8px;"></textarea>
+          <button onclick="saveGrowthApplication()" class="btn-primary">Save This Week's Focus</button>
+        </div>
+      </div>
+
+      <div class="sec-hd">Weekly Reflection Log</div>
+      <div id="growth-log" style="margin-bottom:12px;"></div>
+
+      <div class="sec-hd">20 Character Qualities to Pray For</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">From Session 2 &mdash; Forming Character. Pray through these for each boy.</p>
+          <div id="character-qualities" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+      </div>
+
+      <div class="sec-hd">Per-Boy Notes</div>
+      <div id="growth-boy-notes"></div>
+    </div>
+
+
+    <!-- TAB: PROJECTS -->
+    <div class="tab" id="tab-projects">
+
+      <!-- FAMILY NIGHT ACTIVITIES -->
+      <div class="sec-hd">Family Night Activities</div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-bd" style="padding-bottom:4px;">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Tap an activity to run it tonight. Mix it up — no two weeks the same.</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+            <button onclick="filterActivities('all',this)" class="filter-btn active">All</button>
+            <button onclick="filterActivities('yard',this)" class="filter-btn">Yard</button>
+            <button onclick="filterActivities('barn',this)" class="filter-btn">Barn</button>
+            <button onclick="filterActivities('inside',this)" class="filter-btn">Inside</button>
+          </div>
+          <div id="activity-bank"></div>
+        </div>
+      </div>
+
+      <!-- TEACH ME SESSIONS -->
+      <div class="sec-hd">Teach Me Sessions</div>
+      <div id="teach-me-list" style="margin-bottom:12px;"></div>
+
+      <!-- HOUSE PROJECTS -->
+      <div class="sec-hd">House Projects</div>
+      <div id="house-projects-list" style="margin-bottom:12px;"></div>
+      <button onclick="addCustomProject('house')" style="width:100%;padding:9px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:14px;">+ Add House Project</button>
+
+      <!-- EXTERIOR PROJECTS -->
+      <div class="sec-hd">Exterior &amp; Yard Projects</div>
+      <div id="exterior-projects-list" style="margin-bottom:12px;"></div>
+      <button onclick="addCustomProject('exterior')" style="width:100%;padding:9px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:14px;">+ Add Exterior Project</button>
+
+      <!-- TEACH ME VOTE -->
+      <div class="sec-hd">Teach Me Vote</div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-bd" id="vote-management">
+          <div class="empty-state">Loading vote data...</div>
+        </div>
+      </div>
+
+      <!-- SUPER FAMILY NIGHT -->
+      <div class="sec-hd">Super Family Night</div>
+      <div id="super-fn-dashboard" style="margin-bottom:12px;"></div>
+
+      <!-- STONE COLLECTION TRACKER -->
+      <div class="sec-hd">Stone Collection Log</div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-bd">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Boys log stone collected from the property. Builds inventory for path and bed projects.</p>
+          <div id="stone-log"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <select id="stone-size-select" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <option value="Small (fist)">Small (fist-size)</option>
+              <option value="Medium (two-fist)">Medium (two-fist)</option>
+              <option value="Large (both hands)">Large (both hands)</option>
+              <option value="Flat/path stone">Flat / path stone</option>
+            </select>
+            <input type="number" id="stone-count" placeholder="How many?" min="1" style="width:90px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+            <button onclick="logStones()" style="padding:8px 14px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:12px;cursor:pointer;">Log</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB: SETTINGS -->
+    <div class="tab" id="tab-settings">
+      <div class="sec-hd">Reading Goals</div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-bd">
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Samuel &amp; John Jr. read chapters daily toward a weekly goal. Stephen &amp; Daniel read one full book per day &mdash; no goal needed.</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;font-weight:700;">Samuel &mdash; chapters/day</span>
+            <input type="number" id="goal-samuel" min="1" max="20" value="3" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px;">
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
+            <span style="font-size:13px;font-weight:700;">John Jr. &mdash; chapters/day</span>
+            <input type="number" id="goal-johnjr" min="1" max="20" value="3" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px;">
+          </div>
+          <button onclick="saveReadingGoals()" class="btn-primary" style="margin-top:10px;">Save Goals</button>
+        </div>
+      </div>
+
+      <div class="sec-hd">Portal Links</div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="card-bd">
+          <a href="../kitchen/index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:20px;">&#127869;</span>
+            <div><div style="font-weight:700;font-size:13px;">The Galley</div><div style="font-size:11px;color:var(--muted);">Meal planning &amp; recipes</div></div>
+            <span style="margin-left:auto;color:var(--muted);">&#8250;</span>
+          </a>
+          <a href="../boys/index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);padding:8px 0;">
+            <span style="font-size:20px;">&#129346;</span>
+            <div><div style="font-weight:700;font-size:13px;">Agent HQ</div><div style="font-size:11px;color:var(--muted);">Boys missions &amp; pay</div></div>
+            <span style="margin-left:auto;color:var(--muted);">&#8250;</span>
+          </a>
+        </div>
+      </div>
+      <div class="sec-hd">About</div>
+      <div class="card">
+        <div class="card-bd" style="font-size:12px;color:var(--muted);line-height:1.6;">
+          <div style="font-family:'Cinzel',serif;font-size:11px;color:var(--brown);margin-bottom:6px;">Stewart Family Portal</div>
+          Parent Dashboard v1.0<br>
+          Firebase: stewart-family-3cece<br>
+          GitHub: stewartjm-dev.github.io/stewart-family<br><br>
+          <em>Virescit vulnere virtus</em>
+        </div>
+      </div>
+      <button class="btn-secondary" onclick="lockApp()" style="margin-top:10px;">&#128274; Lock Dashboard</button>
+    </div>
+
+  </div>
+
+  <nav class="botnav">
+    <button class="bnb active" onclick="showTab('overview',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </button>
+    <button class="bnb" onclick="showTab('homestead',this);renderHomestead();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>
+      Home
+    </button>
+    <button class="bnb" onclick="showTab('messenger',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Messages
+    </button>
+    <button class="bnb" onclick="showTab('lunch',this);loadLunchParent();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Lunch
+    </button>
+    <button class="bnb" onclick="showTab('missions',this);loadMissionsDetail();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Missions
+    </button>
+    <button class="bnb" onclick="showTab('dawn',this);renderDawnTab();renderFamilyDevotionalInput();renderDawnDevotionalInput();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+      Dawn
+    </button>
+    <button class="bnb" onclick="showTab('growth',this);renderGrowthTab();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Growth
+    </button>
+    <button class="bnb" onclick="showTab('projects',this);renderProjectsTab();renderVoteManagement();renderSuperFNDashboard();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Projects
+    </button>
+    <button class="bnb" onclick="showTab('settings',this);loadReadingGoals();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+  </nav>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DATE + LINK HELPERS
+// localDateStr() returns LOCAL YYYY-MM-DD (fixes UTC evening-rollover
+// bug that made mission checkmarks read under the wrong date key).
+// ══════════════════════════════════════════════════════
+function localDateStr(date){
+  const d = date ? new Date(date) : new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function escapeHtml(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function linkify(text){
+  const esc = escapeHtml(text);
+  const urlRe = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+  return esc.replace(urlRe, (url) => {
+    let href = url;
+    if(/^www\./i.test(href)) href = 'https://' + href;
+    let trail = '';
+    const tm = href.match(/[.,!?)]+$/);
+    if(tm){ trail = url.slice(url.length - tm[0].length); href = href.slice(0, href.length - tm[0].length); url = url.slice(0, url.length - tm[0].length); }
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;font-weight:600;word-break:break-all;">${url}</a>${trail}`;
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// FIREBASE
+// ══════════════════════════════════════════════════════
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+let _db = null;
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(FB_CONFIG);
+    _db = firebase.database();
+    setSyncStatus('live');
+    _db.ref('.info/connected').on('value', snap => setSyncStatus(snap.val()?'live':'offline'));
+  }catch(e){ setSyncStatus('offline'); }
+}
+
+function setSyncStatus(s){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  if(s==='live'){ el.innerHTML='&#9679; Synced'; el.style.color='#a8e8c0'; }
+  else{ el.innerHTML='&#9675; Offline'; el.style.color='rgba(255,255,255,.4)'; }
+}
+
+// ══════════════════════════════════════════════════════
+// PIN
+// ══════════════════════════════════════════════════════
+const CORRECT_PIN = '5683';
+let pinEntry = '';
+
+function pinPress(d){
+  if(pinEntry.length >= 4) return;
+  pinEntry += d;
+  updatePinDots();
+  if(pinEntry.length === 4){
+    setTimeout(() => {
+      if(pinEntry === CORRECT_PIN){
+        document.getElementById('pin-screen').style.display = 'none';
+        document.getElementById('main-app').classList.add('active');
+        initFirebase();
+        setTimeout(() => renderOverview(), 800);
+      } else {
+        document.getElementById('pin-error').textContent = 'Incorrect PIN. Try again.';
+        pinEntry = '';
+        updatePinDots();
+        setTimeout(() => document.getElementById('pin-error').textContent = '', 2000);
+      }
+    }, 200);
+  }
+}
+
+function pinDelete(){
+  pinEntry = pinEntry.slice(0,-1);
+  updatePinDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function updatePinDots(){
+  for(let i=0;i<4;i++){
+    document.getElementById(`dot-${i}`).classList.toggle('filled', i < pinEntry.length);
+  }
+}
+
+function lockApp(){
+  pinEntry = '';
+  updatePinDots();
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('main-app').classList.remove('active');
+  document.getElementById('pin-screen').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function showTab(name, btn){
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.bnb').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='overview') renderOverview();
+  if(name==='messenger') renderMessenger();
+  if(name==='missions'){ loadMissionsDetail(); renderWeekGrid(); }
+}
+
+// ══════════════════════════════════════════════════════
+// AGENTS DATA
+// ══════════════════════════════════════════════════════
+const AGENTS = [
+  {id:'samuel', name:'Samuel', codename:'Agent Alpha', color:'#1e3a6e', icon:'🦅'},
+  {id:'johnjr', name:'John Jr.', codename:'Agent Bravo', color:'#6e1e1e', icon:'🦁'},
+  {id:'stephen', name:'Stephen', codename:'Agent Dino', color:'#1e5c2a', icon:'🦖'},
+  {id:'daniel', name:'Daniel', codename:'Agent Wildcard', color:'#7a5c1e', icon:'🐘'},
+];
+
+const DAILY_BASE = {
+  samuel: ['bed','bedroom','rabbit-own','floor-laundry'],
+  johnjr: ['bed','bedroom','rabbit-own','floor-living'],
+  stephen:['bed','bedroom','rabbit-own','kitchen-counter','floor-kitchen'],
+  daniel: ['bed','bedroom','rabbit-own','floor-hallway','floor-rabbit','table-set'],
+};
+
+const MISSION_NAMES = {
+  'bed':'Make bed','bedroom':'Tidy bedroom','rabbit-own':'Care for rabbit',
+  'floor-laundry':'Sweep laundry room','floor-living':'Sweep living room',
+  'floor-kitchen':'Sweep kitchen','floor-hallway':'Sweep hallway',
+  'floor-rabbit':'Sweep rabbit area','kitchen-counter':'Clean kitchen counters',
+  'dishwasher-load':'Load dishwasher','dishwasher-unload':'Unload dishwasher',
+  'table-set':'Set table','table-clear':'Clear table','table-wipe':'Wipe table',
+  'drinks':'Pour drinks','stovetop':'Wipe stovetop','microwave':'Wipe microwave',
+  'trash':'Take out trash','bathroom-trash':'Empty bathroom trash',
+  'laundry-sam':'Laundry Day (with John Jr.)','laundry-john':'Laundry Day (with Samuel)',
+  'laundry-stephen':'Laundry Day (with Daniel)','laundry-daniel':'Laundry Day (with Stephen)',
+  'dinner-side-starch':'Make the starch side', 'dinner-side-veggie':'Make the vegetable',
+};
+
+function getDishTeam(){
+  const now = new Date();
+  const dow = now.getDay();
+  const soy = new Date(now.getFullYear(),0,1);
+  const wk = Math.floor((now-soy)/(7*24*60*60*1000));
+  const A = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
+  const B = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
+  return (wk%2===0)?A[dow]:B[dow];
+}
+
+function calculateDayScore(agentId, missions, doneMap){
+  const possible = missions.reduce((sum,m) => sum + (m.points||0), 0);
+  const earned = missions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
+  const pct = possible > 0 ? (earned / possible) : 0;
+  return {
+    earned,
+    possible,
+    pct,
+    points100: Math.round(pct * 100),
+    dollars: Math.round(pct * 100) / 100, // $1.00 max
+    minutes: pct * 6 // 6 min max
+  };
+}
+
+// Apply transfer adjustments to a base score
+// transferAdjust is in points-out-of-100 (e.g. +50 or -50)
+
+function recalculateScore(agentId, dateStr){
+  if(!_db) return;
+
+  Promise.all([
+    _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value'),
+    _db.ref(`stewart/transferAdjust/${agentId}/${dateStr}`).once('value'),
+    _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value')
+  ]).then(([mSnap, tSnap, dSnap]) => {
+    const done = mSnap.val() || {};
+    const transferAdjust = tSnap.val() || 0; // e.g. +50 or -50
+    const deductions = dSnap.val() || {}; // {reasonKey: points, ...}
+
+    // Build expected missions for that date (use date-aware logic)
+    const dayDate = new Date(dateStr);
+    const dayOfWeek = dayDate.getDay();
+    if(dayOfWeek===0||dayOfWeek===6){
+      // Weekend — no score
+      _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null);
+      return;
+    }
+
+    const missions = buildMissionsForDate(agentId, dayDate);
+    const base = calculateDayScore(agentId, missions, done);
+
+    let score = base.points100;
+    score += transferAdjust;
+    const totalDeductions = Object.values(deductions).reduce((a,b)=>a+b,0);
+    score -= totalDeductions;
+    score = Math.max(0, Math.min(100, score));
+
+    _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(score);
+  });
+}
+
+// Build the expected mission list for ANY date (not just today)
+// Mirrors buildMissions but accepts an explicit date
+
+// ===== UNIFIED MISSION ENGINE (mirrors Agent HQ exactly — single source of truth) =====
+function getDishTeam_u(_d){
+  const now = _d ? new Date(_d) : new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun,1=Mon...6=Sat
+  // Week number (0 or 1) based on ISO week
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor((now - startOfYear) / (7 * 24 * 60 * 60 * 1000));
+  const weekParity = weekNum % 2; // 0 or 1
+
+  // Week A pattern: Sun=SJ, Mon=SJ, Tue=SD, Wed=SJ, Thu=SD, Fri=SJ, Sat=SD
+  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
+  // Week B: flipped
+  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
+
+  return weekParity === 0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
+}
+function isWeekend_u(_d){
+  const d = (_d?new Date(_d):new Date()).getDay();
+  return d === 0 || d === 6;
+}
+function isWednesday_u(_d){
+  return (_d?new Date(_d):new Date()).getDay() === 3;
+}
+function getDayName_u(_d){
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return days[(_d?new Date(_d):new Date()).getDay()];
+}
+function getBathroomAgent_u(_d){
+  const order = ['samuel','johnjr','stephen','daniel'];
+  const now = _d ? new Date(_d) : new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
+  return order[weekNum % 4];
+}
+function isLaundryDay_u(agentId, _d){
+  return isLaundryDayFor_u(agentId, (_d?new Date(_d):new Date()).getDay());
+}
+function isLaundryDayFor_u(agentId, dayOfWeek){
+  // dayOfWeek: 1=Mon, 4=Thu
+  if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
+  if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
+  return false;
+}
+function isDinnerSideDay_u(_d){
+  return DINNER_SIDE_DAYS.includes((_d?new Date(_d):new Date()).getDay());
+}
+function getMyDinnerSide_u(agentId, _d){
+  const pair = PAIRS[agentId];
+  if(!pair) return null;
+  const assignment = getDinnerSideAssignment_u(_d);
+  if(!assignment) return null;
+  return assignment[pair.pairId];
+}
+function getDinnerSideAssignment_u(dateOverride){
+  const date = dateOverride ? new Date(dateOverride) : new Date();
+  const dow = date.getDay();
+  if(!DINNER_SIDE_DAYS.includes(dow)) return null;
+
+  const epoch = new Date(2024, 0, 1); // Jan 1, 2024 (Monday)
+  const daysSinceEpoch = Math.floor((date - epoch) / (24*60*60*1000));
+  const fullWeeks = Math.floor(daysSinceEpoch / 7);
+  const remainderDays = daysSinceEpoch % 7;
+  // Each full week contributes 3 cooking days (Mon, Wed, Thu)
+  // Count cooking days in the remainder (days 0..remainderDays-1 of this week, Sun-based)
+  let cookingDayIndex = fullWeeks * 3;
+  for(let i=0;i<remainderDays;i++){
+    if(DINNER_SIDE_DAYS.includes(i)) cookingDayIndex++;
+  }
+
+  // Even index = Virtus does starch, Vulnere does veggie. Odd = swap.
+  const virtusGetsStarch = (cookingDayIndex % 2 === 0);
+  return {
+    virtus: virtusGetsStarch ? 'starch' : 'veggie',
+    vulnere: virtusGetsStarch ? 'veggie' : 'starch'
+  };
+}
+
+function buildMissionsUnified(agentId, _d){
+  const dishTeam = getDishTeam_u(_d);
+  const weekend = isWeekend_u(_d);
+  const wed = isWednesday_u(_d);
+  const day = getDayName_u(_d);
+  const isBathroomWeek = (agentId === getBathroomAgent_u(_d));
+
+  // Is this agent on dishes today?
+  const onDishes = (agentId === 'samuel' || agentId === 'johnjr')
+    ? dishTeam === 'sj'
+    : dishTeam === 'sd';
+
+  const onSetup = !onDishes; // opposite team does setup
+
+  const missions = [];
+
+  // ── SHARED DAILY (all 7 days) ──────────────────────
+  missions.push({
+    id: 'bed',
+    text: 'Make your bed',
+    detail: 'Every morning before anything else.',
+    points: 5,
+    category: 'bedroom',
+    always: true
+  });
+  missions.push({
+    id: 'bedroom',
+    text: 'Tidy your bedroom space',
+    detail: 'Your area clean and clothes put away.',
+    points: 5,
+    category: 'bedroom',
+    always: true
+  });
+  missions.push({
+    id: 'rabbit-own',
+    text: 'Care for your rabbit',
+    detail: 'Feed and water your own rabbit before bed.',
+    points: 5,
+    category: 'animals',
+    always: true
+  });
+
+  // ── DISHES TEAM DAILY ──────────────────────────────
+  if(onDishes){
+    // Dish team is either Sam+John or Stephen+Daniel
+    // Sam+John: both alternate load and unload between themselves
+    // Stephen+Daniel: Stephen UNLOADS, Daniel LOADS — always, no exceptions
+
+    if(agentId === 'samuel' || agentId === 'johnjr'){
+      const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
+      missions.push({
+        id: 'dishwasher-load',
+        text: `Load the dishwasher — with ${partner}`,
+        detail: `You and ${partner} handle dishes today. Load all dirty dishes after meals.`,
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+      missions.push({
+        id: 'dishwasher-unload',
+        text: `Unload dishwasher & put away — with ${partner}`,
+        detail: `Empty the clean dishes and put everything in its place. Work with ${partner}.`,
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+    }
+
+    if(agentId === 'stephen'){
+      // Stephen ONLY unloads — Daniel loads
+      missions.push({
+        id: 'dishwasher-unload',
+        text: 'Unload dishwasher & put away — with Daniel',
+        detail: 'Empty the clean dishes and put everything in its place. Daniel will load.',
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+    }
+
+    if(agentId === 'daniel'){
+      // Daniel ONLY loads — Stephen unloads
+      missions.push({
+        id: 'dishwasher-load',
+        text: 'Load the dishwasher — with Stephen',
+        detail: 'Load all the dirty dishes after meals. Stephen will unload and put away.',
+        points: 10,
+        category: 'kitchen',
+        always: true
+      });
+    }
+
+    missions.push({
+      id: 'table-clear',
+      text: 'Clear the table after dinner',
+      detail: 'Bring all dishes, glasses, and food to the kitchen.',
+      points: 5,
+      category: 'kitchen',
+      always: true
+    });
+    missions.push({
+      id: 'table-wipe',
+      text: 'Wipe down the table after meals',
+      detail: 'Wipe the whole table after every meal — breakfast, lunch, and dinner.',
+      points: 5,
+      category: 'kitchen',
+      always: true
+    });
+  }
+
+// ── SETUP TEAM DAILY ──────────────────────────────
+  if(onSetup){
+    missions.push({
+      id: 'table-set',
+      text: 'Set the table before dinner',
+      detail: 'Plates, silverware, and napkins — set 10 minutes before we sit down.',
+      points: 5,
+      category: 'kitchen',
+      always: true
+    });
+    // Drinks — only older boys
+    if(agentId === 'samuel' || agentId === 'johnjr'){
+      const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
+      missions.push({
+        id: 'drinks',
+        text: `Pour drinks before dinner — with ${partner}`,
+        detail: `Pour everyone's drinks 10 minutes before dinner. You and ${partner} handle setup today.`,
+        points: 5,
+        category: 'kitchen',
+        always: true
+      });
+    }
+    // Appliance wipes — Sam, John, Stephen only, dropped on their laundry day
+    if(agentId !== 'daniel' && !isLaundryDay_u(agentId, _d)){
+      missions.push({
+        id: 'stovetop',
+        text: 'Wipe down the stovetop',
+        detail: 'Wipe down all burners and the stovetop surface after cooking.',
+        points: 5,
+        category: 'kitchen',
+        always: true
+      });
+      missions.push({
+        id: 'microwave',
+        text: 'Wipe down the microwave',
+        detail: 'Inside and outside. Check for splatter.',
+        points: 5,
+        category: 'kitchen',
+        always: true
+      });
+    }
+  }
+
+  // ── AGENT-SPECIFIC DAILY ─────────────────────────
+  if(agentId === 'samuel'){
+    missions.push({
+      id: 'floor-laundry',
+      text: 'Sweep the laundry room floor',
+      detail: 'Sweep and tidy the laundry room.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+  }
+
+  if(agentId === 'johnjr'){
+    missions.push({
+      id: 'floor-living',
+      text: 'Sweep the living room floor',
+      detail: 'Sweep the full living room floor.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+  }
+
+  if(agentId === 'stephen'){
+    missions.push({
+      id: 'kitchen-counter',
+      text: 'Clean & wipe kitchen counters',
+      detail: 'Wipe down all counter surfaces. Clear anything that doesn\'t belong.',
+      points: 10,
+      category: 'kitchen',
+      weekday: true
+    });
+    missions.push({
+      id: 'floor-kitchen',
+      text: 'Sweep the kitchen floor',
+      detail: 'Sweep the full kitchen floor including under the table.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+  }
+
+  if(agentId === 'daniel'){
+    missions.push({
+      id: 'floor-hallway',
+      text: 'Sweep the hallway',
+      detail: 'Sweep the hallway floor.',
+      points: 5,
+      category: 'floors',
+      weekday: true
+    });
+    missions.push({
+      id: 'floor-rabbit',
+      text: 'Sweep the rabbit cage area',
+      detail: 'Sweep around and under the rabbit cages.',
+      points: 5,
+      category: 'animals',
+      weekday: true
+    });
+  }
+
+  // ── WEEKLY MISSIONS ────────────────────────────────
+  // Only show on weekdays, one per week — app marks when done
+
+  if(agentId === 'samuel'){
+    if(isLaundryDay_u('samuel', _d)){
+      missions.push({
+        id: 'laundry-sam',
+        text: 'Laundry Day — with John Jr.',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 15,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'fridge',
+      text: 'Wipe down the fridge',
+      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true,
+      rotate: 'sj-stephen'
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  if(agentId === 'johnjr'){
+    if(isLaundryDay_u('johnjr', _d)){
+      missions.push({
+        id: 'laundry-john',
+        text: 'Laundry Day — with Samuel',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 15,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'fridge',
+      text: 'Wipe down the fridge',
+      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true,
+      rotate: 'sj-stephen'
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  if(agentId === 'stephen'){
+    if(isLaundryDay_u('stephen', _d)){
+      missions.push({
+        id: 'laundry-stephen',
+        text: 'Laundry Day — with Daniel',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 15,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'hutch',
+      text: 'Organize the hutch',
+      detail: 'Keep the food hutch organized — boxes neat, nothing expired, everything in its place.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true
+    });
+    missions.push({
+      id: 'fridge',
+      text: 'Wipe down the fridge',
+      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
+      points: 10,
+      category: 'kitchen',
+      weekly: true,
+      rotate: 'sj-stephen'
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  if(agentId === 'daniel'){
+    if(isLaundryDay_u('daniel', _d)){
+      missions.push({
+        id: 'laundry-daniel',
+        text: 'Laundry Day — with Stephen',
+        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
+        points: 10,
+        category: 'laundry',
+        always: true
+      });
+    }
+    missions.push({
+      id: 'bathroom-trash',
+      text: 'Empty bathroom trash',
+      detail: 'Wednesday morning — empty the bathroom trash can and bring it to the road with Sam and John.',
+      points: 10,
+      category: 'bathroom',
+      weekly: true,
+      wednesday: true
+    });
+    if(isBathroomWeek){
+      missions.push({
+        id: 'bathroom-clean',
+        text: 'Clean the bathroom',
+        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
+        points: 15,
+        category: 'bathroom',
+        weekly: true
+      });
+    }
+  }
+
+  // ── WEDNESDAY TRASH ────────────────────────────────
+  if(wed && (agentId === 'samuel' || agentId === 'johnjr')){
+    const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
+    missions.push({
+      id: 'trash',
+      text: `Take trash to the road — with ${partner}`,
+      detail: `Wednesday mission — you and ${partner} go together. Long driveway, out before 9am. Daniel brings the bathroom trash to you.`,
+      points: 10,
+      category: 'trash',
+      always: true,
+      urgent: true
+    });
+  }
+
+  // ── WEEKLY RABBIT CAGE CLEAN ─────────────────────
+  missions.push({
+    id: 'rabbit-cage',
+    text: 'Clean rabbit cages',
+    detail: 'All four boys clean the cages together once this week.',
+    points: 15,
+    category: 'animals',
+    weekly: true
+  });
+
+  // ── DINNER SIDE DISH (Mon/Wed/Thu) ────────────────
+  if(isDinnerSideDay_u(_d)){
+    const side = getMyDinnerSide_u(agentId, _d);
+    const pair = PAIRS[agentId];
+    if(side && pair){
+      const partner = pair.partner === 'johnjr' ? 'John Jr.' : pair.partner.charAt(0).toUpperCase() + pair.partner.slice(1);
+      if(side === 'starch'){
+        missions.push({
+          id: 'dinner-side-starch',
+          text: `Make the starch side — with ${partner}`,
+          detail: `Potatoes, rice, pasta, or similar. Work with ${partner} to get it ready for dinner.`,
+          points: 10,
+          category: 'kitchen',
+          always: true
+        });
+      } else {
+        missions.push({
+          id: 'dinner-side-veggie',
+          text: `Make the vegetable — with ${partner}`,
+          detail: `Heat the vegetable on the stove or microwave with ${partner} for dinner tonight.`,
+          points: 5,
+          category: 'kitchen',
+          always: true
+        });
+      }
+    }
+  }
+
+  // Filter by day type
+  return missions.filter(m => {
+    if(m.always) return true;
+    if(m.weekday && !weekend) return true;
+    if(m.weekly && !weekend) return true;
+    if(m.wednesday && wed) return true;
+    return false;
+  });
+}
+
+// Dashboard entrypoint: delegate to the unified engine for any date
+function buildMissionsForDate(agentId, dayDate){
+  return buildMissionsUnified(agentId, dayDate);
+}
+
+
+// ══════════════════════════════════════════════════════
+// RENDER MISSIONS
+// ══════════════════════════════════════════════════════
+
+function isLaundryDayFor(agentId, dayOfWeek){
+  // dayOfWeek: 1=Mon, 4=Thu
+  if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
+  if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
+  return false;
+}
+
+// Monday = laundry day for Sam & John (pairId 'virtus')
+// Thursday = laundry day for Stephen & Daniel (pairId 'vulnere')
+
+// Monday = laundry day for Sam & John, Thursday = laundry day for Stephen & Daniel
+function isLaundryDay(agentId){
+  const dow = new Date().getDay();
+  if((agentId==='samuel'||agentId==='johnjr') && dow===1) return true;
+  if((agentId==='stephen'||agentId==='daniel') && dow===4) return true;
+  return false;
+}
+
+const PAIRS = {
+  'samuel':  { partner: 'johnjr',  pairId: 'virtus',   label: 'Team Virtus',   names: 'Samuel & John Jr.' },
+  'johnjr':  { partner: 'samuel',  pairId: 'virtus',   label: 'Team Virtus',   names: 'Samuel & John Jr.' },
+  'stephen': { partner: 'daniel',  pairId: 'vulnere',  label: 'Team Vulnere',  names: 'Stephen & Daniel' },
+  'daniel':  { partner: 'stephen', pairId: 'vulnere',  label: 'Team Vulnere',  names: 'Stephen & Daniel' },
+};
+
+const DINNER_SIDE_DAYS = [1, 3, 4]; // Mon, Wed, Thu
+
+function isDinnerSideDay(){
+  return DINNER_SIDE_DAYS.includes(new Date().getDay());
+}
+
+// Count which "cooking day" this is since a fixed epoch (Mon Jan 1 2024)
+// to get continuous alternation regardless of week
+function getDinnerSideAssignment(dateOverride){
+  const date = dateOverride ? new Date(dateOverride) : new Date();
+  const dow = date.getDay();
+  if(!DINNER_SIDE_DAYS.includes(dow)) return null;
+
+  const epoch = new Date(2024, 0, 1); // Jan 1, 2024 (Monday)
+  const daysSinceEpoch = Math.floor((date - epoch) / (24*60*60*1000));
+  const fullWeeks = Math.floor(daysSinceEpoch / 7);
+  const remainderDays = daysSinceEpoch % 7;
+  // Each full week contributes 3 cooking days (Mon, Wed, Thu)
+  // Count cooking days in the remainder (days 0..remainderDays-1 of this week, Sun-based)
+  let cookingDayIndex = fullWeeks * 3;
+  for(let i=0;i<remainderDays;i++){
+    if(DINNER_SIDE_DAYS.includes(i)) cookingDayIndex++;
+  }
+
+  // Even index = Virtus does starch, Vulnere does veggie. Odd = swap.
+  const virtusGetsStarch = (cookingDayIndex % 2 === 0);
+  return {
+    virtus: virtusGetsStarch ? 'starch' : 'veggie',
+    vulnere: virtusGetsStarch ? 'veggie' : 'starch'
+  };
+}
+
+function getMyDinnerSide(agentId){
+  const pair = PAIRS[agentId];
+  if(!pair) return null;
+  const assignment = getDinnerSideAssignment();
+  if(!assignment) return null;
+  return assignment[pair.pairId];
+}
+
+function getExpectedMissions(agentId){
+  const dt = getDishTeam();
+  const onDishes = (agentId==='samuel'||agentId==='johnjr') ? dt==='sj' : dt==='sd';
+  const base = [...(DAILY_BASE[agentId]||[])];
+  const onLaundryDay = isLaundryDay(agentId);
+  if(onDishes){
+    if(agentId==='stephen') base.push('dishwasher-unload','table-clear','table-wipe');
+    else if(agentId==='daniel') base.push('dishwasher-load','table-clear','table-wipe');
+    else base.push('dishwasher-load','dishwasher-unload','table-clear','table-wipe');
+  } else {
+    if(agentId!=='daniel' && !onLaundryDay) base.push('stovetop','microwave');
+    if(agentId==='samuel'||agentId==='johnjr') base.push('drinks');
+    if(!base.includes('table-set')) base.push('table-set');
+  }
+  if(new Date().getDay()===3){
+    if(agentId==='samuel'||agentId==='johnjr') base.push('trash');
+    if(agentId==='daniel') base.push('bathroom-trash');
+  }
+  if(onLaundryDay){
+    if(agentId==='samuel') base.push('laundry-sam');
+    if(agentId==='johnjr') base.push('laundry-john');
+    if(agentId==='stephen') base.push('laundry-stephen');
+    if(agentId==='daniel') base.push('laundry-daniel');
+  }
+  if(isDinnerSideDay()){
+    const side = getMyDinnerSide(agentId);
+    if(side === 'starch') base.push('dinner-side-starch');
+    else if(side === 'veggie') base.push('dinner-side-veggie');
+  }
+  return [...new Set(base)];
+}
+
+function getWeekDays(){
+  const now = new Date();
+  const dow = now.getDay();
+  const diff = dow===0?-6:1-dow;
+  const mon = new Date(now); mon.setDate(now.getDate()+diff);
+  const days = [];
+  for(let i=0;i<5;i++){
+    const d=new Date(mon); d.setDate(mon.getDate()+i);
+    days.push(localDateStr(d));
+  }
+  return days;
+}
+
+// ══════════════════════════════════════════════════════
+// OVERVIEW
+// ══════════════════════════════════════════════════════
+function renderOverview(){
+  if(!_db){ return; }
+  const today = localDateStr();
+  const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dayName = dayNames[new Date().getDay()];
+  const isWeekend = new Date().getDay()===0||new Date().getDay()===6;
+  const dt = getDishTeam();
+  const dishLabel = dt==='sj'?'Samuel & John Jr.':'Stephen & Daniel';
+  const setupLabel = dt==='sj'?'Stephen & Daniel':'Samuel & John Jr.';
+
+  document.getElementById('overview-day-banner').innerHTML =
+    `<div style="background:var(--green);border-radius:10px;padding:11px 14px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;">
+      <div style="font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--white);flex:1;">${dayName}</div>
+      ${isWeekend
+        ? '<span class="badge badge-green">Family Service Day</span>'
+        : `<span class="badge badge-green" style="background:rgba(255,255,255,.15);color:var(--gold2);">Dishes: ${dishLabel}</span>
+           <span class="badge badge-amber" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);">Setup: ${setupLabel}</span>`
+      }
+    </div>`;
+
+  Promise.all(AGENTS.map(a => _db.ref(`stewart/missions/${a.id}/${today}`).once('value')))
+  .then(snaps => {
+    const agentsEl = document.getElementById('overview-agents');
+    agentsEl.innerHTML = AGENTS.map((a,i) => {
+      const done = snaps[i].val()||{};
+      const expected = getExpectedMissions(a.id);
+      const completed = expected.filter(m=>done[m]).length;
+      const total = expected.length;
+      const pct = total>0?Math.round((completed/total)*100):0;
+      const allDone = completed===total&&total>0;
+      const earned = allDone&&!isWeekend;
+      return `<div class="agent-card" style="border-color:${allDone?'#2d6a47':pct>50?'#c8922a':'var(--border)'};">
+        <div class="agent-card-hd" style="background:${a.color};">
+          <div><div class="agent-card-name">${a.name}</div><div class="agent-card-sub">${a.codename}</div></div>
+          <div style="font-size:18px;">${allDone?'✅':pct>50?'⚡':'⏳'}</div>
+        </div>
+        <div class="agent-card-bd">
+          <div class="agent-prog-bar"><div class="agent-prog-fill" style="width:${pct}%;background:${allDone?'#2d6a47':pct>50?'#c8922a':'#b5451b'};"></div></div>
+          <div class="agent-stat">
+            <span class="agent-missions">${completed}/${total} missions</span>
+            <span class="agent-pay" style="color:${earned?'#2d6a47':isWeekend?'var(--muted)':'#b5451b'};">${isWeekend?'Family day':earned?'$1.00':'$0.00'}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  });
+
+  // Weekly pay
+  const weekDays = getWeekDays();
+  Promise.all(AGENTS.map(a => Promise.all(weekDays.map(d => _db.ref(`stewart/missions/${a.id}/${d}`).once('value')))))
+  .then(allData => {
+    const payEl = document.getElementById('overview-pay');
+    payEl.innerHTML = `<div class="card brown-hd">
+      <div class="card-hd"><div class="card-hd-icon">&#128181;</div><div class="card-hd-title">Friday Payout — Week of ${weekDays[0]}</div></div>
+      <div class="card-bd">
+        ${AGENTS.map((a,ai) => {
+          let earned=0;
+          weekDays.forEach((d,di)=>{
+            const done=allData[ai][di].val()||{};
+            const dow=new Date(d).getDay();
+            if(dow===0||dow===6) return;
+            const exp=getExpectedMissions(a.id);
+            if(exp.every(m=>done[m])&&exp.length>0) earned++;
+          });
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:${a.color};"></div>
+              <span style="font-weight:700;font-size:13px;">${a.name}</span>
+              <span style="font-size:10px;color:var(--muted);">${a.codename}</span>
+            </div>
+            <span style="font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:${earned>=4?'#2d6a47':earned>=2?'#c8922a':'#b5451b'};">$${earned}.00</span>
+          </div>`;
+        }).join('')}
+        <div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:8px;text-align:right;">Max $5.00 per boy &middot; Paid Friday</div>
+      </div>
+    </div>`;
+  });
+
+  // Family night
+  _db.ref(`stewart/familynight/${getWeekDays()[0]}`).once('value', snap => {
+    const el = document.getElementById('overview-familynight');
+    if(snap.val()){
+      el.innerHTML = `<div style="background:linear-gradient(135deg,var(--green),var(--indigo));border:2px solid var(--gold);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:4px;">&#127881;</div>
+        <div style="font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--gold2);margin-bottom:3px;">Family Night Unlocked!</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.8);">All four boys completed their weekly missions.</div>
+      </div>`;
+    }
+  });
+
+  renderReadingOverview();
+}
+
+function sendQuickTransmission(){
+  const msg = document.getElementById('quick-trans-text').value.trim();
+  const from = document.getElementById('quick-trans-from').value;
+  if(!msg||!_db) return;
+  _db.ref('stewart/transmissions').push({message:msg,from,timestamp:Date.now()}).then(()=>{
+    document.getElementById('quick-trans-text').value='';
+    const btn = document.querySelector('#tab-overview button[onclick*="sendQuick"]');
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// MESSENGER
+// ══════════════════════════════════════════════════════
+let currentThread = null;
+
+function renderMessenger(){
+  if(!_db) return;
+  loadBoardMessages();
+  loadThreadPreviews();
+  updateDashGroupBadge();
+  renderModeration();
+}
+
+function loadBoardMessages(){
+  _db.ref('stewart/transmissions').limitToLast(10).once('value', snap => {
+    const el = document.getElementById('board-messages');
+    const val = snap.val();
+    if(!val){ el.innerHTML='<div class="empty-state">No board posts yet.</div>'; return; }
+    const items = Object.values(val).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+    el.innerHTML = items.map(t => {
+      const time = t.timestamp ? new Date(t.timestamp).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+      return `<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid var(--indigo);border-radius:8px;padding:10px 13px;margin-bottom:7px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--indigo2);margin-bottom:4px;">From: ${t.from||'HQ'}</div>
+        <div style="font-size:13px;color:var(--ink);line-height:1.5;">${linkify(t.message||'')}</div>
+        ${time?`<div style="font-size:10px;color:var(--muted);margin-top:4px;font-style:italic;">${time}</div>`:''}
+      </div>`;
+    }).join('');
+  });
+}
+
+function loadThreadPreviews(){
+  AGENTS.forEach(a => {
+    _db.ref(`stewart/messages/${a.id}`).limitToLast(1).once('value', snap => {
+      const val = snap.val();
+      if(val){
+        const last = Object.values(val)[0];
+        const el = document.getElementById(`preview-${a.id}`);
+        if(el) el.textContent = last.text ? last.text.slice(0,40)+'...' : a.codename;
+      }
+    });
+  });
+}
+
+function sendBoardMessage(){
+  const msg = document.getElementById('board-msg').value.trim();
+  const from = document.getElementById('board-from').value;
+  if(!msg||!_db) return;
+  _db.ref('stewart/transmissions').push({message:msg,from,timestamp:Date.now()}).then(()=>{
+    document.getElementById('board-msg').value='';
+    loadBoardMessages();
+  });
+}
+
+function openThread(agentId, name, codename, color){
+  currentThread = {agentId, name, codename};
+  document.getElementById('thread-title').textContent = name;
+  document.getElementById('thread-sub').textContent = codename;
+  document.getElementById('messenger-list-view').style.display = 'none';
+  document.getElementById('messenger-thread-view').style.display = 'flex';
+  loadThreadMessages(agentId);
+
+  // Listen for new messages
+  _db.ref(`stewart/messages/${agentId}`).on('value', snap => {
+    if(currentThread && currentThread.agentId === agentId) renderThreadMessages(snap.val()||{});
+  });
+}
+
+function openGroupChat(){
+  currentThread = {group:true, name:'Agent Group Chat'};
+  document.getElementById('thread-title').textContent = '\u{1F4AC} Agent Group Chat';
+  document.getElementById('thread-sub').textContent = 'All agents + Mom & Dad';
+  document.getElementById('messenger-list-view').style.display = 'none';
+  document.getElementById('messenger-thread-view').style.display = 'flex';
+  if(!_db) return;
+  _db.ref('stewart/groupchat').on('value', snap => {
+    if(currentThread && currentThread.group){
+      const msgs = snap.val()||{};
+      renderThreadMessages(msgs);
+      const latest = Object.values(msgs).reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
+      try{ localStorage.setItem('pd-group-seen', String(latest)); }catch(e){}
+      const tag = document.getElementById('group-new-tag');
+      if(tag) tag.style.display = 'none';
+    }
+  });
+}
+
+function updateDashGroupBadge(){
+  if(!_db) return;
+  _db.ref('stewart/groupchat').limitToLast(1).once('value', snap => {
+    const val = snap.val();
+    const tag = document.getElementById('group-new-tag');
+    if(!tag||!val) return;
+    const latest = Object.values(val).reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
+    let seen = 0;
+    try{ seen = parseInt(localStorage.getItem('pd-group-seen')||'0',10); }catch(e){}
+    const lastMsg = Object.values(val)[0];
+    // Only show NEW if last message came from a boy (not Dad/Mom/HQ)
+    const fromBoy = lastMsg && !['Dad','Mom','HQ'].includes(lastMsg.from);
+    tag.style.display = (latest > seen && fromBoy) ? 'inline-block' : 'none';
+    const prev = document.getElementById('preview-group');
+    if(prev && lastMsg) prev.textContent = (lastMsg.from||'')+': '+(lastMsg.text||'').slice(0,30);
+  });
+}
+
+function closeThread(){
+  currentThread = null;
+  document.getElementById('messenger-thread-view').style.display = 'none';
+  document.getElementById('messenger-list-view').style.display = 'block';
+  if(_db){ _db.ref('stewart/messages').off(); _db.ref('stewart/groupchat').off(); }
+  updateDashGroupBadge();
+  renderMessenger();
+}
+
+function loadThreadMessages(agentId){
+  _db.ref(`stewart/messages/${agentId}`).once('value', snap => {
+    renderThreadMessages(snap.val()||{});
+  });
+}
+
+function renderThreadMessages(msgs){
+  const el = document.getElementById('thread-messages');
+  const items = Object.values(msgs).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  if(!items.length){
+    el.innerHTML = '<div class="empty-state">No messages yet. Start the conversation.</div>';
+    return;
+  }
+  const AGENT_ICONS = {samuel:'&#129413;',johnjr:'&#129409;',stephen:'&#129430;',daniel:'&#128024;'};
+  const HANS_ICON = '&#129441;';
+  el.innerHTML = items.map(m => {
+    const isHeinz = m.isHeinz || m.agentId==='heinz';
+    const isHans = m.isHans || m.agentId==='hans';
+    const isParent = isHeinz || isHans || m.from==='Dad'||m.from==='Mom'||m.from==='HQ';
+    let icon;
+    if(isHeinz) icon = '\u{1F9D1}\u200D\u{1F52C}\u26A1';
+    else if(isHans) icon = '\u{1F9D1}\u200D\u{1F52C}';
+    else if(isParent) icon = HANS_ICON;
+    else icon = (AGENT_ICONS[m.agentId] || '&#128100;');
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    const extraStyle = isHeinz ? 'background:rgba(120,40,140,.18);border:1px solid rgba(160,60,180,.4);'
+                      : (isHans ? 'background:rgba(200,146,42,.14);border:1px solid rgba(200,146,42,.3);' : '');
+    return `<div style="display:flex;align-items:flex-end;gap:6px;${isParent?'':'flex-direction:row-reverse;align-self:flex-end;'}max-width:85%;${isParent?'':'margin-left:auto;'}">
+      <div style="font-size:18px;flex-shrink:0;">${icon}</div>
+      <div class="msg-bubble ${isParent?'sent':'received'}" style="max-width:100%;${extraStyle}">
+        <div class="msg-bubble-from" style="${isHeinz?'color:#a03cb4;':(isHans?'color:#c8922a;':'')}">${m.from||'Unknown'}</div>
+        ${linkify(m.text||'')}
+        <div class="msg-bubble-time">${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendThreadMessage(){
+  if(!currentThread||!_db) return;
+  const input = document.getElementById('thread-input');
+  const text = input.value.trim();
+  if(!text) return;
+  if(currentThread.group){
+    _db.ref('stewart/groupchat').push({
+      text, from:'Dad', agentId:'parent', timestamp:Date.now()
+    }).then(()=>{ input.value=''; });
+  } else {
+    _db.ref(`stewart/messages/${currentThread.agentId}`).push({
+      text, from:'Dad', timestamp:Date.now()
+    }).then(()=>{ input.value=''; });
+  }
+}
+
+// Enter key sends
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('thread-input').addEventListener('keydown', e => {
+    if(e.key==='Enter') sendThreadMessage();
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// LUNCH DROP
+// ══════════════════════════════════════════════════════
+const LUNCH_DAYS = ['monday','tuesday','wednesday','thursday','friday'];
+const LUNCH_DAY_LABELS = {monday:'Mon',tuesday:'Tue',wednesday:'Wed',thursday:'Thu',friday:'Fri'};
+let currentLunchDay = 'monday';
+let lunchDayOptions = {};
+
+function loadLunchParent(){
+  const today = new Date().getDay();
+  const dayMap = {1:'monday',2:'tuesday',3:'wednesday',4:'thursday',5:'friday'};
+  currentLunchDay = dayMap[today]||'monday';
+  buildLunchDayTabsParent();
+  loadLunchDayOptions();
+  loadLunchPicksOverview();
+}
+
+function buildLunchDayTabsParent(){
+  const el = document.getElementById('lunch-day-tabs-parent');
+  el.innerHTML = LUNCH_DAYS.map(d =>
+    `<button class="lunch-tab-btn ${d===currentLunchDay?'active':''}" onclick="selectLunchDayParent('${d}',this)">${LUNCH_DAY_LABELS[d]}</button>`
+  ).join('');
+}
+
+function selectLunchDayParent(day, btn){
+  currentLunchDay = day;
+  document.querySelectorAll('.lunch-tab-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  loadLunchDayOptions();
+}
+
+function loadLunchDayOptions(){
+  if(!_db){ renderLunchOptions([]); return; }
+  _db.ref(`stewart/lunch/week/${currentLunchDay}`).once('value', snap => {
+    lunchDayOptions[currentLunchDay] = snap.val()||[];
+    renderLunchOptions(lunchDayOptions[currentLunchDay]);
+  });
+}
+
+function renderLunchOptions(opts){
+  const el = document.getElementById('lunch-options-parent');
+  if(!opts.length){
+    el.innerHTML = '<div class="empty-state" style="padding:12px 0;">No options loaded for this day yet.</div>';
+    return;
+  }
+  el.innerHTML = opts.map((opt,i) =>
+    `<div class="lunch-option-row">
+      <input class="lunch-opt-input" type="text" value="${opt.item||''}" placeholder="Lunch item..." id="lunch-item-${i}">
+      <input class="lunch-opt-qty" type="number" value="${opt.qty||1}" min="1" max="10" id="lunch-qty-${i}">
+      <button class="lunch-opt-remove" onclick="removeLunchOption(${i})">&#215;</button>
+    </div>`
+  ).join('');
+}
+
+function addLunchOption(){
+  if(!lunchDayOptions[currentLunchDay]) lunchDayOptions[currentLunchDay]=[];
+  lunchDayOptions[currentLunchDay].push({item:'',qty:1});
+  renderLunchOptions(lunchDayOptions[currentLunchDay]);
+}
+
+function removeLunchOption(i){
+  lunchDayOptions[currentLunchDay].splice(i,1);
+  renderLunchOptions(lunchDayOptions[currentLunchDay]);
+}
+
+function saveLunchDay(){
+  if(!_db) return;
+  const opts = lunchDayOptions[currentLunchDay]||[];
+  const saved = opts.map((_,i) => ({
+    item: document.getElementById(`lunch-item-${i}`)?.value?.trim()||'',
+    qty: parseInt(document.getElementById(`lunch-qty-${i}`)?.value||'1')
+  })).filter(o => o.item);
+
+  _db.ref(`stewart/lunch/week/${currentLunchDay}`).set(saved).then(()=>{
+    const btn = document.querySelector('.lunch-save-btn');
+    const orig = btn.textContent;
+    btn.textContent='Saved!';
+    btn.style.background='#2d6a47';
+    setTimeout(()=>{btn.textContent=orig;btn.style.background='';},2000);
+    lunchDayOptions[currentLunchDay] = saved;
+  });
+}
+
+function loadLunchPicksOverview(){
+  if(!_db) return;
+  _db.ref('stewart/lunch/picks').once('value', snap => {
+    const picks = snap.val()||{};
+    const el = document.getElementById('lunch-picks-overview');
+    const agentNames = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
+    const rows = LUNCH_DAYS.map(day => {
+      const dayPicks = AGENTS.map(a => {
+        const p = picks[a.id]&&picks[a.id][day];
+        return p ? `<span style="font-size:10px;color:${a.color};background:var(--offwhite);padding:2px 6px;border-radius:4px;margin-right:3px;">${a.name.split(' ')[0]}: ${p}</span>` : '';
+      }).filter(Boolean).join('');
+      return `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+        <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);width:32px;flex-shrink:0;padding-top:3px;">${LUNCH_DAY_LABELS[day]}</div>
+        <div style="flex:1;flex-wrap:wrap;">${dayPicks||'<span style="font-size:11px;color:var(--muted);font-style:italic;">No picks yet</span>'}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div class="card"><div class="card-bd">${rows}</div></div>`;
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// MISSIONS DETAIL
+// ══════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════
+// WEEKLY CHORE GRID — who did what, fills as week progresses
+// ════════════════════════════════════════════
+function getGridWeekDays(){
+  // Monday of current week through Sunday (7 days)
+  const now=new Date();
+  const day=(now.getDay()+6)%7; // 0=Mon
+  const monday=new Date(now); monday.setDate(now.getDate()-day);
+  const days=[];
+  for(let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); days.push(localDateStr(d)); }
+  return days;
+}
+function renderWeekGrid(){
+  if(!_db) return;
+  const days = getGridWeekDays(); // 7 days Mon-Sun
+  const today = localDateStr();
+  const dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  Promise.all(AGENTS.map(a =>
+    Promise.all(days.map(d => _db.ref(`stewart/missions/${a.id}/${d}`).once('value')))
+  )).then(all => {
+    let html = '<div class="bwc-grid">';
+    AGENTS.forEach((a, ai) => {
+      let weekDone = 0, weekAssigned = 0;
+      let daysHtml = '';
+      days.forEach((d, di) => {
+        const dObj = new Date(d+'T12:00:00');
+        const assigned = buildMissionsUnified(a.id, dObj);
+        const done = all[ai][di].val() || {};
+        const isFuture = d > today;
+        const isToday = d === today;
+        if(!isFuture){
+          weekAssigned += assigned.length;
+          weekDone += assigned.filter(m => !!done[m.id]).length;
+        }
+        const dayLabel = dayNames[di] + ' ' + d.slice(5).replace('-','/');
+        const doneCount = assigned.filter(m => !!done[m.id]).length;
+
+        let itemsHtml;
+        if(isFuture){
+          itemsHtml = '<li class="bwc-upcoming-note">Chores assigned when the day arrives</li>';
+        } else {
+          itemsHtml = assigned.map(m => {
+            const ok = !!done[m.id];
+            return '<li class="'+(ok?'bwc-done':'')+'">'+(ok?'✅':'⬜')+' '+m.text+'</li>';
+          }).join('');
+        }
+
+        daysHtml += '<div class="bwc-day'+(isToday?' bwc-today':'')+(isFuture?' bwc-future':'')+'">'+
+          '<div class="bwc-day-hd"><span>'+dayLabel+'</span>'+
+          (isFuture ? '<span class="bwc-upcoming">Upcoming</span>' : '<span class="bwc-day-count">'+doneCount+'/'+assigned.length+'</span>')+
+          '</div>'+
+          '<ul class="bwc-checklist">'+itemsHtml+'</ul>'+
+        '</div>';
+      });
+
+      const ratio = weekAssigned ? weekDone/weekAssigned : 0;
+      const totalCls = ratio>=1 ? 'bwc-t-full' : (weekDone>0 ? 'bwc-t-partial' : 'bwc-t-none');
+
+      html += '<div class="bwc-card">'+
+        '<div class="bwc-head"><span class="bwc-name">'+a.icon+' '+a.name+'</span>'+
+        '<span class="bwc-total '+totalCls+'">'+weekDone+' / '+weekAssigned+' this week</span></div>'+
+        daysHtml+
+      '</div>';
+    });
+    html += '</div>';
+
+    const wrap=document.getElementById('week-grid-wrap');
+    if(wrap) wrap.innerHTML=html;
+  }).catch(()=>{});
+}
+
+function showCellDetail(agentId, dateStr, agentName){
+  if(!_db) return;
+  const dObj = new Date(dateStr+'T12:00:00');
+  const assigned = buildMissionsUnified(agentId, dObj);
+  _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value', s=>{
+    const done = s.val()||{};
+    const lines = assigned.map(m=>{
+      const ok = !!done[m.id];
+      return (ok?'✅ ':'⬜ ')+m.text;
+    }).join('\n');
+    const dayName = dObj.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    alert(agentName+' — '+dayName+'\n\n'+(lines||'No chores assigned.'));
+  });
+}
+
+function loadMissionsDetail(){
+  if(!_db) return;
+  const today = localDateStr();
+  const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  document.getElementById('missions-day-header').innerHTML =
+    `<div style="background:var(--green);border-radius:10px;padding:10px 14px;">
+      <div style="font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--white);">${dayNames[new Date().getDay()]} &mdash; ${today}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Tap a mission to mark complete or incomplete</div>
+    </div>`;
+
+  Promise.all([
+    Promise.all(AGENTS.map(a => _db.ref(`stewart/missions/${a.id}/${today}`).once('value'))),
+    Promise.all(AGENTS.map(a => _db.ref(`stewart/scores/${a.id}/${today}`).once('value'))),
+    Promise.all(AGENTS.map(a => _db.ref(`stewart/deductions/${a.id}/${today}`).once('value')))
+  ])
+  .then(([missionSnaps, scoreSnaps, deductionSnaps]) => {
+    const el = document.getElementById('missions-detail');
+    el.innerHTML = AGENTS.map((a,i) => {
+      const done = missionSnaps[i].val()||{};
+      const score = scoreSnaps[i].val();
+      const deductions = deductionSnaps[i].val()||{};
+      const expected = getExpectedMissions(a.id);
+      const completed = expected.filter(m=>done[m]).length;
+      const dollars = score!==null&&score!==undefined ? (score/100).toFixed(2) : '0.00';
+
+      const missionRows = expected.map(m => {
+        const isDone = !!done[m];
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleMissionParent('${a.id}','${m}','${today}')">
+          <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${isDone?'<span style="color:white;font-size:10px;">&#10003;</span>':''}
+          </div>
+          <span style="font-size:12px;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">${MISSION_NAMES[m]||m}</span>
+        </div>`;
+      }).join('');
+
+      // Active deductions list
+      const deductionEntries = Object.entries(deductions);
+      const deductionRows = deductionEntries.length
+        ? deductionEntries.map(([key,pts]) => {
+            const reason = BEHAVIOR_REASONS.find(r=>r.key===key);
+            return `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(181,69,27,.08);border-radius:6px;padding:6px 9px;margin-bottom:4px;">
+              <span style="font-size:11px;color:#b5451b;">${reason?reason.label:key} (-${pts}pts)</span>
+              <button onclick="removeDeduction('${a.id}','${today}','${key}')" style="background:none;border:none;color:#b5451b;font-size:14px;cursor:pointer;padding:0 4px;">&times;</button>
+            </div>`;
+          }).join('')
+        : '';
+
+      // Deduction buttons
+      const deductionButtons = BEHAVIOR_REASONS.map(r =>
+        `<button onclick="applyDeduction('${a.id}','${today}','${r.key}')" style="font-size:10px;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;${deductions[r.key]?'opacity:.4;':''}">${r.label} (-${r.points})</button>`
+      ).join('');
+
+      return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${a.color};">
+        <div style="padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:${a.color};">
+          <div style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:var(--white);">${a.name} &mdash; ${a.codename}</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:rgba(255,255,255,.8);">${completed}/${expected.length}</span>
+            <span style="font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--gold2);">$${dollars}</span>
+          </div>
+        </div>
+        <div style="padding:8px 13px;">${missionRows}</div>
+        <div style="padding:0 13px 11px;">
+          ${deductionRows}
+          <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:8px 0 6px;">Behavior</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">${deductionButtons}</div>
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+const BEHAVIOR_REASONS = [
+  {key:'attitude', label:'Attitude', points:25},
+  {key:'disobedience', label:'Disobedience', points:25},
+  {key:'fighting', label:'Fighting', points:25},
+  {key:'dishonesty', label:'Dishonesty', points:25},
+];
+
+function applyDeduction(agentId, date, reasonKey){
+  if(!_db) return;
+  const reason = BEHAVIOR_REASONS.find(r=>r.key===reasonKey);
+  if(!reason) return;
+  _db.ref(`stewart/deductions/${agentId}/${date}/${reasonKey}`).once('value', snap => {
+    if(snap.val()){ return; } // already applied
+    _db.ref(`stewart/deductions/${agentId}/${date}/${reasonKey}`).set(reason.points).then(() => {
+      recalculateScore(agentId, date);
+      setTimeout(() => loadMissionsDetail(), 400);
+    });
+  });
+}
+
+function removeDeduction(agentId, date, reasonKey){
+  if(!_db) return;
+  _db.ref(`stewart/deductions/${agentId}/${date}/${reasonKey}`).remove().then(() => {
+    recalculateScore(agentId, date);
+    setTimeout(() => loadMissionsDetail(), 400);
+  });
+}
+
+function toggleMissionParent(agentId, missionId, date){
+  if(!_db) return;
+  const ref = _db.ref(`stewart/missions/${agentId}/${date}/${missionId}`);
+  ref.once('value', snap => {
+    ref.set(snap.val()?null:true).then(()=>loadMissionsDetail());
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// COMMANDER DAWN TAB
+// ══════════════════════════════════════════════════════
+
+const DAWN_DAILY_MISSIONS = [
+  {id:'devotional', name:'Devotional &amp; Bible time', icon:'&#128214;', detail:'Quiet time with the Lord before the day gets going.'},
+  {id:'handwash', name:'Hand-wash pots &amp; pans', icon:'&#129385;', detail:'Items that don\'t go in the dishwasher.'},
+];
+
+const DAWN_ROOM_ROTATION = ['samuel','johnjr','stephen','daniel'];
+const DAWN_AGENT_NAMES = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
+const DAWN_AGENT_ROOMS = {
+  samuel:'laundry room',
+  johnjr:'living room',
+  stephen:'kitchen',
+  daniel:'hallway &amp; rabbit area'
+};
+
+// Friday deep-clean rotation — offset from bathroom rotation so it's a different agent
+function getDeepCleanAgent(){
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
+  return DAWN_ROOM_ROTATION[(weekNum + 2) % 4]; // offset by 2 from bathroom rotation
+}
+
+function renderDawnTab(){
+  if(!_db) return;
+  const today = localDateStr();
+  const dow = new Date().getDay(); // 0=Sun, 1=Mon ... 6=Sat
+  const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dayName = dayNames[dow];
+
+  // Day banner
+  let bannerHtml = `<div style="background:var(--brown);border-radius:10px;padding:11px 14px;">
+    <div style="font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--cream);">${dayName}</div>`;
+
+  if(dow===0){ // Sunday
+    bannerHtml += `<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Day of rest &mdash; no missions required</div>`;
+  } else if(dow===2){ // Tuesday
+    bannerHtml += `<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Your laundry day &mdash; yours, John's &amp; Trail Life uniforms</div>`;
+  } else if(dow===5){ // Friday
+    const agent = getDeepCleanAgent();
+    bannerHtml += `<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Deep clean day with ${DAWN_AGENT_NAMES[agent]} &mdash; ${DAWN_AGENT_ROOMS[agent]}</div>`;
+  } else if(dow===6){ // Saturday
+    bannerHtml += `<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Inventory before shopping &mdash; check Kitchen app Pantry tab</div>`;
+  } else {
+    bannerHtml += `<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Daily rhythm</div>`;
+  }
+  bannerHtml += `</div>`;
+  document.getElementById('dawn-day-banner').innerHTML = bannerHtml;
+
+  // Daily missions (Sunday = rest, nothing required)
+  const missionsEl = document.getElementById('dawn-daily-missions');
+  if(dow===0){
+    missionsEl.innerHTML = `<div class="card"><div class="card-bd" style="text-align:center;padding:20px;">
+      <div style="font-size:28px;margin-bottom:8px;">&#9203;</div>
+      <div style="font-family:'Cinzel',serif;font-size:13px;color:var(--brown);">Rest Today</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">No missions on the Sabbath. Be still.</div>
+    </div></div>`;
+  } else {
+    _db.ref(`stewart/dawnmissions/${today}`).once('value', snap => {
+      const done = snap.val() || {};
+      missionsEl.innerHTML = DAWN_DAILY_MISSIONS.map(m => {
+        const isDone = !!done[m.id];
+        return `<div onclick="toggleDawnMission('${m.id}','${today}')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:7px;cursor:pointer;">
+          <div style="width:22px;height:22px;border-radius:5px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:white;">
+            ${isDone?'&#10003;':''}
+          </div>
+          <div style="font-size:16px;">${m.icon}</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">${m.name}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;">${m.detail}</div>
+          </div>
+        </div>`;
+      }).join('');
+    });
+  }
+
+  // Special section based on day
+  const specialEl = document.getElementById('dawn-special-section');
+  if(dow===2){
+    // Tuesday — laundry mission
+    _db.ref(`stewart/dawnmissions/${today}`).once('value', snap => {
+      const done = snap.val() || {};
+      const isDone = !!done['laundry-dawn'];
+      specialEl.innerHTML = `<div class="sec-hd">Tuesday Laundry</div>
+        <div onclick="toggleDawnMission('laundry-dawn','${today}')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid ${isDone?'#2d6a47':'var(--gold)'};border-radius:8px;padding:11px 13px;margin-bottom:14px;cursor:pointer;">
+          <div style="width:22px;height:22px;border-radius:5px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:white;">
+            ${isDone?'&#10003;':''}
+          </div>
+          <div style="font-size:16px;">&#128083;</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">Laundry &mdash; yours, John's &amp; Trail Life uniforms</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;">Wash, dry, fold, put away</div>
+          </div>
+        </div>`;
+    });
+  } else if(dow===5){
+    // Friday — deep clean
+    _db.ref(`stewart/dawnmissions/${today}`).once('value', snap => {
+      const done = snap.val() || {};
+      const isDone = !!done['deepclean'];
+      const agent = getDeepCleanAgent();
+      specialEl.innerHTML = `<div class="sec-hd">Friday Deep Clean</div>
+        <div onclick="toggleDawnMission('deepclean','${today}')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid ${isDone?'#2d6a47':'var(--gold)'};border-radius:8px;padding:11px 13px;margin-bottom:14px;cursor:pointer;">
+          <div style="width:22px;height:22px;border-radius:5px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:white;">
+            ${isDone?'&#10003;':''}
+          </div>
+          <div style="font-size:16px;">&#10024;</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">Deep clean ${DAWN_AGENT_ROOMS[agent]} with ${DAWN_AGENT_NAMES[agent]}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;">Baseboards, windows, dusting &mdash; beyond the daily sweep</div>
+          </div>
+        </div>`;
+    });
+  } else if(dow===6){
+    // Saturday — inventory
+    _db.ref(`stewart/dawnmissions/${today}`).once('value', snap => {
+      const done = snap.val() || {};
+      const isDone = !!done['inventory'];
+      specialEl.innerHTML = `<div class="sec-hd">Saturday Inventory</div>
+        <div onclick="toggleDawnMission('inventory','${today}')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid ${isDone?'#2d6a47':'var(--gold)'};border-radius:8px;padding:11px 13px;margin-bottom:14px;cursor:pointer;">
+          <div style="width:22px;height:22px;border-radius:5px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:white;">
+            ${isDone?'&#10003;':''}
+          </div>
+          <div style="font-size:16px;">&#128722;</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">Check pantry, fridge &amp; freezer before shopping</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;">Use the Kitchen app Pantry tab &mdash; then generate the week's plan &amp; shopping list</div>
+          </div>
+        </div>
+        <a href="../kitchen/index.html" class="btn-secondary" style="display:block;text-align:center;text-decoration:none;margin-bottom:14px;">Open the Galley &#8594;</a>`;
+    });
+  } else {
+    specialEl.innerHTML = '';
+  }
+}
+
+function toggleDawnMission(missionId, date){
+  if(!_db) return;
+  const ref = _db.ref(`stewart/dawnmissions/${date}/${missionId}`);
+  ref.once('value', snap => {
+    ref.set(snap.val()?null:true).then(()=>renderDawnTab());
+  });
+}
+
+
+
+// ══════════════════════════════════════════════════════
+// READING GOALS & FIELD LIBRARY OVERVIEW
+// ══════════════════════════════════════════════════════
+
+const READING_GROUP = {
+  samuel: 'chapters', johnjr: 'chapters',
+  stephen: 'books', daniel: 'books'
+};
+const DEFAULT_CHAPTER_GOAL = 3;
+
+function loadReadingGoals(){
+  if(!_db) return;
+  ['samuel','johnjr'].forEach(id => {
+    _db.ref(`stewart/readinggoals/${id}`).once('value', snap => {
+      const val = snap.val() || DEFAULT_CHAPTER_GOAL;
+      const el = document.getElementById(`goal-${id}`);
+      if(el) el.value = val;
+    });
+  });
+}
+
+function saveReadingGoals(){
+  if(!_db) return;
+  const sam = parseInt(document.getElementById('goal-samuel').value) || DEFAULT_CHAPTER_GOAL;
+  const john = parseInt(document.getElementById('goal-johnjr').value) || DEFAULT_CHAPTER_GOAL;
+  Promise.all([
+    _db.ref('stewart/readinggoals/samuel').set(sam),
+    _db.ref('stewart/readinggoals/johnjr').set(john)
+  ]).then(() => {
+    const btn = document.querySelector('#tab-settings .btn-primary');
+    const orig = btn.textContent;
+    btn.textContent = 'Saved!';
+    btn.style.background = '#2d6a47';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 2000);
+  });
+}
+
+function renderReadingOverview(){
+  if(!_db) return;
+  const weekStart = getWeekDays()[0];
+
+  Promise.all([
+    Promise.all(AGENTS.map(a => _db.ref(`stewart/reading/${a.id}/${weekStart}`).once('value'))),
+    _db.ref('stewart/readinggoals').once('value')
+  ]).then(([readingSnaps, goalsSnap]) => {
+    const goals = goalsSnap.val() || {};
+    const el = document.getElementById('reading-overview');
+    if(!el) return;
+    const today = localDateStr();
+
+    el.innerHTML = AGENTS.map((a,i) => {
+      const log = readingSnaps[i].val() || {};
+      const group = READING_GROUP[a.id];
+      const weekDays = getWeekDays();
+      let progressLabel, pct;
+
+      if(group === 'books'){
+        const daysCompleted = weekDays.filter(d => log[d] && log[d].title).length;
+        pct = Math.round((daysCompleted/5)*100);
+        const titles = weekDays.filter(d=>log[d]&&log[d].title).map(d=>log[d].title).join(', ');
+        progressLabel = `${daysCompleted}/5 days${titles ? ' — '+titles : ''}`;
+      } else {
+        const goal = goals[a.id] || DEFAULT_CHAPTER_GOAL;
+        const weeklyGoal = goal * 5;
+        let totalChapters = 0;
+        weekDays.forEach(d => { if(log[d] && log[d].chapters) totalChapters += Number(log[d].chapters); });
+        pct = Math.min(100, Math.round((totalChapters/weeklyGoal)*100));
+        const lastBook = weekDays.slice().reverse().map(d=>log[d]&&log[d].title).find(t=>t) || '';
+        progressLabel = `${totalChapters}/${weeklyGoal} chapters${lastBook?' — '+lastBook:''}`;
+      }
+
+      // Today's entry verification status
+      const todayEntry = log[today];
+      let verifyHtml = '';
+      if(todayEntry && (todayEntry.title || todayEntry.chapters)){
+        const detail = group==='books' ? todayEntry.title : `${todayEntry.title||''} (${todayEntry.chapters||0} ch)`;
+        if(todayEntry.verified){
+          verifyHtml = `<div style="font-size:10px;color:#2d6a47;margin-top:2px;">&#10003; Verified: ${detail}</div>`;
+        } else {
+          verifyHtml = `<div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+            <span style="font-size:10px;color:var(--muted);flex:1;">Today: ${detail}</span>
+            <button onclick="verifyReading('${a.id}','${today}')" style="font-size:9px;padding:3px 8px;border-radius:5px;border:1px solid var(--green2);background:#edf7f0;color:var(--green2);cursor:pointer;">Verify</button>
+          </div>`;
+        }
+      }
+
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${a.color};flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:700;">${a.name}</div>
+            <div style="font-size:10px;color:var(--muted);">${progressLabel}</div>
+          </div>
+          <div style="font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:${pct>=80?'#2d6a47':pct>=40?'#c8922a':'var(--muted)'};">${pct}%</div>
+        </div>
+        ${verifyHtml}
+      </div>`;
+    }).join('');
+  });
+}
+
+function verifyReading(agentId, date){
+  if(!_db) return;
+  _db.ref(`stewart/reading/${agentId}/${getWeekDays()[0]}/${date}/verified`).set(true).then(() => {
+    renderReadingOverview();
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// PARENT GROWTH — Art of Parenting tracker
+// ══════════════════════════════════════════════════════
+
+const ART_OF_PARENTING_SESSIONS = [
+  '', // index 0 = not started
+  'The Goal of Parenting',
+  'Forming Character',
+  'Applying Discipline',
+  'Building Relationships',
+  'Understanding Identity',
+  'Nurturing Identity',
+  'Preparing for Mission',
+  'The Power of Family'
+];
+
+const CHARACTER_QUALITIES = [
+  {name:'Patience', ref:'Galatians 5:22-23'},
+  {name:'Faithfulness', ref:'Galatians 5:22-23'},
+  {name:'Self-Control', ref:'Galatians 5:22-23'},
+  {name:'Goodness', ref:'Galatians 5:22-23'},
+  {name:'Truthfulness', ref:'Proverbs 19:1'},
+  {name:'Wisdom', ref:'Proverbs 4:5-7'},
+  {name:'Virtue', ref:'Proverbs 20:11'},
+  {name:'Gentleness', ref:'Galatians 5:22-23'},
+  {name:'Humility', ref:'Philippians 2:3'},
+  {name:'Serving', ref:'Mark 10:45'},
+  {name:'Kindness', ref:'Galatians 5:22-23'},
+  {name:'Compassion', ref:'Colossians 3:12'},
+  {name:'Obedience', ref:'Deuteronomy 11:1'},
+  {name:'Teachable', ref:'Psalm 143:10'},
+  {name:'Faithfulness (Diligence)', ref:'Luke 16:10'},
+  {name:'Contentment', ref:'1 Timothy 6:6-7'},
+  {name:'Responsibility', ref:'Colossians 3:23-24'},
+  {name:'Endurance', ref:'Hebrews 12:1-3'},
+  {name:'Discernment', ref:'Philippians 1:9-10'},
+  {name:'Generosity', ref:'2 Corinthians 9:6-7'},
+];
+
+function renderGrowthTab(){
+  if(!_db) return;
+
+  // Load current session
+  _db.ref('stewart/growth/session').once('value', snap => {
+    const session = snap.val() || 0;
+    document.getElementById('growth-session').value = session;
+  });
+
+  // Load this week's application focus
+  const weekStart = getWeekDays()[0];
+  _db.ref(`stewart/growth/weekly/${weekStart}/application`).once('value', snap => {
+    document.getElementById('growth-application').value = snap.val() || '';
+  });
+
+  // Render character qualities reference
+  const qEl = document.getElementById('character-qualities');
+  qEl.innerHTML = CHARACTER_QUALITIES.map(q =>
+    `<div style="background:var(--offwhite);border-radius:6px;padding:6px 10px;font-size:11px;">
+      <span style="font-weight:700;color:var(--brown);">${q.name}</span>
+      <span style="color:var(--muted);"> &mdash; ${q.ref}</span>
+    </div>`
+  ).join('');
+
+  // Load weekly reflection log (last 8 weeks)
+  renderGrowthLog();
+
+  // Per-boy notes
+  renderGrowthBoyNotes();
+}
+
+function saveGrowthSession(){
+  if(!_db) return;
+  const session = document.getElementById('growth-session').value;
+  _db.ref('stewart/growth/session').set(parseInt(session)).then(() => {
+    const btn = document.querySelector('#tab-growth .btn-primary');
+    flashSaved(btn);
+  });
+}
+
+function saveGrowthApplication(){
+  if(!_db) return;
+  const weekStart = getWeekDays()[0];
+  const text = document.getElementById('growth-application').value.trim();
+  _db.ref(`stewart/growth/weekly/${weekStart}/application`).set(text).then(() => {
+    const btns = document.querySelectorAll('#tab-growth .btn-primary');
+    flashSaved(btns[1]);
+    renderGrowthLog();
+  });
+}
+
+function flashSaved(btn){
+  if(!btn) return;
+  const orig = btn.textContent;
+  btn.textContent = 'Saved!';
+  btn.style.background = '#2d6a47';
+  setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 2000);
+}
+
+function renderGrowthLog(){
+  if(!_db) return;
+  _db.ref('stewart/growth/weekly').once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('growth-log');
+    const weeks = Object.keys(data).sort().reverse().slice(0, 8);
+
+    if(!weeks.length){
+      el.innerHTML = '<div class="empty-state">No weekly reflections logged yet.</div>';
+      return;
+    }
+
+    el.innerHTML = weeks.map(weekStart => {
+      const entry = data[weekStart];
+      const application = entry.application || '';
+      const reflection = entry.reflection || '';
+      const d = new Date(weekStart);
+      const label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+
+      return `<div class="card" style="margin-bottom:8px;">
+        <div class="card-bd">
+          <div style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:var(--brown);margin-bottom:4px;">Week of ${label}</div>
+          ${application ? `<div style="font-size:12px;color:var(--ink);margin-bottom:6px;"><strong>Focus:</strong> ${application}</div>` : ''}
+          ${reflection ? `<div style="font-size:12px;color:var(--muted);font-style:italic;"><strong>How it went:</strong> ${reflection}</div>` :
+            `<div style="display:flex;gap:8px;">
+              <input type="text" id="reflect-${weekStart}" placeholder="How did this week go?" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <button onclick="saveGrowthReflection('${weekStart}')" style="padding:7px 12px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:11px;cursor:pointer;">Save</button>
+            </div>`}
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function saveGrowthReflection(weekStart){
+  if(!_db) return;
+  const input = document.getElementById(`reflect-${weekStart}`);
+  const text = input.value.trim();
+  if(!text) return;
+  _db.ref(`stewart/growth/weekly/${weekStart}/reflection`).set(text).then(() => renderGrowthLog());
+}
+
+function renderGrowthBoyNotes(){
+  if(!_db) return;
+  Promise.all([
+    Promise.all(AGENTS.map(a => _db.ref(`stewart/growth/boynotes/${a.id}`).once('value'))),
+    Promise.all(AGENTS.map(a => _db.ref(`stewart/selfassessment/${a.id}`).once('value')))
+  ]).then(([notesSnaps, selfSnaps]) => {
+    const el = document.getElementById('growth-boy-notes');
+    el.innerHTML = AGENTS.map((a,i) => {
+      const notes = notesSnaps[i].val() || {};
+      const self = selfSnaps[i].val() || {};
+      const hasSelf = self.strength || self.mission || self.step;
+
+      const selfHtml = hasSelf ? `
+          <div style="background:rgba(74,112,96,.08);border:1px solid rgba(74,112,96,.2);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green2);margin-bottom:6px;">${a.name}'s Own Self-Assessment</div>
+            ${self.strength?`<div style="font-size:12px;margin-bottom:4px;"><strong>My Strength:</strong> ${self.strength}</div>`:''}
+            ${self.mission?`<div style="font-size:12px;margin-bottom:4px;"><strong>My Mission:</strong> ${self.mission}</div>`:''}
+            ${self.step?`<div style="font-size:12px;"><strong>This Week's Step:</strong> ${self.step}</div>`:''}
+          </div>` : '';
+
+      return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${a.color};">
+        <div style="padding:9px 13px;background:${a.color};">
+          <div style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:white;">${a.name} &mdash; ${a.codename}</div>
+        </div>
+        <div class="card-bd">
+          ${selfHtml}
+          <div style="margin-bottom:8px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;">Strengths</div>
+            <textarea id="strengths-${a.id}" placeholder="Character strengths you see in ${a.name}..." style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:none;height:50px;">${notes.strengths||''}</textarea>
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;">Growth Areas</div>
+            <textarea id="needs-${a.id}" placeholder="Areas to work on with ${a.name}..." style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:none;height:50px;">${notes.needs||''}</textarea>
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;">Action Step (with date)</div>
+            <input type="text" id="action-${a.id}" placeholder="e.g. Daily one-on-one time, starting June 16" value="${notes.action||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          </div>
+          <button onclick="saveBoyGrowthNotes('${a.id}')" style="width:100%;padding:8px;border:none;border-radius:6px;background:${a.color};color:white;font-size:12px;font-weight:700;cursor:pointer;">Save Notes</button>
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function saveBoyGrowthNotes(agentId){
+  if(!_db) return;
+  const strengths = document.getElementById(`strengths-${agentId}`).value.trim();
+  const needs = document.getElementById(`needs-${agentId}`).value.trim();
+  const action = document.getElementById(`action-${agentId}`).value.trim();
+  _db.ref(`stewart/growth/boynotes/${agentId}`).set({strengths, needs, action}).then(() => {
+    renderGrowthBoyNotes();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// FAMILY NIGHT & PROJECTS SYSTEM
+// Parent Dashboard — full management
+// Agent HQ — read-only project/activity view
+// ══════════════════════════════════════════════════════
+
+// ─── ACTIVITY BANK ────────────────────────────────────
+const FAMILY_NIGHT_ACTIVITIES = [
+  // Outdoor / Fire
+  { id:'campfire', label:'Campfire Night', icon:'🔥', venue:'yard', desc:'Fire pit, s\'mores, stories. Everyone unplugs.' },
+  { id:'stargazing', label:'Stargazing', icon:'⭐', venue:'yard', desc:'Lay in the yard after dark. Find constellations. Talk about creation.' },
+  { id:'grill-night', label:'Grill Night', icon:'🥩', venue:'yard', desc:'Dad grills, boys help prep. Eat outside together.' },
+  { id:'campfire-stories', label:'Storytelling Night', icon:'📖', venue:'yard', desc:'Take turns telling or reading stories around the fire. Dad reads from a book.' },
+  { id:'night-games', label:'Night Games', icon:'🌙', venue:'yard', desc:'Flashlight tag, hide and seek in the dark, capture the flag.' },
+  { id:'firepit-devotional', label:'Fire Pit Devotional', icon:'✝️', venue:'yard', desc:'Open Bible, fire, no distractions. Dad leads a discussion from Scripture.' },
+
+  // Barn / Workshop
+  { id:'barn-games', label:'Barn Game Night', icon:'🎯', venue:'barn', desc:'Set up games in the pole barn — cornhole, darts, cards, whatever fits.' },
+  { id:'teach-tools', label:'Tool School', icon:'🔧', venue:'barn', desc:'Teach one skill: measuring, cutting, driving screws, reading a level.' },
+  { id:'build-something', label:'Build Something Small', icon:'🪚', venue:'barn', desc:'Simple project — a shelf bracket, a birdhouse, a wooden sign. Boys build with Dad.' },
+  { id:'bike-maintenance', label:'Bike Maintenance Day', icon:'🚲', venue:'barn', desc:'All four bikes, one session. Every bike inspected and running before done.' },
+  { id:'car-basics', label:'Car Basics Session', icon:'🚗', venue:'barn', desc:'Oil check, tire pressure, jump starts, basic under-the-hood orientation.' },
+  { id:'barn-cookout', label:'Barn Cookout', icon:'🍖', venue:'barn', desc:'Cook in or near the barn. Griddle, camp stove, or whatever\'s on hand.' },
+
+  // Inside
+  { id:'board-games', label:'Board Game Night', icon:'🎲', venue:'inside', desc:'Everyone picks one game. No phones. Winner picks next week\'s activity.' },
+  { id:'movie-popcorn', label:'Movie & Popcorn', icon:'🍿', venue:'inside', desc:'Family picks together. Real popcorn, not microwave. Blankets.' },
+  { id:'cook-together', label:'Cook Something Together', icon:'👨‍🍳', venue:'inside', desc:'Pick a real recipe — not simple stuff. Homemade pizza, soup from scratch, etc.' },
+  { id:'reading-night', label:'Reading Night', icon:'📚', venue:'inside', desc:'Everyone reads their own book in the same room. No screens. Dad reads too.' },
+  { id:'map-night', label:'Map & Navigation Night', icon:'🗺️', venue:'inside', desc:'Teach map reading, compass, how to find your way. Trail Life prep.' },
+
+  // Outdoor Projects
+  { id:'stone-collection', label:'Stone Collection Run', icon:'🪨', venue:'yard', desc:'Walk the property. Collect and sort stone by size for path and bed projects.' },
+  { id:'planting-day', label:'Planting Day', icon:'🌿', venue:'yard', desc:'Put in ferns, hostas, or ground cover along the path or shed base.' },
+  { id:'path-work', label:'Path Work Session', icon:'🛤️', venue:'yard', desc:'Level and set stones, fill gaps, extend the path toward the shed.' },
+  { id:'yard-cleanup', label:'Full Yard Cleanup', icon:'🌱', venue:'yard', desc:'Everyone has a zone. Mow, edge, weed, pick up. Property looks sharp when done.' },
+];
+
+// ─── TEACH ME SESSIONS ────────────────────────────────
+const TEACH_ME_TEMPLATES = [
+  {
+    id: 'bike-maintenance',
+    title: 'Bicycle Maintenance',
+    venue: 'barn',
+    icon: '🚲',
+    desc: 'Every boy maintains his own bike from start to finish.',
+    checklist: [
+      'Safety check — frame, handlebars, seat all tight',
+      'Tires — check pressure, inspect for wear, fix flats if needed',
+      'Brakes — adjust pads, test stopping power',
+      'Chain — clean, lubricate, check tension',
+      'Gears — shift through all gears, adjust derailleur if needed',
+      'Final ride test — every bike ridden before session is done',
+    ]
+  },
+  {
+    id: 'basic-tools',
+    title: 'Tool Basics',
+    venue: 'barn',
+    icon: '🔧',
+    desc: 'How to use common hand and power tools safely.',
+    checklist: [
+      'Tool safety rules — every tool, every time',
+      'Tape measure and marking',
+      'Hammer and nails — proper grip and swing',
+      'Screwdriver types and uses',
+      'Drill — bits, technique, pilot holes',
+      'Level — why it matters, how to use it',
+    ]
+  },
+  {
+    id: 'car-basics',
+    title: 'Car Basics',
+    venue: 'barn',
+    icon: '🚗',
+    desc: 'What every man needs to know about a vehicle.',
+    checklist: [
+      'Check oil — dipstick, color, level',
+      'Check coolant, brake fluid, power steering',
+      'Tire pressure — check and fill all four',
+      'Change a tire — jack, lug nuts, spare',
+      'Jump start a dead battery',
+      'What warning lights mean',
+    ]
+  },
+  {
+    id: 'knots',
+    title: 'Knots & Rope Work',
+    venue: 'yard',
+    icon: '🪢',
+    desc: 'Essential Trail Life and outdoor knots.',
+    checklist: [
+      'Square knot',
+      'Bowline',
+      'Cleat hitch',
+      'Taut-line hitch',
+      'Sheet bend',
+      'Figure eight',
+    ]
+  },
+  {
+    id: 'fire-building',
+    title: 'Fire Building',
+    venue: 'yard',
+    icon: '🔥',
+    desc: 'From tinder to a sustained fire, safely.',
+    checklist: [
+      'Fire safety rules and site selection',
+      'Tinder, kindling, fuel — what each does',
+      'Teepee, log cabin, and lean-to structures',
+      'Strike a fire — matches, lighter, ferro rod',
+      'Keeping it fed without smothering it',
+      'Putting it out completely and safely',
+    ]
+  },
+  {
+    id: 'first-aid',
+    title: 'Basic First Aid',
+    venue: 'inside',
+    icon: '🩹',
+    desc: 'Cuts, burns, sprains, and emergency basics.',
+    checklist: [
+      'Clean and dress a wound',
+      'Recognize and treat a burn',
+      'Splint a sprain',
+      'Signs of concussion',
+      'How to call for help — 911 basics',
+      'What\'s in a first aid kit and why',
+    ]
+  },
+];
+
+// ─── HOUSE PROJECTS ───────────────────────────────────
+const HOUSE_PROJECTS_TEMPLATE = [
+  {
+    id: 'bathroom',
+    title: 'Bathroom Renovation',
+    icon: '🚿',
+    category: 'house',
+    priority: 1,
+    desc: 'New flooring, paint, and ceiling. Full refresh before winter.',
+    phases: [
+      { id: 'demo', title: 'Demo & Prep', desc: 'Remove old flooring, patch walls, prep surfaces. Protect fixtures.', boys: ['samuel','johnjr'] },
+      { id: 'flooring', title: 'New Flooring', desc: 'Lay new floor material. Measure, cut, set, seal edges.', boys: ['samuel','johnjr','stephen'] },
+      { id: 'ceiling', title: 'Ceiling Work', desc: 'Repair or replace ceiling. Prime and paint.', boys: ['samuel','johnjr'] },
+      { id: 'paint', title: 'Paint', desc: 'Walls and trim. Cut in, roll, two coats.', boys: ['samuel','johnjr','stephen','daniel'] },
+      { id: 'finish', title: 'Final Touches', desc: 'Reinstall fixtures, hardware, touch-ups. Clean and done.', boys: ['samuel','johnjr'] },
+    ]
+  },
+];
+
+// ─── EXTERIOR PROJECTS ────────────────────────────────
+const EXTERIOR_PROJECTS_TEMPLATE = [
+  {
+    id: 'stone-path',
+    title: 'Stone Path Improvement',
+    icon: '🛤️',
+    category: 'exterior',
+    priority: 1,
+    desc: 'Extend, level, and set the existing stone path. Gravel between stones. Looks sharp.',
+    phases: [
+      { id: 'collect', title: 'Stone Collection', desc: 'Walk the property. Collect flat stones, sort by size. Stage near the path.', boys: ['samuel','johnjr','stephen','daniel'] },
+      { id: 'prep', title: 'Path Prep', desc: 'Mark path line, remove grass, add sand base layer.', boys: ['samuel','johnjr','stephen'] },
+      { id: 'set', title: 'Set the Stones', desc: 'Place and level stones. Even spacing. Tap into sand base.', boys: ['samuel','johnjr','stephen'] },
+      { id: 'gravel', title: 'Fill with Gravel', desc: 'Fill gaps between stones with pea gravel or crushed stone. Sweep in.', boys: ['samuel','johnjr','stephen','daniel'] },
+    ]
+  },
+  {
+    id: 'shed-beds',
+    title: 'Shed Bed & Border Planting',
+    icon: '🌿',
+    category: 'exterior',
+    priority: 2,
+    desc: 'Stone-bordered beds along the shed base. Ferns, hostas, ground cover.',
+    phases: [
+      { id: 'border-stones', title: 'Set Border Stones', desc: 'Use collected stone to edge the beds around shed base.', boys: ['samuel','johnjr','stephen','daniel'] },
+      { id: 'soil-prep', title: 'Soil Prep', desc: 'Clear weeds, add topsoil or compost to the beds.', boys: ['samuel','johnjr','stephen'] },
+      { id: 'planting', title: 'Plant the Beds', desc: 'Put in ferns, hostas, or ground cover. Water in well.', boys: ['samuel','johnjr','stephen','daniel'] },
+      { id: 'mulch', title: 'Mulch & Finish', desc: 'Mulch the beds. Clean up. Water again.', boys: ['samuel','johnjr','stephen','daniel'] },
+    ]
+  },
+  {
+    id: 'path-lights',
+    title: 'Path Lighting',
+    icon: '💡',
+    category: 'exterior',
+    priority: 3,
+    desc: 'Solar or low-voltage lights along the stone path. Stake, space, done.',
+    phases: [
+      { id: 'plan', title: 'Plan & Space', desc: 'Walk the path, mark where lights go. Consistent spacing.', boys: ['samuel','johnjr'] },
+      { id: 'install', title: 'Install Lights', desc: 'Stake lights, connect if needed, test at dusk.', boys: ['samuel','johnjr','stephen','daniel'] },
+    ]
+  },
+  {
+    id: 'fire-area',
+    title: 'Fire Pit Area Improvement',
+    icon: '🔥',
+    category: 'exterior',
+    priority: 2,
+    desc: 'Level the fire pit area, stone ring surround, seating defined.',
+    phases: [
+      { id: 'level', title: 'Level the Area', desc: 'Clear and level ground around fire pit. Tamp down.', boys: ['samuel','johnjr','stephen'] },
+      { id: 'ring', title: 'Stone Ring', desc: 'Set stone ring around the pit using collected stone.', boys: ['samuel','johnjr','stephen','daniel'] },
+      { id: 'seating', title: 'Define Seating', desc: 'Move or build benches/logs. Everyone has a place.', boys: ['samuel','johnjr'] },
+    ]
+  },
+];
+
+// Stone collection tracker constants
+const STONE_SIZES = ['Small (fist)', 'Medium (two-fist)', 'Large (both hands)', 'Flat/path stone'];
+
+
+// ══════════════════════════════════════════════════════
+// PROJECTS TAB — Family Night, Teach Me, Projects, Stone
+// ══════════════════════════════════════════════════════
+
+const AGENT_NAMES_SHORT = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+
+function renderProjectsTab(){
+  renderActivityBank('all');
+  renderTeachMeSessions();
+  renderHouseProjects();
+  renderExteriorProjects();
+  renderStoneLog();
+}
+
+// ─── ACTIVITY BANK ────────────────────────────────────
+
+function filterActivities(venue, btn){
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderActivityBank(venue);
+}
+
+function renderActivityBank(venue){
+  const el = document.getElementById('activity-bank');
+  const list = venue === 'all' ? FAMILY_NIGHT_ACTIVITIES : FAMILY_NIGHT_ACTIVITIES.filter(a => a.venue === venue);
+
+  el.innerHTML = list.map(a => {
+    const venueLabel = a.venue === 'yard' ? '🌙 Yard' : a.venue === 'barn' ? '🏚️ Barn' : '🏠 Inside';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:24px;flex-shrink:0;">${a.icon}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);">${a.label}</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">${venueLabel}</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.4;">${a.desc}</div>
+      </div>
+      <button onclick="runActivityTonight('${a.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:10px;cursor:pointer;flex-shrink:0;white-space:nowrap;">Tonight</button>
+    </div>`;
+  }).join('');
+}
+
+function runActivityTonight(activityId){
+  if(!_db) return;
+  const activity = FAMILY_NIGHT_ACTIVITIES.find(a => a.id === activityId);
+  if(!activity) return;
+  const today = localDateStr();
+  _db.ref(`stewart/familynight/activities/${today}`).set({
+    id: activityId,
+    label: activity.label,
+    icon: activity.icon,
+    venue: activity.venue,
+    timestamp: Date.now()
+  }).then(() => {
+    alert(`✅ ${activity.icon} ${activity.label} set for tonight! The boys will see it in their app.`);
+  });
+}
+
+// ─── TEACH ME SESSIONS ────────────────────────────────
+
+function renderTeachMeSessions(){
+  if(!_db) return;
+  _db.ref('stewart/teachme').once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('teach-me-list');
+
+    el.innerHTML = TEACH_ME_TEMPLATES.map(t => {
+      const saved = data[t.id] || {};
+      const isComplete = saved.completedDate;
+      const checklistDone = saved.checklist || {};
+      const totalItems = t.checklist.length;
+      const doneItems = t.checklist.filter((_,i) => checklistDone[i]).length;
+
+      return `<div class="card" style="margin-bottom:10px;${isComplete?'opacity:.7':''}">
+        <div style="padding:9px 13px;background:${isComplete?'var(--muted)':'var(--green2)'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:white;">${t.icon} ${t.title}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.8);">${isComplete?'✓ Done '+saved.completedDate:doneItems+'/'+totalItems}</div>
+        </div>
+        <div class="card-bd">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">${t.desc}</div>
+          <div style="margin-bottom:8px;">
+            ${t.checklist.map((item,i) =>
+              `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleTeachItem('${t.id}',${i})">
+                <div style="width:16px;height:16px;border-radius:3px;border:2px solid ${checklistDone[i]?'var(--green2)':'var(--border)'};background:${checklistDone[i]?'var(--green2)':'transparent'};flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;">
+                  ${checklistDone[i]?'<span style="color:white;font-size:9px;">✓</span>':''}
+                </div>
+                <span style="font-size:12px;color:${checklistDone[i]?'var(--muted)':'var(--ink)'};${checklistDone[i]?'text-decoration:line-through;':''}">${item}</span>
+              </div>`
+            ).join('')}
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;">Boys Present</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              ${AGENTS.map(a =>
+                `<button onclick="toggleTeachAgent('${t.id}','${a.id}')" style="padding:4px 10px;border-radius:20px;font-size:10px;cursor:pointer;border:1px solid ${(saved.boys||[]).includes(a.id)?a.color:'var(--border)'};background:${(saved.boys||[]).includes(a.id)?a.color:'transparent'};color:${(saved.boys||[]).includes(a.id)?'white':'var(--muted)'};">
+                  ${a.name}
+                </button>`
+              ).join('')}
+            </div>
+          </div>
+          ${!isComplete ?
+            `<button onclick="completeTeachSession('${t.id}')" style="width:100%;padding:8px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:12px;font-weight:700;cursor:pointer;">Mark Session Complete</button>` :
+            `<div style="font-size:11px;color:var(--muted);text-align:center;">Completed ${saved.completedDate} — ${(saved.boys||[]).map(b=>AGENT_NAMES_SHORT[b]).join(', ')}</div>`
+          }
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function toggleTeachItem(sessionId, itemIndex){
+  if(!_db) return;
+  _db.ref(`stewart/teachme/${sessionId}/checklist/${itemIndex}`).once('value', snap => {
+    _db.ref(`stewart/teachme/${sessionId}/checklist/${itemIndex}`).set(!snap.val())
+      .then(() => renderTeachMeSessions());
+  });
+}
+
+function toggleTeachAgent(sessionId, agentId){
+  if(!_db) return;
+  _db.ref(`stewart/teachme/${sessionId}/boys`).once('value', snap => {
+    const boys = snap.val() || [];
+    const idx = boys.indexOf(agentId);
+    if(idx === -1) boys.push(agentId);
+    else boys.splice(idx, 1);
+    _db.ref(`stewart/teachme/${sessionId}/boys`).set(boys)
+      .then(() => renderTeachMeSessions());
+  });
+}
+
+function completeTeachSession(sessionId){
+  if(!_db) return;
+  const today = localDateStr();
+  _db.ref(`stewart/teachme/${sessionId}/completedDate`).set(today)
+    .then(() => renderTeachMeSessions());
+}
+
+// ─── PROJECT PHASES ───────────────────────────────────
+
+function renderProjectList(projects, savedData, elementId){
+  const el = document.getElementById(elementId);
+  el.innerHTML = projects.map(p => {
+    const saved = savedData[p.id] || {};
+    const phases = saved.phases || {};
+    const totalPhases = p.phases.length;
+    const donePhases = p.phases.filter(ph => phases[ph.id] && phases[ph.id].done).length;
+    const isComplete = donePhases === totalPhases;
+    const pct = Math.round((donePhases/totalPhases)*100);
+
+    return `<div class="card" style="margin-bottom:10px;">
+      <div style="padding:9px 13px;background:${isComplete?'var(--muted)':'var(--brown)'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:white;">${p.icon} ${p.title}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.8);">${isComplete?'✓ Complete':pct+'%'}</div>
+      </div>
+      <div class="card-bd">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">${p.desc}</div>
+        <div style="background:rgba(0,0,0,.06);border-radius:4px;height:4px;overflow:hidden;margin-bottom:10px;">
+          <div style="height:100%;width:${pct}%;background:var(--green2);border-radius:4px;transition:width .5s;"></div>
+        </div>
+        ${p.phases.map(ph => {
+          const phSaved = phases[ph.id] || {};
+          return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:${phSaved.done?'rgba(74,112,96,.06)':'transparent'};">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <div style="font-size:12px;font-weight:700;color:${phSaved.done?'var(--green2)':'var(--ink)'};">${phSaved.done?'✓ ':''} ${ph.title}</div>
+              ${!phSaved.done ?
+                `<button onclick="completePhase('${p.id}','${ph.id}','${elementId}')" style="padding:4px 10px;border:none;border-radius:5px;background:var(--green2);color:white;font-size:10px;cursor:pointer;">Done</button>` :
+                `<span style="font-size:10px;color:var(--muted);">${phSaved.date||''}</span>`
+              }
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:5px;line-height:1.4;">${ph.desc}</div>
+            <div style="font-size:10px;color:var(--muted);">Boys: ${ph.boys.map(b=>AGENT_NAMES_SHORT[b]).join(', ')}</div>
+            ${phSaved.done && phSaved.note ?
+              `<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:4px;">"${phSaved.note}"</div>` : ''
+            }
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHouseProjects(){
+  if(!_db) return;
+  _db.ref('stewart/projects/house').once('value', snap => {
+    const data = snap.val() || {};
+    renderProjectList(HOUSE_PROJECTS_TEMPLATE, data, 'house-projects-list');
+  });
+}
+
+function renderExteriorProjects(){
+  if(!_db) return;
+  _db.ref('stewart/projects/exterior').once('value', snap => {
+    const data = snap.val() || {};
+    renderProjectList(EXTERIOR_PROJECTS_TEMPLATE, data, 'exterior-projects-list');
+  });
+}
+
+function completePhase(projectId, phaseId, listElId){
+  if(!_db) return;
+  const today = localDateStr();
+  const category = listElId === 'house-projects-list' ? 'house' : 'exterior';
+  _db.ref(`stewart/projects/${category}/${projectId}/phases/${phaseId}`).set({
+    done: true,
+    date: today
+  }).then(() => {
+    if(category === 'house') renderHouseProjects();
+    else renderExteriorProjects();
+  });
+}
+
+function addCustomProject(category){
+  const title = prompt('Project name?');
+  if(!title || !title.trim()) return;
+  const desc = prompt('Brief description?') || '';
+  const id = title.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const proj = {
+    id, title: title.trim(), icon: '🔨', category,
+    priority: 99, desc: desc.trim(), phases: [
+      {id:'phase1', title:'Phase 1', desc:'First phase of work.', boys:['samuel','johnjr','stephen','daniel']}
+    ]
+  };
+  if(category === 'house') HOUSE_PROJECTS_TEMPLATE.push(proj);
+  else EXTERIOR_PROJECTS_TEMPLATE.push(proj);
+  if(category === 'house') renderHouseProjects();
+  else renderExteriorProjects();
+}
+
+// ─── STONE COLLECTION ─────────────────────────────────
+
+function renderStoneLog(){
+  if(!_db) return;
+  _db.ref('stewart/stones').once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('stone-log');
+
+    // Tally by size
+    const totals = {};
+    Object.values(data).forEach(entry => {
+      totals[entry.size] = (totals[entry.size]||0) + entry.count;
+    });
+
+    const totalAll = Object.values(totals).reduce((a,b)=>a+b,0);
+
+    if(!totalAll){
+      el.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px 0;">No stones logged yet. Go find some!</div>';
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="background:rgba(92,61,30,.06);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:22px;font-weight:700;font-family:\'Cinzel\',serif;color:var(--brown);text-align:center;">${totalAll}</div>
+        <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:8px;">total stones collected</div>
+        ${Object.entries(totals).map(([size,count]) =>
+          `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
+            <span style="color:var(--muted);">${size}</span>
+            <span style="font-weight:700;color:var(--brown);">${count}</span>
+          </div>`
+        ).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--muted);">Recent logs:</div>
+      ${Object.entries(data).sort((a,b)=>b[1].timestamp-a[1].timestamp).slice(0,5).map(([_,e]) =>
+        `<div style="font-size:11px;color:var(--muted);padding:2px 0;">${e.date} — ${e.count} ${e.size} stones</div>`
+      ).join('')}`;
+  });
+}
+
+function logStones(){
+  if(!_db) return;
+  const size = document.getElementById('stone-size-select').value;
+  const count = parseInt(document.getElementById('stone-count').value);
+  if(!count || count < 1) return;
+  const today = localDateStr();
+  _db.ref(`stewart/stones/${today}-${Date.now()}`).set({size, count, date: today, timestamp: Date.now()})
+    .then(() => {
+      document.getElementById('stone-count').value = '';
+      renderStoneLog();
+    });
+}
+
+
+// ══════════════════════════════════════════════════════
+// PARENT DASHBOARD — Teach Me Vote & Super Family Night
+// ══════════════════════════════════════════════════════
+
+function getVoteWeekKey(){
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateStr(monday);
+}
+
+function getSuperFNMonthKey(){
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+// Parent versions of TEACH_ME_OPTIONS (shared constant)
+const TEACH_ME_OPTIONS_PD = [
+  { id:'bike', label:'Bike Maintenance', icon:'🚲' },
+  { id:'tools', label:'Tool Basics', icon:'🔧' },
+  { id:'car', label:'Car Basics', icon:'🚗' },
+  { id:'knots', label:'Knots & Rope Work', icon:'🪢' },
+  { id:'fire', label:'Fire Building', icon:'🔥' },
+  { id:'firstaid', label:'First Aid', icon:'🩹' },
+  { id:'cooking', label:'Campfire Cooking', icon:'🍳' },
+  { id:'navigation', label:'Map & Navigation', icon:'🗺️' },
+  { id:'woodwork', label:'Basic Woodworking', icon:'🪚' },
+  { id:'fishing', label:'Fishing Basics', icon:'🎣' },
+  { id:'electrical', label:'Basic Electrical', icon:'💡' },
+  { id:'plumbing', label:'Basic Plumbing', icon:'🔩' },
+];
+
+function renderVoteManagement(){
+  if(!_db) return;
+  const weekKey = getVoteWeekKey();
+  _db.ref(`stewart/teachvote/${weekKey}`).once('value', snap => {
+    const data = snap.val() || {};
+    const suggestions = data.suggestions || {};
+    const votes = data.votes || {};
+    const winner = data.winner;
+
+    // Tally votes
+    const voteCounts = {};
+    Object.values(votes).forEach(v => { voteCounts[v]=(voteCounts[v]||0)+1; });
+    const sortedOptions = [...new Set([...Object.values(suggestions)])].sort((a,b)=>(voteCounts[b]||0)-(voteCounts[a]||0));
+
+    const el = document.getElementById('vote-management');
+    if(!el) return;
+
+    const agentNames = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel',dad:'Dad',mom:'Mom'};
+    const totalVotes = Object.keys(votes).length;
+
+    el.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Week of ${weekKey}</div>
+
+        <!-- Suggestions -->
+        <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:4px;">Suggestions</div>
+        ${Object.entries(suggestions).length ?
+          Object.entries(suggestions).map(([who, optId]) => {
+            const opt = TEACH_ME_OPTIONS_PD.find(o=>o.id===optId);
+            return `<div style="font-size:12px;color:var(--muted);padding:3px 0;">${agentNames[who]||who}: ${opt?opt.icon+' '+opt.label:optId}</div>`;
+          }).join('') :
+          '<div style="font-size:12px;color:var(--muted);">No suggestions yet (boys suggest on Monday)</div>'
+        }
+      </div>
+
+      <!-- Parent Vote -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px;">Your Votes (Dad &amp; Mom)</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <div style="flex:1;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">Dad's vote: ${votes.dad ? (TEACH_ME_OPTIONS_PD.find(o=>o.id===votes.dad)?.icon+' '+TEACH_ME_OPTIONS_PD.find(o=>o.id===votes.dad)?.label) : 'not cast'}</div>
+            <select id="dad-vote-select" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <option value="">Pick...</option>
+              ${TEACH_ME_OPTIONS_PD.map(o=>`<option value="${o.id}" ${votes.dad===o.id?'selected':''}>${o.icon} ${o.label}</option>`).join('')}
+            </select>
+            <button onclick="castParentVote('dad')" style="width:100%;margin-top:4px;padding:6px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:11px;cursor:pointer;">Vote as Dad</button>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">Mom's vote: ${votes.mom ? (TEACH_ME_OPTIONS_PD.find(o=>o.id===votes.mom)?.icon+' '+TEACH_ME_OPTIONS_PD.find(o=>o.id===votes.mom)?.label) : 'not cast'}</div>
+            <select id="mom-vote-select" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <option value="">Pick...</option>
+              ${TEACH_ME_OPTIONS_PD.map(o=>`<option value="${o.id}" ${votes.mom===o.id?'selected':''}>${o.icon} ${o.label}</option>`).join('')}
+            </select>
+            <button onclick="castParentVote('mom')" style="width:100%;margin-top:4px;padding:6px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:11px;cursor:pointer;">Vote as Mom</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Tally -->
+      ${sortedOptions.length ? `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px;">Current Tally (${totalVotes} vote${totalVotes!==1?'s':''})</div>
+        ${sortedOptions.map(optId => {
+          const opt = TEACH_ME_OPTIONS_PD.find(o=>o.id===optId);
+          const count = voteCounts[optId]||0;
+          const pct = totalVotes > 0 ? Math.round((count/totalVotes)*100) : 0;
+          return `<div style="margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
+              <span>${opt?opt.icon+' '+opt.label:optId}</span>
+              <span style="color:var(--muted);">${count} vote${count!==1?'s':''}</span>
+            </div>
+            <div style="background:rgba(0,0,0,.08);border-radius:4px;height:6px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:var(--green2);border-radius:4px;transition:width .5s;"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+
+      <!-- Set Winner -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:4px;">
+          ${winner ? `✓ Winner set: ${TEACH_ME_OPTIONS_PD.find(o=>o.id===winner)?.icon||''} ${TEACH_ME_OPTIONS_PD.find(o=>o.id===winner)?.label||winner}` : 'Set the winner (after Thursday)'}
+        </div>
+        <select id="winner-select" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:6px;">
+          <option value="">Select winner...</option>
+          ${TEACH_ME_OPTIONS_PD.map(o=>`<option value="${o.id}" ${winner===o.id?'selected':''}>${o.icon} ${o.label}</option>`).join('')}
+        </select>
+        <button onclick="setTeachMeWinner()" style="width:100%;padding:8px;border:none;border-radius:6px;background:var(--brown);color:white;font-size:12px;font-weight:700;cursor:pointer;">Set This Week's Winner</button>
+      </div>`;
+  });
+}
+
+function castParentVote(who){
+  if(!_db) return;
+  const select = document.getElementById(`${who}-vote-select`);
+  if(!select||!select.value) return;
+  const weekKey = getVoteWeekKey();
+  _db.ref(`stewart/teachvote/${weekKey}/votes/${who}`).set(select.value)
+    .then(() => renderVoteManagement());
+}
+
+function setTeachMeWinner(){
+  if(!_db) return;
+  const select = document.getElementById('winner-select');
+  if(!select||!select.value) return;
+  const weekKey = getVoteWeekKey();
+  _db.ref(`stewart/teachvote/${weekKey}/winner`).set(select.value)
+    .then(() => renderVoteManagement());
+}
+
+// ─── SUPER FAMILY NIGHT (Parent Dashboard) ────────────
+
+function renderSuperFNDashboard(){
+  if(!_db) return;
+  const monthKey = getSuperFNMonthKey();
+  const agentIds = ['samuel','johnjr','stephen','daniel'];
+
+  // Get weekdays in current month up to today
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = localDateStr(now);
+  const weekdays = [];
+  const d = new Date(year, month, 1);
+  while(d.getMonth()===month){
+    const dow = d.getDay();
+    const ds = localDateStr(d);
+    if(dow>=1&&dow<=5&&ds<=today) weekdays.push(ds);
+    d.setDate(d.getDate()+1);
+  }
+
+  Promise.all([
+    Promise.all(agentIds.map(id => _db.ref(`stewart/scores/${id}`).once('value'))),
+    _db.ref(`stewart/superfamilynight/${monthKey}`).once('value')
+  ]).then(([scoreSnaps, sfnSnap]) => {
+    const sfnData = sfnSnap.val() || {};
+    const el = document.getElementById('super-fn-dashboard');
+    if(!el) return;
+
+    let totalScore=0, totalDays=0;
+    const agentAverages = {};
+    scoreSnaps.forEach((snap,i) => {
+      const scores = snap.val()||{};
+      let at=0, ad=0;
+      weekdays.forEach(ds => {
+        if(scores[ds]!==null&&scores[ds]!==undefined){ at+=scores[ds]; ad++; totalScore+=scores[ds]; totalDays++; }
+      });
+      agentAverages[agentIds[i]] = ad>0 ? Math.round(at/ad) : 0;
+    });
+
+    const familyAvg = totalDays>0 ? Math.round(totalScore/totalDays) : 0;
+    const isUnlocked = sfnData.unlocked || familyAvg>=80;
+
+    const AGENT_COLORS_PD = {samuel:'#1a3a6e',johnjr:'#6e1a1a',stephen:'#1a4a2e',daniel:'#6e5a10'};
+
+    el.innerHTML = `
+      <div style="background:${isUnlocked?'linear-gradient(135deg,rgba(45,106,71,.1),rgba(232,184,74,.1))':'rgba(0,0,0,.03)'};border:2px solid ${isUnlocked?'var(--gold2)':'var(--border)'};border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:${isUnlocked?'var(--gold2)':'var(--ink)'};">
+            ${isUnlocked?'🎉 SUPER FAMILY NIGHT UNLOCKED!':'Super Family Night Progress'}
+          </div>
+          <div style="font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:${familyAvg>=80?'#2d6a47':familyAvg>=60?'#c8922a':'var(--muted)'};">${familyAvg}%</div>
+        </div>
+        <div style="background:rgba(0,0,0,.08);border-radius:4px;height:8px;overflow:hidden;margin-bottom:8px;">
+          <div style="height:100%;width:${Math.min(100,familyAvg)}%;background:${familyAvg>=80?'var(--green2)':familyAvg>=60?'var(--gold2)':'var(--rust)'};border-radius:4px;transition:width .8s;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:${isUnlocked?'12px':'0'};">
+          ${agentIds.map(id => {
+            const a = AGENTS.find(ag=>ag.id===id);
+            const avg = agentAverages[id];
+            return `<div style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,.04);display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--muted);">${a?a.name:id}</span>
+              <span style="font-size:12px;font-weight:700;color:${avg>=80?'#2d6a47':avg>=60?'#c8922a':'var(--rust)'};">${avg}%</span>
+            </div>`;
+          }).join('')}
+        </div>
+        ${isUnlocked ? `
+        <div style="border-top:1px solid var(--border);padding-top:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px;">Plan the Night</div>
+          <input type="text" id="sfn-food" placeholder="Takeout — e.g. Dominos pizza" value="${sfnData.food||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:6px;">
+          <input type="text" id="sfn-activity" placeholder="Activity — e.g. Night tag, Capture the Flag" value="${sfnData.activity||''}" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:6px;">
+          <button onclick="saveSuperFNPlan()" class="btn-primary">Save & Announce to Boys</button>
+        </div>` : `
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:4px;">Goal: 80% family average &mdash; ${weekdays.length} days tracked &mdash; need ${Math.max(0,80-familyAvg)}% more</div>`}
+      </div>`;
+  });
+}
+
+function saveSuperFNPlan(){
+  if(!_db) return;
+  const monthKey = getSuperFNMonthKey();
+  const food = document.getElementById('sfn-food').value.trim();
+  const activity = document.getElementById('sfn-activity').value.trim();
+  _db.ref(`stewart/superfamilynight/${monthKey}`).update({
+    unlocked: true, food, activity, announcedAt: Date.now()
+  }).then(() => {
+    renderSuperFNDashboard();
+    // Also push announcement to family board
+    const msg = `🎉 SUPER FAMILY NIGHT IS ON! ${food?'Takeout: '+food+'. ':''} ${activity?'Activity: '+activity+'.':''} You earned it!`;
+    const msgRef = _db.ref('stewart/messages/family').push();
+    msgRef.set({ text: msg, from: 'HQ', fromName: 'HQ', timestamp: Date.now(), icon: '🎉' });
+  });
+}
+
+
+// ══════════════════════════════════════════════════════
+// DEVOTIONAL SYSTEM
+// Family Devotional: Dawn leads with all boys, weekly
+// Dawn's Daily: personal, private, dashboard only
+// ══════════════════════════════════════════════════════
+
+function getDevotionalWeekKey(){
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateStr(monday);
+}
+
+// ─── FAMILY DEVOTIONAL INPUT (Dashboard) ──────────────
+
+function renderFamilyDevotionalInput(){
+  if(!_db) return;
+  const weekKey = getDevotionalWeekKey();
+  const d = new Date(weekKey);
+  const weekLabel = d.toLocaleDateString('en-US',{month:'long', day:'numeric'});
+
+  _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('family-devotional-input');
+    if(!el) return;
+
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Week of ${weekLabel}. This devotional will appear in each boy's Training tab when they open the app.
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Title / Theme</div>
+        <input type="text" id="fdev-title" placeholder="e.g. Patience Under Fire — Hans learns to wait" value="${data.title||''}"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;">
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Scripture</div>
+        <input type="text" id="fdev-scripture-ref" placeholder="Reference — e.g. James 1:2-4" value="${data.scriptureRef||''}"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;margin-bottom:6px;">
+        <textarea id="fdev-scripture-text" placeholder="Verse text (KJV)..." rows="3"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:none;">${data.scriptureText||''}</textarea>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Narrative / Story</div>
+        <textarea id="fdev-narrative" placeholder="The OWCA story, Hans vignette, field agent scene — write it here..." rows="8"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:vertical;">${data.narrative||''}</textarea>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Discussion Question</div>
+        <textarea id="fdev-question" placeholder="A question for the dinner table or the end of the reading..." rows="2"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:none;">${data.question||''}</textarea>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Prayer Prompt</div>
+        <textarea id="fdev-prayer" placeholder="Close with — e.g. Ask God to help you be patient this week, especially when..." rows="2"
+          style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:'Lato',sans-serif;resize:none;">${data.prayer||''}</textarea>
+      </div>
+
+      <button onclick="saveFamilyDevotional('${weekKey}')" class="btn-primary" style="width:100%;">
+        Save Family Devotional
+      </button>
+      <div id="fdev-saved" style="font-size:11px;color:var(--green2);text-align:center;margin-top:6px;display:none;">✓ Saved — boys will see this in their Training tab</div>
+
+      <!-- Previous weeks -->
+      <div id="fdev-history" style="margin-top:16px;"></div>`;
+
+    renderDevotionalHistory();
+  });
+}
+
+function saveFamilyDevotional(weekKey){
+  if(!_db) return;
+  const entry = {
+    title: document.getElementById('fdev-title').value.trim(),
+    scriptureRef: document.getElementById('fdev-scripture-ref').value.trim(),
+    scriptureText: document.getElementById('fdev-scripture-text').value.trim(),
+    narrative: document.getElementById('fdev-narrative').value.trim(),
+    question: document.getElementById('fdev-question').value.trim(),
+    prayer: document.getElementById('fdev-prayer').value.trim(),
+    savedAt: Date.now()
+  };
+  _db.ref(`stewart/devotional/family/${weekKey}`).set(entry).then(() => {
+    const el = document.getElementById('fdev-saved');
+    if(el){ el.style.display='block'; setTimeout(()=>el.style.display='none', 3000); }
+    renderDevotionalHistory();
+  });
+}
+
+function renderDevotionalHistory(){
+  if(!_db) return;
+  _db.ref('stewart/devotional/family').once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('fdev-history');
+    if(!el) return;
+    const weeks = Object.keys(data).sort().reverse().slice(1, 6); // skip current week
+    if(!weeks.length){ el.innerHTML=''; return; }
+
+    el.innerHTML = `<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Previous Weeks</div>` +
+      weeks.map(wk => {
+        const entry = data[wk];
+        const d = new Date(wk);
+        const label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        return `<div style="border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-bottom:6px;cursor:pointer;" onclick="loadDevotionalWeek('${wk}')">
+          <div style="font-size:12px;font-weight:700;color:var(--ink);">Week of ${label}${entry.title?' — '+entry.title:''}</div>
+          ${entry.scriptureRef?`<div style="font-size:11px;color:var(--muted);">${entry.scriptureRef}</div>`:''}
+        </div>`;
+      }).join('');
+  });
+}
+
+function loadDevotionalWeek(weekKey){
+  if(!_db) return;
+  _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
+    const data = snap.val() || {};
+    document.getElementById('fdev-title').value = data.title||'';
+    document.getElementById('fdev-scripture-ref').value = data.scriptureRef||'';
+    document.getElementById('fdev-scripture-text').value = data.scriptureText||'';
+    document.getElementById('fdev-narrative').value = data.narrative||'';
+    document.getElementById('fdev-question').value = data.question||'';
+    document.getElementById('fdev-prayer').value = data.prayer||'';
+    window.scrollTo(0,0);
+  });
+}
+
+// ─── DAWN'S DAILY DEVOTIONAL INPUT (Dashboard) ────────
+
+function renderDawnDevotionalInput(){
+  if(!_db) return;
+  const today = localDateStr();
+  const weekKey = getDevotionalWeekKey();
+
+  _db.ref(`stewart/devotional/dawn/${weekKey}`).once('value', snap => {
+    const weekData = snap.val() || {};
+    const el = document.getElementById('dawn-devotional-input');
+    if(!el) return;
+
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dow = new Date().getDay();
+
+    // Build day tabs Mon-Sun
+    const days = [];
+    for(let i=0; i<7; i++){
+      const d = new Date(weekKey);
+      d.setDate(d.getDate()+i);
+      days.push(localDateStr(d));
+    }
+
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Private — only visible here in your dashboard.
+      </div>
+      <div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;">
+        ${days.map((ds,i) => {
+          const hasEntry = weekData[ds] && weekData[ds].text;
+          const isToday = ds === today;
+          return `<button onclick="selectDawnDay('${ds}')" id="dawn-day-btn-${ds}"
+            style="flex-shrink:0;padding:6px 10px;border-radius:20px;border:1px solid ${isToday?'var(--green2)':hasEntry?'var(--border)':'var(--border)'};background:${isToday?'var(--green2)':hasEntry?'rgba(45,106,71,.1)':'transparent'};color:${isToday?'white':hasEntry?'var(--green2)':'var(--muted)'};font-size:11px;cursor:pointer;">
+            ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}${hasEntry?' ✓':''}
+          </button>`;
+        }).join('')}
+      </div>
+      <div id="dawn-day-entry"></div>`;
+
+    // Load today's entry by default
+    selectDawnDay(today);
+  });
+}
+
+function selectDawnDay(dateStr){
+  if(!_db) return;
+  const weekKey = getDevotionalWeekKey();
+  _db.ref(`stewart/devotional/dawn/${weekKey}/${dateStr}`).once('value', snap => {
+    const data = snap.val() || {};
+    const el = document.getElementById('dawn-day-entry');
+    if(!el) return;
+
+    const d = new Date(dateStr);
+    const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:8px;">${dayName}, ${dateStr}</div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Scripture</div>
+        <input type="text" id="dawn-dev-ref" placeholder="Reference" value="${data.ref||''}"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:5px;">
+        <textarea id="dawn-dev-verse" placeholder="Verse text..." rows="2"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:none;">${data.verse||''}</textarea>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Reflection / Notes</div>
+        <textarea id="dawn-dev-text" placeholder="What stood out today, what you're praying through, what God is showing you..." rows="5"
+          style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;resize:vertical;">${data.text||''}</textarea>
+      </div>
+      <button onclick="saveDawnDevotional('${dateStr}')" class="btn-primary" style="width:100%;">Save</button>
+      <div id="dawn-dev-saved" style="font-size:11px;color:var(--green2);text-align:center;margin-top:5px;display:none;">✓ Saved</div>`;
+  });
+}
+
+function saveDawnDevotional(dateStr){
+  if(!_db) return;
+  const weekKey = getDevotionalWeekKey();
+  const entry = {
+    ref: document.getElementById('dawn-dev-ref').value.trim(),
+    verse: document.getElementById('dawn-dev-verse').value.trim(),
+    text: document.getElementById('dawn-dev-text').value.trim(),
+    savedAt: Date.now()
+  };
+  _db.ref(`stewart/devotional/dawn/${weekKey}/${dateStr}`).set(entry).then(() => {
+    const el = document.getElementById('dawn-dev-saved');
+    if(el){ el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
+    renderDawnDevotionalInput(); // refresh day tabs to show checkmarks
+  });
+}
+
+// ─── FAMILY DEVOTIONAL DISPLAY (Boys' Training tab) ───
+
+function renderFamilyDevotionalDisplay(){
+  const el = document.getElementById('family-devotional-display');
+  if(!el||!_db) return;
+
+  const weekKey = getDevotionalWeekKey();
+  _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
+    const data = snap.val();
+    if(!data||!data.title){
+      el.innerHTML = `<div class="empty" style="color:rgba(255,255,255,.3);">This week's devotional hasn't been posted yet.<br>Check back soon, Agent.</div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,var(--dark2),#0a140a);border:1px solid rgba(12,200,200,.2);border-radius:10px;padding:16px;margin-bottom:2px;">
+
+        ${data.title ? `
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:4px;">THIS WEEK'S DEVOTIONAL</div>
+        <div style="font-family:'Exo 2',sans-serif;font-size:16px;font-weight:700;color:var(--white);margin-bottom:14px;line-height:1.3;">${data.title}</div>` : ''}
+
+        ${data.scriptureRef ? `
+        <div style="background:rgba(232,184,74,.1);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:14px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:5px;">${data.scriptureRef}</div>
+          ${data.scriptureText?`<div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.7;font-style:italic;">&ldquo;${data.scriptureText}&rdquo;</div>`:''}
+        </div>` : ''}
+
+        ${data.narrative ? `
+        <div style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.8;margin-bottom:14px;white-space:pre-wrap;">${data.narrative}</div>` : ''}
+
+        ${data.question ? `
+        <div style="background:rgba(12,200,200,.08);border:1px solid rgba(12,200,200,.2);border-radius:8px;padding:11px 13px;margin-bottom:12px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">&#9654; DISCUSSION</div>
+          <div style="font-size:13px;color:var(--white);line-height:1.6;">${data.question}</div>
+        </div>` : ''}
+
+        ${data.prayer ? `
+        <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:12px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:rgba(255,255,255,.4);margin-bottom:5px;">&#9679; PRAYER</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.7;font-style:italic;">${data.prayer}</div>
+        </div>` : ''}
+
+      </div>`;
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+// PIN screen is shown by default — app hidden until correct PIN
+
+// ════════════════════════════════════════════
+// HOMESTEAD MANAGER — garden / animals / supplies / household
+// Writes to its own homestead/ namespace (never touches boys' data)
+// ════════════════════════════════════════════
+const HS_SECTIONS = [
+  {key:'chores',   label:'Household'},
+  {key:'garden',   label:'Garden'},
+  {key:'animals',  label:'Animals'},
+  {key:'supplies', label:'Supplies'}
+];
+let hsActive = 'chores';
+let hsRef = null;
+
+
+// ════════════════════════════════════════════
+// DAWN'S DEVOTIONAL WISHES — feeds John's Word tab
+// Path: stewart/devotional/dawn/{key} = {topic, note, timestamp}
+// ════════════════════════════════════════════
+function addDawnDevWish(){
+  if(!_db) return;
+  const inp=document.getElementById('dawn-dev-input');
+  const topic=inp.value.trim(); if(!topic) return;
+  _db.ref('stewart/devotional/dawn').push({topic, timestamp:Date.now()}).then(()=>{ inp.value=''; });
+}
+function delDawnDevWish(k){ if(_db) _db.ref('stewart/devotional/dawn/'+k).remove(); }
+function loadDawnDevWishes(){
+  if(!_db) return;
+  _db.ref('stewart/devotional/dawn').on('value', s=>{
+    const v=s.val()||{};
+    const items=Object.entries(v).map(([k,d])=>({k,...d})).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+    const el=document.getElementById('dawn-dev-list'); if(!el) return;
+    if(!items.length){ el.innerHTML='<div style="opacity:.5;font-style:italic;font-size:13px;">No wishes yet.</div>'; return; }
+    el.innerHTML=items.map(it=>'<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border);">'+
+      '<div style="flex:1;font-size:14px;">💗 '+escapeHtml(it.topic)+'</div>'+
+      '<button onclick="delDawnDevWish(\''+it.k+'\')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;opacity:.6;">&times;</button></div>').join('');
+  });
+}
+
+function renderHomestead(){
+  renderHsSegs();
+  listenHsSection();
+  loadDawnDevWishes();
+  const inp=document.getElementById('hs-input');
+  if(inp && !inp.dataset.bound){
+    inp.dataset.bound='1';
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addHsItem(); } });
+  }
+}
+function renderHsSegs(){
+  const el=document.getElementById('segs-hs');
+  if(!el) return;
+  el.innerHTML=HS_SECTIONS.map(s=>
+    `<button onclick="switchHs('${s.key}')" style="flex:1;min-width:70px;padding:9px 6px;border-radius:8px;border:1px solid var(--border);background:${s.key===hsActive?'var(--green)':'#fff'};color:${s.key===hsActive?'#fff':'var(--ink)'};font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">${s.label}</button>`
+  ).join('');
+}
+function switchHs(k){ hsActive=k; renderHsSegs(); listenHsSection(); }
+function listenHsSection(){
+  if(!_db) return;
+  if(hsRef) hsRef.off();
+  hsRef=_db.ref('homestead/'+hsActive);
+  hsRef.on('value', s=>{
+    const v=s.val()||{};
+    const items=Object.entries(v).map(([k,o])=>({k,...o})).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+    const el=document.getElementById('hs-list');
+    if(!el) return;
+    if(!items.length){ el.innerHTML='<div style="opacity:.5;font-style:italic;padding:8px 0;">Nothing here yet. Add the first item below.</div>'; return; }
+    el.innerHTML=items.map(it=>`
+      <div style="display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <button onclick="toggleHs('${it.k}',${!it.done})" style="width:26px;height:26px;border-radius:7px;border:2px solid var(--green);background:${it.done?'var(--green)':'transparent'};color:${it.done?'#fff':'transparent'};cursor:pointer;flex-shrink:0;font-size:15px;">&#10003;</button>
+        <div style="flex:1;font-size:16px;${it.done?'opacity:.45;text-decoration:line-through;':''}">${escapeHtml(it.name)}</div>
+        <button onclick="delHs('${it.k}')" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;opacity:.6;">&times;</button>
+      </div>`).join('');
+  });
+}
+function addHsItem(){
+  if(!_db) return;
+  const inp=document.getElementById('hs-input');
+  const v=inp.value.trim(); if(!v) return;
+  _db.ref('homestead/'+hsActive).push({name:v,done:false,timestamp:Date.now()}).then(()=>{ inp.value=''; });
+}
+function toggleHs(k,val){ if(_db) _db.ref('homestead/'+hsActive+'/'+k+'/done').set(val); }
+function delHs(k){ if(_db) _db.ref('homestead/'+hsActive+'/'+k).remove(); }
+
+
+// ════════════════════════════════════════════
+// CHAT MODERATION — pause a boy's group chat (reversible)
+// ════════════════════════════════════════════
+const MOD_AGENTS = [
+  {id:'samuel',name:'Samuel',icon:'🦅'},
+  {id:'johnjr',name:'John Jr.',icon:'🦁'},
+  {id:'stephen',name:'Stephen',icon:'🦖'},
+  {id:'daniel',name:'Daniel',icon:'🐘'}
+];
+function renderModeration(){
+  if(!_db) return;
+  _db.ref('stewart/chatmutes').on('value', s=>{
+    const mutes = s.val()||{};
+    const el=document.getElementById('mod-list');
+    if(!el) return;
+    el.innerHTML = MOD_AGENTS.map(a=>{
+      const mute = mutes[a.id];
+      const until = (mute===true)?Infinity:(typeof mute==='number'?mute:0);
+      const active = until && Date.now()<until;
+      const statusTxt = active
+        ? (until===Infinity ? 'Paused (until lifted)' : 'Paused until '+new Date(until).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}))
+        : 'Active';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">'+
+        '<div style="font-size:20px;">'+a.icon+'</div>'+
+        '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">'+a.name+'</div>'+
+        '<div style="font-size:12px;opacity:.7;'+(active?'color:#c0504d;':'')+'">'+statusTxt+'</div></div>'+
+        (active
+          ? '<button onclick="unmuteBoy(\''+a.id+'\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Unpause</button>'
+          : '<div style="display:flex;gap:5px;">'+
+            '<button onclick="muteBoy(\''+a.id+'\',1)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;">1 hr</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',24)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;">1 day</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',0)" style="padding:6px 9px;border-radius:7px;border:1px solid #c0504d;background:#fff;color:#c0504d;font-size:11px;cursor:pointer;">Hold</button>'+
+            '</div>')+
+        '</div>';
+    }).join('');
+  });
+}
+function muteBoy(id,hours){
+  if(!_db) return;
+  const name=(MOD_AGENTS.find(a=>a.id===id)||{}).name||'this agent';
+  if(hours===0){
+    if(!confirm('Pause '+name+"'s group chat until you lift it?")) return;
+    _db.ref('stewart/chatmutes/'+id).set(true);
+  }else{
+    _db.ref('stewart/chatmutes/'+id).set(Date.now()+hours*3600*1000);
+  }
+}
+function unmuteBoy(id){ if(_db) _db.ref('stewart/chatmutes/'+id).set(null); }
+
+</script>
+</body>
+</html>
