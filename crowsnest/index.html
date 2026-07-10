@@ -23,6 +23,8 @@ body{
 }
 .back{ position:fixed; top:16px; left:14px; color:var(--brass2); text-decoration:none; font-family:'Lato',sans-serif; font-size:12px;}
 header{ text-align:center; padding:34px 16px 8px; }
+.cn-banner{ width:100%; max-height:190px; overflow:hidden; }
+.cn-banner img{ width:100%; height:100%; object-fit:cover; object-position:center 45%; display:block; }
 .hcrest{ width:56px; height:56px; border-radius:50%; box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 0 2px rgba(212,175,90,.4); margin-bottom:10px;}
 .pennant{ font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.35em;text-transform:uppercase;color:var(--brass2);}
 h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(26px,7vw,38px);letter-spacing:.08em; margin-top:4px;}
@@ -48,6 +50,7 @@ select{ width:100%; padding:11px; border-radius:6px; background:rgba(0,0,0,.3); 
 </head>
 <body>
 
+<div class="cn-banner"><img src="assets/crowsnest-interior.jpg" alt="" loading="eager"></div>
 <a class="back" href="../">← Gangway</a>
 <header>
   <img class="hcrest" src="../assets/crest.png" alt="HMS Resolute crest">
