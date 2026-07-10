@@ -70,6 +70,7 @@ h1 .hms{ font-size:.45em; display:block; letter-spacing:.5em; color:var(--brass2
   background:rgba(0,0,0,.2);
 }
 .card-head::before,.card-head::after{content:"⚓";font-size:12px;opacity:.7;}
+#deckCard{ width:min(1400px,96vw); }
 .card-body{ padding:22px; }
 
 .modes{ display:flex; gap:8px; margin-bottom:18px; }
@@ -131,12 +132,12 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
 .callout .leader{ stroke:rgba(212,175,90,.55); stroke-width:2; stroke-dasharray:5 4; fill:none; transition:stroke .15s; }
 .callout .dot{ fill:var(--brass2); stroke:rgba(6,15,29,.8); stroke-width:3; transition:r .15s; }
 .callout .pill{ fill:rgba(6,15,29,.82); stroke:rgba(212,175,90,.55); stroke-width:1.5; transition:fill .15s, stroke .15s; }
-.callout .plabel{ font-family:'Cinzel',serif; font-size:30px; fill:var(--brass2); text-anchor:middle; pointer-events:none; }
+.callout .plabel{ font-family:'Cinzel',serif; font-size:38px; fill:var(--brass2); text-anchor:middle; pointer-events:none; letter-spacing:.5px;}
 .callout:hover .leader, .callout:active .leader{ stroke:var(--brass2); stroke-dasharray:none; }
 .callout:hover .dot, .callout:active .dot{ r:11; }
 .callout:hover .pill, .callout:active .pill{ fill:rgba(176,141,62,.28); stroke:var(--brass2); }
 .callout.reg .pill{ stroke:rgba(132,148,165,.5); }
-.callout.reg .plabel{ font-size:24px; fill:var(--steel2); }
+.callout.reg .plabel{ font-size:32px; fill:var(--steel2); }
 .callout.reg .dot{ fill:var(--steel2); }
 .mapcaption{
   text-align:center; min-height:38px; margin-top:10px; padding:8px;
@@ -257,70 +258,70 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
   <div class="card-body">
     <div class="whoami">Aboard: <b id="whoName">—</b></div>
     <div class="shipdiagram-wrap">
-      <svg class="shipdiagram" viewBox="0 0 1774 1237" xmlns="http://www.w3.org/2000/svg">
-        <image href="assets/ship-cutaway.jpg" x="0" y="130" width="1774" height="887"/>
+      <svg class="shipdiagram" viewBox="0 0 1774 1330" xmlns="http://www.w3.org/2000/svg">
+        <image href="assets/ship-cutaway.jpg" x="0" y="170" width="1774" height="887"/>
 
         <g class="callout reg" onclick="selectDeck('Ship\'s Registry','registry.html','Officers only. Muster roll, ID cards, credentials.',null,'📜')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Ship's Registry" data-sub="officers only">
-          <line class="leader" x1="142" y1="219" x2="150" y2="95"/>
-          <circle class="dot" cx="142" cy="219" r="8"/>
-          <rect class="pill" x="30" y="35" width="240" height="60" rx="30"/>
-          <text class="plabel" x="150" y="73">📜 Registry</text>
+          <line class="leader" x1="142" y1="259" x2="200" y2="120"/>
+          <circle class="dot" cx="142" cy="259" r="8"/>
+          <rect class="pill" x="55" y="70" width="290" height="72" rx="36"/>
+          <text class="plabel" x="200" y="118">Registry</text>
         </g>
 
         <g class="callout" onclick="selectDeck('The Bridge','bridge/','Captain\'s station. Instruments, devotional, planning, and the Registry.','bridge/assets/bridge-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Bridge" data-sub="command &amp; overview">
-          <line class="leader" x1="1029" y1="485" x2="720" y2="95"/>
-          <circle class="dot" cx="1029" cy="485" r="9"/>
-          <rect class="pill" x="590" y="35" width="260" height="64" rx="32"/>
-          <text class="plabel" x="720" y="76">🧭 Bridge</text>
+          <line class="leader" x1="1029" y1="525" x2="800" y2="120"/>
+          <circle class="dot" cx="1029" cy="525" r="10"/>
+          <rect class="pill" x="660" y="70" width="280" height="76" rx="38"/>
+          <text class="plabel" x="800" y="120">Bridge</text>
         </g>
 
         <g class="callout" onclick="selectDeck('Crow\'s Nest','crowsnest/','Spotted providence — the family watch-log of God\'s hand at work.',null,'🔭')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Crow's Nest" data-sub="the watch above">
-          <line class="leader" x1="1313" y1="307" x2="1400" y2="95"/>
-          <circle class="dot" cx="1313" cy="307" r="9"/>
-          <rect class="pill" x="1270" y="35" width="260" height="64" rx="32"/>
-          <text class="plabel" x="1400" y="76">🔭 Nest</text>
+          <line class="leader" x1="1313" y1="347" x2="1480" y2="120"/>
+          <circle class="dot" cx="1313" cy="347" r="10"/>
+          <rect class="pill" x="1320" y="70" width="260" height="76" rx="38"/>
+          <text class="plabel" x="1450" y="120">Crow's Nest</text>
         </g>
 
         <g class="callout" onclick="selectDeck('Agent HQ','boys/','Ship\'s boys\' quarters. Missions, devotional voting, and training.',null,'🫡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Agent HQ" data-sub="crew missions &amp; training">
-          <line class="leader" x1="532" y1="644" x2="180" y2="1120"/>
-          <circle class="dot" cx="532" cy="644" r="9"/>
-          <rect class="pill" x="50" y="1088" width="260" height="64" rx="32"/>
-          <text class="plabel" x="180" y="1129">🫡 Agent HQ</text>
+          <line class="leader" x1="532" y1="684" x2="190" y2="1180"/>
+          <circle class="dot" cx="532" cy="684" r="10"/>
+          <rect class="pill" x="40" y="1140" width="300" height="76" rx="38"/>
+          <text class="plabel" x="190" y="1190">Agent HQ</text>
         </g>
 
-        <g class="callout small" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()" data-name="The Galley" data-sub="meals &amp; provisioning">
-          <line class="leader" x1="532" y1="857" x2="490" y2="1120"/>
-          <circle class="dot" cx="532" cy="857" r="8"/>
-          <rect class="pill" x="370" y="1088" width="240" height="64" rx="32"/>
-          <text class="plabel" x="490" y="1129">🍳 Galley</text>
+        <g class="callout" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()" data-name="The Galley" data-sub="meals &amp; provisioning">
+          <line class="leader" x1="532" y1="897" x2="500" y2="1180"/>
+          <circle class="dot" cx="532" cy="897" r="9"/>
+          <rect class="pill" x="370" y="1140" width="260" height="76" rx="38"/>
+          <text class="plabel" x="500" y="1190">Galley</text>
         </g>
 
         <g class="callout" onclick="selectDeck('The Homestead','dashboard/','Executive Officer\'s station. Rounds, Quartermaster, Quarterdeck.',null,'🏡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Homestead" data-sub="home management">
-          <line class="leader" x1="781" y1="751" x2="800" y2="1120"/>
-          <circle class="dot" cx="781" cy="751" r="9"/>
-          <rect class="pill" x="670" y="1088" width="260" height="64" rx="32"/>
-          <text class="plabel" x="800" y="1129">🏡 Homestead</text>
+          <line class="leader" x1="781" y1="791" x2="820" y2="1180"/>
+          <circle class="dot" cx="781" cy="791" r="10"/>
+          <rect class="pill" x="670" y="1140" width="300" height="76" rx="38"/>
+          <text class="plabel" x="820" y="1190">Homestead</text>
         </g>
 
         <g class="callout" onclick="selectDeck('War Room','warroom/','Prayer requests, the daily sheet, and the Wall of Valor.','warroom/assets/warroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="War Room" data-sub="strategy &amp; prayer">
-          <line class="leader" x1="1029" y1="644" x2="1110" y2="1120"/>
-          <circle class="dot" cx="1029" cy="644" r="9"/>
-          <rect class="pill" x="985" y="1088" width="250" height="64" rx="32"/>
-          <text class="plabel" x="1110" y="1129">⚔️ War Room</text>
+          <line class="leader" x1="1029" y1="684" x2="1130" y2="1180"/>
+          <circle class="dot" cx="1029" cy="684" r="10"/>
+          <rect class="pill" x="1000" y="1140" width="270" height="76" rx="38"/>
+          <text class="plabel" x="1135" y="1190">War Room</text>
         </g>
 
-        <g class="callout small" onclick="selectDeck('The Vineyard','vineyard/','Private deck. Date nights and shared devotional (own PIN).',null,'🍇')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Vineyard" data-sub="private deck">
-          <line class="leader" x1="1029" y1="857" x2="1420" y2="1120"/>
-          <circle class="dot" cx="1029" cy="857" r="8"/>
-          <rect class="pill" x="1300" y="1088" width="240" height="64" rx="32"/>
-          <text class="plabel" x="1420" y="1129">🍇 Vineyard</text>
+        <g class="callout" onclick="selectDeck('The Vineyard','vineyard/','Private deck. Date nights and shared devotional (own PIN).',null,'🍇')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Vineyard" data-sub="private deck">
+          <line class="leader" x1="1029" y1="897" x2="1440" y2="1180"/>
+          <circle class="dot" cx="1029" cy="897" r="9"/>
+          <rect class="pill" x="1310" y="1140" width="270" height="76" rx="38"/>
+          <text class="plabel" x="1445" y="1190">Vineyard</text>
         </g>
 
         <g class="callout" onclick="selectDeck('Wardroom','saga/','Off-duty rest. The Adamah Saga and family annotations.','saga/assets/wardroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Wardroom" data-sub="off-duty rest">
-          <line class="leader" x1="1242" y1="751" x2="1650" y2="1120"/>
-          <circle class="dot" cx="1242" cy="751" r="9"/>
-          <rect class="pill" x="1530" y="1088" width="230" height="64" rx="32"/>
-          <text class="plabel" x="1645" y="1129">📖 Wardroom</text>
+          <line class="leader" x1="1242" y1="791" x2="1650" y2="1180"/>
+          <circle class="dot" cx="1242" cy="791" r="10"/>
+          <rect class="pill" x="1520" y="1140" width="260" height="76" rx="38"/>
+          <text class="plabel" x="1650" y="1190">Wardroom</text>
         </g>
       </svg>
     </div>
