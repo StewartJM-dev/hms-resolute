@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>HMS Resolute · Gangway</title>
+<title>Systems Seven · Gangway</title>
+<link rel="apple-touch-icon" href="assets/crest.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Systems Seven">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
@@ -55,7 +60,18 @@ h1{
   text-shadow:0 3px 14px rgba(0,0,0,.75);
 }
 h1 .hms{ font-size:.45em; display:block; letter-spacing:.5em; color:var(--brass2); font-weight:600; margin-bottom:6px;}
+.sysseven-badge{
+  display:inline-block; margin-top:8px; padding:4px 12px; border-radius:20px;
+  background:rgba(212,175,90,.14); border:1px solid rgba(212,175,90,.4);
+  font-family:'Lato',sans-serif; font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--brass2); text-shadow:none;
+}
 .motto{ font-style:italic; color:var(--offwhite,#e8e3d8); margin-top:10px; font-size:15px; text-shadow:0 2px 8px rgba(0,0,0,.7);}
+.ccd-credit{
+  text-align:center; padding:20px 16px 30px; font-family:'Lato',sans-serif;
+  font-size:11px; letter-spacing:.08em; color:var(--steel2); opacity:.75;
+}
+.ccd-credit b{ color:var(--brass2); font-weight:600; }
 .verse{ font-style:italic; color:var(--brass2); font-size:13px; margin-top:4px; opacity:.95; text-shadow:0 2px 8px rgba(0,0,0,.7);}
 
 .card{
@@ -201,6 +217,7 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
     <img class="crest" src="assets/crest.png" alt="HMS Resolute crest">
     <div class="pennant">His Majesty's Service</div>
     <h1><span class="hms">H·M·S</span>RESOLUTE</h1>
+    <div class="sysseven-badge">Systems Seven · Version 2</div>
     <div class="motto">Seven systems. One ship. One Majesty served.</div>
     <div class="verse">"Be ye stedfast, unmoveable" — 1 Cor. 15:58</div>
   </div>
@@ -365,6 +382,7 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
 </div>
 
 <div class="foot">"Except the LORD build the house, they labour in vain that build it." — Psalm 127:1</div>
+<div class="ccd-credit">Systems Seven, Version 2 — Built by <b>Covenant Creation &amp; Design</b></div>
 
 <script>
 // ───────────────────────── Firebase ─────────────────────────
