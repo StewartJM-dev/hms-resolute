@@ -3959,12 +3959,23 @@ function renderVoteResults(el, suggestions, votes, winner, completedDate){
   Object.values(votes).forEach(v => { voteCounts[v] = (voteCounts[v]||0)+1; });
   const winnerOpt = TEACH_ME_OPTIONS.find(o=>o.id===winner) || TEACH_ME_OPTIONS.find(o=>o.id===Object.keys(voteCounts).sort((a,b)=>voteCounts[b]-voteCounts[a])[0]);
 
+  if(!winnerOpt){
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,rgba(232,184,74,.1),rgba(12,200,200,.06));border:1px solid rgba(232,184,74,.4);border-radius:10px;padding:16px;margin-bottom:12px;text-align:center;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:6px;">THIS WEEK'S TEACH ME</div>
+        <div style="font-size:32px;margin-bottom:6px;">&#128683;</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.6);">No one submitted a topic this week.</div>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;">Suggestions open again Monday.</div>`;
+    return;
+  }
+
   el.innerHTML = `
     <div style="background:linear-gradient(135deg,rgba(232,184,74,.15),rgba(12,200,200,.1));border:1px solid var(--gold);border-radius:10px;padding:16px;margin-bottom:12px;text-align:center;">
       <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:6px;">THIS WEEK'S TEACH ME</div>
-      <div style="font-size:36px;margin-bottom:6px;">${winnerOpt?.icon||'🎯'}</div>
-      <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:var(--white);">${winnerOpt?.label||winner}</div>
-      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">${winnerOpt?.desc||''}</div>
+      <div style="font-size:36px;margin-bottom:6px;">${winnerOpt.icon||'🎯'}</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:var(--white);">${winnerOpt.label}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;">${winnerOpt.desc||''}</div>
     </div>
     <div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;">Voting closed. Check back Monday to suggest next week's topic.</div>`;
 }
