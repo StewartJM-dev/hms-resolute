@@ -55,19 +55,19 @@ body{
 
 .smoke-wisp{
   position:absolute; z-index:1; pointer-events:none;
-  width:90px; height:90px; border-radius:50%;
-  background:radial-gradient(circle, rgba(220,220,225,.16) 0%, rgba(200,200,210,.08) 45%, transparent 75%);
-  filter:blur(6px);
-  animation:smokeRise 14s ease-in infinite;
+  width:130px; height:130px; border-radius:50%;
+  background:radial-gradient(circle, rgba(230,230,235,.42) 0%, rgba(210,210,220,.22) 45%, transparent 72%);
+  filter:blur(5px);
+  animation:smokeRise 9s ease-out infinite;
   opacity:0;
 }
-.smoke-wisp.s2{ animation-delay:4.5s; width:70px; height:70px; }
-.smoke-wisp.s3{ animation-delay:9s; width:60px; height:60px; }
+.smoke-wisp.s2{ animation-delay:3s; width:105px; height:105px; }
+.smoke-wisp.s3{ animation-delay:6s; width:90px; height:90px; }
 @keyframes smokeRise{
   0%   { opacity:0; transform:translate(0,0) scale(.6); }
-  12%  { opacity:.55; }
-  55%  { opacity:.3; }
-  100% { opacity:0; transform:translate(18px,-160px) scale(2.1); }
+  15%  { opacity:.9; }
+  60%  { opacity:.5; }
+  100% { opacity:0; transform:translate(14px,-90px) scale(1.7); }
 }
 .crest{ width:78px; height:78px; border-radius:50%; margin:0 auto 12px;
   box-shadow:0 4px 18px rgba(0,0,0,.6), 0 0 0 2px rgba(212,175,90,.5); display:block;}
