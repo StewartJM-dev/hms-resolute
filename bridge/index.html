@@ -372,6 +372,10 @@ body{
     <div class="focus" id="t-focus">—</div>
   </div>
 
+    <!-- THE WEEK -->
+  <div class="shead">The Seven-Day Cycle</div>
+  <div class="week" id="week"></div>
+
     <!-- CREW STATUS (live from family app) -->
   <div class="shead">Crew Status — Today</div>
   <div class="crew" id="crew"><div class="crew-loading">Reading the family channel…</div></div>
@@ -503,17 +507,6 @@ body{
     <div class="word-suggest-note">The boys vote in O.W.C.A.; Dawn suggests in Officers' Country. Their picks gather here to guide next week's study.</div>
   </div>
 
-  <!-- ===== SYSTEMS TAB ===== -->
-  <div class="btab" id="btab-systems">
-    <!-- THE WEEK -->
-  <div class="shead">The Seven-Day Cycle</div>
-  <div class="week" id="week"></div>
-
-    <!-- THE SYSTEMS -->
-  <div class="shead">The Seven Systems</div>
-  <div class="systems" id="systems"></div>
-  </div>
-
   <div class="foot">
     <div class="motto">Virescit vulnere virtus</div>
     Courage grows strong at a wound.<br>
@@ -632,17 +625,6 @@ const WEEK = [
   {day:"Saturday",  abbr:"Repair", sys:"Damage Control",       note:"Keep the vessel seaworthy — troop activities, the body, the household, the marriage."}
 ];
 
-// THE SEVEN SYSTEMS
-const SYSTEMS = [
-  {ico:"⚓", name:"Command / Bridge",     role:"You & your faith. Where the whole vessel is sailing. Vision, values, the man at the helm. Cannot be delegated."},
-  {ico:"🧭", name:"Navigation",           role:"The plan. Where you are, where you're going, the route. Lives outside your head so it stops getting lost."},
-  {ico:"🔥", name:"Propulsion (Starfire)",role:"The engines. Daily rhythms and standing structures that move you forward without fresh willpower."},
-  {ico:"⚡", name:"Power",                role:"What runs everything else — faith, rest, energy. When this browns out, every other system fails."},
-  {ico:"🎚️", name:"Steering / Helm",      role:"Priorities & boundaries. Course-correction. Saying no. Keeping the ship on its heading."},
-  {ico:"🛠️", name:"Damage Control",       role:"Keeping the vessel seaworthy. Health, maintenance, fixing the small things before they sink you."},
-  {ico:"📡", name:"Communications / Crew", role:"Dawn, the boys, troop, ministry, friendships. The crew you sail with and lead."}
-];
-
 // ----- render -----
 function renderWeek(){
   const todayIdx = new Date().getDay(); // 0 = Sunday
@@ -661,13 +643,6 @@ function renderWeek(){
   document.getElementById('t-day').textContent = t.day;
   document.getElementById('t-watch').textContent = t.sys;
   document.getElementById('t-focus').textContent = t.note;
-}
-function renderSystems(){
-  document.getElementById('systems').innerHTML = SYSTEMS.map(s=>`
-    <div class="sys">
-      <div class="ico">${s.ico}</div>
-      <div class="stext"><b>${s.name}</b><div class="role">${s.role}</div></div>
-    </div>`).join('');
 }
 
 // ════════════════════════════════════════════
@@ -1140,7 +1115,6 @@ function renderStatusBoard(crew){
 }
 
 renderWeek();
-renderSystems();
 initFirebase();
 </script>
 
@@ -1151,7 +1125,6 @@ initFirebase();
   <button class="bnav" data-btab="instruments" onclick="showBTab('instruments',this)"><span class="bni">🎛️</span>Instruments</button>
   <button class="bnav" data-btab="saga" onclick="showBTab('saga',this)"><span class="bni">📖</span>Saga</button>
   <button class="bnav" data-btab="word" onclick="showBTab('word',this)"><span class="bni">✝️</span>Word</button>
-  <button class="bnav" data-btab="systems" onclick="showBTab('systems',this)"><span class="bni">🧭</span>Systems</button>
 </div>
 </body>
 </html>
