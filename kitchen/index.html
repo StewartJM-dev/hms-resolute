@@ -9,6 +9,8 @@
 :root{--ink:#1a1410;--cream:#f7f2ea;--brown:#5c3d1e;--rust:#b5451b;--gold:#c8922a;--sage:#4a7060;--border:#e0d5c0;--muted:#8a7a65;--card:#fff;--green:#2d6a3f;--gbg:#edf7f0;--abg:#fdf6e3;--amb:#a07000;--rbg:#fdf0eb;--red:#8b3010;--nh:56px;--bh:62px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font-size:15px;overflow-x:hidden;}
+.galley-banner{width:100%;max-height:190px;overflow:hidden;}
+.galley-banner img{width:100%;height:100%;object-fit:cover;object-position:center 45%;display:block;}
 .tnav{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--nh);background:var(--ink);display:flex;align-items:center;justify-content:space-between;padding:0 14px;box-shadow:0 2px 12px rgba(0,0,0,.3);}
 .logo{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--cream);}
 .logo span{color:var(--gold);font-style:italic;}
@@ -202,6 +204,7 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
+<div class="galley-banner"><img src="assets/galley-interior.jpg" alt="" loading="eager"></div>
 <nav class="tnav">
   <div style="display:flex;align-items:center;gap:10px;">
     <a href="../dashboard/" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid #3a2a18;color:var(--gold);font-size:15px;text-decoration:none;flex-shrink:0;" title="Officers' Country">&#127968;</a>
