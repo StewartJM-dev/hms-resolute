@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>War Room · HMS Resolute</title>
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --navy:#0b1d33;--navy2:#12294a;--navy3:#1b3a63;
+  --brass:#b08d3e;--brass2:#d4af5a;
+  --steel:#5d6b7a;--steel2:#8494a5;
+  --signal:#f2efe6;--paper:#efe9da;
+  --alert:#a63d40;--go:#3d8a5e;--ink:#101820;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Crimson Pro',Georgia,serif;
+  background:
+    radial-gradient(ellipse at 50% -10%,rgba(212,175,90,.08),transparent 55%),
+    linear-gradient(170deg,var(--navy) 0%,#081426 60%,#060f1d 100%);
+  color:var(--signal); min-height:100vh; padding-bottom:60px;
+}
+header{ text-align:center; padding:30px 16px 6px; }
+.pennant{ font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.35em;text-transform:uppercase;color:var(--brass2); }
+h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(26px,7vw,38px);letter-spacing:.08em; margin-top:4px;}
+.verse{ font-style:italic; color:var(--steel2); font-size:13.5px; max-width:520px; margin:8px auto 0; line-height:1.5; padding:0 12px;}
+.back{ position:absolute; top:16px; left:14px; color:var(--brass2); text-decoration:none; font-family:'Lato',sans-serif; font-size:12px; letter-spacing:.1em;}
+.hcrest{ width:54px; height:54px; border-radius:50%; box-shadow:0 3px 12px rgba(0,0,0,.5), 0 0 0 2px rgba(212,175,90,.4); margin-bottom:8px;}
+
+nav{ display:flex; justify-content:center; gap:8px; margin:20px auto 0; max-width:560px; padding:0 12px;}
+.tab{
+  flex:1; padding:11px 4px; text-align:center; cursor:pointer; border-radius:6px;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+  background:rgba(0,0,0,.25); color:var(--steel2); border:1px solid rgba(132,148,165,.3);
+}
+.tab.on{ background:rgba(176,141,62,.18); color:var(--brass2); border-color:var(--brass);}
+.tab .n{ display:inline-block; min-width:18px; margin-left:4px; padding:1px 5px; border-radius:9px; background:rgba(212,175,90,.25); font-size:10px;}
+
+main{ max-width:560px; margin:18px auto 0; padding:0 12px;}
+
+.wr-banner{width:100%;max-height:190px;overflow:hidden;border-radius:10px;margin-bottom:16px;position:relative;
+  border:1px solid rgba(212,175,90,.3);box-shadow:0 6px 22px rgba(0,0,0,.4);}
+.wr-banner img{width:100%;height:100%;object-fit:cover;object-position:center 48%;display:block;opacity:.9;}
+.wr-banner::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(6,15,29,0) 45%,rgba(6,15,29,.65) 100%);}
+.pane{ display:none;}
+.pane.on{ display:block; }
+
+.card{
+  background:linear-gradient(180deg,rgba(18,41,74,.8),rgba(11,29,51,.9));
+  border:1px solid rgba(212,175,90,.3); border-radius:10px; padding:16px; margin-bottom:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+.card h3{ font-family:'Cinzel',serif; font-size:15px; letter-spacing:.12em; color:var(--brass2); margin-bottom:10px;}
+label{ display:block; font-family:'Lato',sans-serif; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--steel2); margin:10px 0 5px;}
+input,textarea,select{
+  width:100%; padding:11px; border-radius:6px; font-size:16px;
+  background:rgba(0,0,0,.3); color:var(--signal); border:1px solid rgba(132,148,165,.35);
+  font-family:'Crimson Pro',serif;
+}
+textarea{ min-height:76px; resize:vertical; }
+input:focus,textarea:focus,select:focus{ outline:none; border-color:var(--brass);}
+.btn{
+  margin-top:12px; padding:12px 18px; border:none; border-radius:6px; cursor:pointer;
+  font-family:'Cinzel',serif; font-size:13.5px; letter-spacing:.1em;
+  background:linear-gradient(180deg,var(--brass2),var(--brass)); color:var(--ink); width:100%;
+}
+.btn.small{ width:auto; padding:8px 14px; font-size:12px; margin-top:0;}
+.btn.ghost{ background:transparent; color:var(--steel2); border:1px solid rgba(132,148,165,.4);}
+.btn.go{ background:linear-gradient(180deg,#57ab7d,var(--go)); color:#08150d;}
+.btn.alert{ background:transparent; color:#d98a8c; border:1px solid rgba(166,61,64,.5);}
+
+/* request items */
+.req{
+  border-left:3px solid var(--brass); background:rgba(0,0,0,.22);
+  border-radius:0 8px 8px 0; padding:12px 14px; margin-bottom:10px;
+}
+.req .who{ font-family:'Lato',sans-serif; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--brass2);}
+.req .for{ font-family:'Cinzel',serif; font-size:15px; margin:3px 0 4px;}
+.req .txt{ font-size:15.5px; line-height:1.5; color:var(--paper);}
+.req .meta{ font-size:11.5px; color:var(--steel); margin-top:6px; font-style:italic;}
+.req .actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+.req.pending{ border-left-color:var(--steel2); opacity:.95;}
+
+/* daily sheet */
+.sheet{
+  background:linear-gradient(180deg,var(--paper),#e2dbc8);
+  color:var(--ink); border-radius:10px; padding:22px 20px; box-shadow:0 8px 26px rgba(0,0,0,.45);
+}
+.sheet h2{ font-family:'Cinzel',serif; text-align:center; font-size:19px; letter-spacing:.14em; color:#5c4718;}
+.sheet .date{ text-align:center; font-style:italic; color:#7a6a4a; font-size:13.5px; margin:4px 0 14px;}
+.sheet .s-verse{ text-align:center; font-style:italic; font-size:13px; color:#8a7a55; border-top:1px solid #cfc4a4; border-bottom:1px solid #cfc4a4; padding:9px 4px; margin-bottom:14px;}
+.s-item{ padding:9px 2px; border-bottom:1px dotted #c9bd9c; }
+.s-item .s-for{ font-weight:600; font-size:15.5px;}
+.s-item .s-txt{ font-size:14.5px; line-height:1.45; color:#33291a;}
+.s-item .s-by{ font-size:11px; color:#8a7a55; font-style:italic; margin-top:2px;}
+.print-btn{ margin-top:14px; }
+@media print{
+  body *{ visibility:hidden; } .sheet, .sheet *{ visibility:visible; }
+  .sheet{ position:absolute; inset:0; box-shadow:none; border-radius:0;}
+  .print-btn{ display:none; }
+}
+
+/* Wall of Valor */
+.valor-intro{ text-align:center; font-style:italic; color:var(--steel2); font-size:13.5px; line-height:1.55; margin-bottom:16px; padding:0 8px;}
+.stone{
+  background:linear-gradient(180deg,#2a2f38,#1d222b);
+  border:1px solid rgba(212,175,90,.45); border-radius:8px;
+  padding:16px; margin-bottom:12px; position:relative;
+  box-shadow:inset 0 1px 0 rgba(242,239,230,.07), 0 5px 16px rgba(0,0,0,.4);
+}
+.stone::before{ content:"⚓"; position:absolute; top:10px; right:12px; color:var(--brass); opacity:.5; font-size:14px;}
+.stone .v-for{ font-family:'Cinzel',serif; font-size:16px; color:var(--brass2); letter-spacing:.06em;}
+.stone .v-req{ font-size:14.5px; color:var(--paper); line-height:1.5; margin-top:5px;}
+.stone .v-ans{ font-size:14.5px; font-style:italic; color:#a9d8bd; line-height:1.5; margin-top:8px; border-top:1px dashed rgba(132,148,165,.3); padding-top:8px;}
+.stone .v-date{ font-family:'Lato',sans-serif; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--steel2); margin-top:8px;}
+.empty{ text-align:center; color:var(--steel); font-style:italic; padding:26px 10px;}
+.lock-note{ text-align:center; color:var(--steel2); font-size:13px; font-style:italic; margin-bottom:12px;}
+.modal-bg{ display:none; position:fixed; inset:0; background:rgba(4,10,18,.8); z-index:50; align-items:center; justify-content:center; padding:16px;}
+.modal-bg.on{ display:flex; }
+.modal{ width:min(440px,94vw); }
+</style>
+</head>
+<body>
+
+<a class="back" href="../">← Gangway</a>
+<header>
+  <img class="hcrest" src="../assets/crest.png" alt="HMS Resolute crest">
+  <div class="pennant">Strategy Deck · HMS Resolute</div>
+  <h1>WAR ROOM</h1>
+  <div class="verse">"For we wrestle not against flesh and blood… the weapons of our warfare are not carnal, but mighty through God." — Eph. 6:12 · 2 Cor. 10:4</div>
+</header>
+
+<nav>
+  <div class="tab on" data-p="sheet" onclick="go('sheet')">📋 Daily Sheet</div>
+  <div class="tab" data-p="reqs" onclick="go('reqs')">🗂 Requests<span class="n" id="nActive">0</span></div>
+  <div class="tab" data-p="pending" onclick="go('pending')" id="pendTab" style="display:none;">⏳ Pending<span class="n" id="nPend">0</span></div>
+  <div class="tab" data-p="valor" onclick="go('valor')">⚓ Wall of Valor</div>
+</nav>
+
+<main>
+  <div class="wr-banner"><img src="assets/warroom-interior.jpg" alt="" loading="lazy"></div>
+
+  <!-- DAILY SHEET -->
+  <div class="pane on" id="p-sheet">
+    <div class="sheet">
+      <h2>DAILY PRAYER SHEET</h2>
+      <div class="date" id="sheetDate"></div>
+      <div class="s-verse">"Pray without ceasing." — 1 Thessalonians 5:17</div>
+      <div id="sheetList"><div class="empty">No active requests. The sea is calm — give thanks.</div></div>
+    </div>
+    <button class="btn ghost print-btn" onclick="window.print()">🖨 Print today's sheet</button>
+  </div>
+
+  <!-- REQUESTS -->
+  <div class="pane" id="p-reqs">
+    <div class="card">
+      <h3>NEW REQUEST</h3>
+      <label>Submitted by</label>
+      <select id="reqBy">
+        <option value="john">John (Captain)</option>
+        <option value="dawn">Dawn (XO)</option>
+        <option value="samuel">Samuel</option>
+        <option value="johnjr">John Jr.</option>
+        <option value="stephen">Stephen</option>
+        <option value="daniel">Daniel</option>
+      </select>
+      <label>Praying for (person / situation)</label>
+      <input id="reqFor" maxlength="60" placeholder="e.g., Grandma's health">
+      <label>The request</label>
+      <textarea id="reqTxt" maxlength="500" placeholder="What are we asking the Lord for?"></textarea>
+      <button class="btn" onclick="submitReq()">Submit to the War Room</button>
+      <div class="lock-note" id="reqNote" style="margin-top:10px;"></div>
+    </div>
+    <div id="activeList"></div>
+  </div>
+
+  <!-- PENDING (parents only) -->
+  <div class="pane" id="p-pending">
+    <div class="lock-note">Crew submissions awaiting an officer's review.</div>
+    <div id="pendingList"><div class="empty">Nothing pending.</div></div>
+  </div>
+
+  <!-- WALL OF VALOR -->
+  <div class="pane" id="p-valor">
+    <div class="valor-intro">
+      "What mean these stones? …the LORD your God dried up the waters of Jordan from before you." — Joshua 4:21,23<br>
+      Every stone on this wall is a prayer the Lord answered. Walk past on purpose. Tell the children why.
+    </div>
+    <div id="valorList"><div class="empty">The wall awaits its first stone.</div></div>
+  </div>
+</main>
+
+<!-- Answer modal -->
+<div class="modal-bg" id="ansModal">
+  <div class="card modal">
+    <h3>MARK ANSWERED · ADD TO THE WALL</h3>
+    <div class="req" style="margin-top:8px;"><div class="for" id="ansFor"></div><div class="txt" id="ansTxt"></div></div>
+    <label>How did the Lord answer? (optional, but the stones speak better with it)</label>
+    <textarea id="ansHow" maxlength="500"></textarea>
+    <button class="btn go" onclick="confirmAnswer()">⚓ Set the Stone</button>
+    <button class="btn ghost" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+<script>
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+firebase.initializeApp(FB_CONFIG);
+const db = firebase.database();
+
+const NAMES = {john:'John',dawn:'Dawn',samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
+const PARENTS = ['john','dawn'];
+
+// session from gateway (determines pending-queue visibility & default submitter)
+let session=null;
+try{ session = JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){}
+const isParent = !!(session && session.role==='parent');
+if(isParent){
+  document.getElementById('pendTab').style.display='';
+  document.getElementById('reqBy').value = session.person;
+}else if(session && session.person && NAMES[session.person]){
+  document.getElementById('reqBy').value = session.person;
+}
+
+function go(p){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.p===p));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  document.getElementById('p-'+p).classList.add('on');
+}
+function esc(s){ return (s||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function fmtDate(t){ return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+
+document.getElementById('sheetDate').textContent =
+  new Date().toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric', year:'numeric'});
+
+// ───────── Submit ─────────
+async function submitReq(){
+  const by = document.getElementById('reqBy').value;
+  const forWho = document.getElementById('reqFor').value.trim();
+  const txt = document.getElementById('reqTxt').value.trim();
+  const note = document.getElementById('reqNote');
+  if(!forWho || !txt){ note.textContent='Fill in both fields.'; return; }
+  const entry = { by, forWho, txt, created: firebase.database.ServerValue.TIMESTAMP,
+    assist: (session&&session.assist)?session.assist:null };
+  if(PARENTS.includes(by)){
+    await db.ref('resolute/prayer/requests').push({...entry, status:'active'});
+    note.textContent='Posted to the daily sheet. ⚓';
+  }else{
+    await db.ref('resolute/prayer/pending').push(entry);
+    note.textContent='Submitted — an officer will review it. 🫡';
+  }
+  document.getElementById('reqFor').value=''; document.getElementById('reqTxt').value='';
+  setTimeout(()=>note.textContent='', 4000);
+}
+
+// ───────── Live: active requests + daily sheet ─────────
+let activeCache = {};
+db.ref('resolute/prayer/requests').on('value', snap=>{
+  activeCache = snap.val()||{};
+  const items = Object.entries(activeCache)
+    .filter(([id,r])=>r.status==='active')
+    .sort((a,b)=>(a[1].created||0)-(b[1].created||0));
+  document.getElementById('nActive').textContent = items.length;
+
+  // daily sheet
+  const sl = document.getElementById('sheetList');
+  sl.innerHTML = items.length ? items.map(([id,r])=>
+    `<div class="s-item"><div class="s-for">${esc(r.forWho)}</div>
+     <div class="s-txt">${esc(r.txt)}</div>
+     <div class="s-by">brought by ${NAMES[r.by]||esc(r.by)} · ${fmtDate(r.created)}</div></div>`).join('')
+   : '<div class="empty" style="color:#8a7a55;">No active requests. The sea is calm — give thanks.</div>';
+
+  // manage list
+  const al = document.getElementById('activeList');
+  al.innerHTML = items.map(([id,r])=>`
+    <div class="req">
+      <div class="who">${NAMES[r.by]||esc(r.by)} · ${fmtDate(r.created)}${r.assist?' · ⚑ parent-assisted':''}</div>
+      <div class="for">${esc(r.forWho)}</div>
+      <div class="txt">${esc(r.txt)}</div>
+      ${isParent?`<div class="actions">
+        <button class="btn small go" onclick="openAnswer('${id}')">⚓ Answered</button>
+        <button class="btn small alert" onclick="retireReq('${id}')">Retire quietly</button>
+      </div>`:''}
+    </div>`).join('') || '<div class="empty">No active requests.</div>';
+});
+
+// ───────── Live: pending (parents) ─────────
+db.ref('resolute/prayer/pending').on('value', snap=>{
+  const v = snap.val()||{};
+  const items = Object.entries(v).sort((a,b)=>(a[1].created||0)-(b[1].created||0));
+  document.getElementById('nPend').textContent = items.length;
+  const pl = document.getElementById('pendingList');
+  pl.innerHTML = items.length ? items.map(([id,r])=>`
+    <div class="req pending">
+      <div class="who">${NAMES[r.by]||esc(r.by)} · ${fmtDate(r.created)}${r.assist?' · ⚑ parent-assisted':''}</div>
+      <div class="for">${esc(r.forWho)}</div>
+      <div class="txt">${esc(r.txt)}</div>
+      <div class="actions">
+        <button class="btn small go" onclick="approvePending('${id}')">Approve → Active</button>
+        <button class="btn small alert" onclick="declinePending('${id}')">Decline</button>
+      </div>
+    </div>`).join('') : '<div class="empty">Nothing pending.</div>';
+});
+
+async function approvePending(id){
+  const snap = await db.ref('resolute/prayer/pending/'+id).get();
+  if(!snap.exists()) return;
+  await db.ref('resolute/prayer/requests').push({...snap.val(), status:'active',
+    approvedBy: session?session.person:'parent', approvedAt: firebase.database.ServerValue.TIMESTAMP});
+  await db.ref('resolute/prayer/pending/'+id).remove();
+}
+async function declinePending(id){
+  if(!confirm('Decline this request? (Talk with them about it, too.)')) return;
+  await db.ref('resolute/prayer/pending/'+id).remove();
+}
+async function retireReq(id){
+  if(!confirm('Retire this request without marking it answered?')) return;
+  await db.ref('resolute/prayer/requests/'+id+'/status').set('retired');
+}
+
+// ───────── Answer flow → Wall of Valor ─────────
+let ansId=null;
+function openAnswer(id){
+  ansId=id; const r=activeCache[id]; if(!r) return;
+  document.getElementById('ansFor').textContent=r.forWho;
+  document.getElementById('ansTxt').textContent=r.txt;
+  document.getElementById('ansHow').value='';
+  document.getElementById('ansModal').classList.add('on');
+}
+function closeModal(){ document.getElementById('ansModal').classList.remove('on'); ansId=null; }
+async function confirmAnswer(){
+  if(!ansId) return;
+  const r=activeCache[ansId]; const how=document.getElementById('ansHow').value.trim();
+  await db.ref('resolute/prayer/valor').push({
+    forWho:r.forWho, txt:r.txt, by:r.by, asked:r.created||null,
+    how: how||null, answered: firebase.database.ServerValue.TIMESTAMP
+  });
+  await db.ref('resolute/prayer/requests/'+ansId+'/status').set('answered');
+  closeModal(); go('valor');
+}
+
+// ───────── Wall of Valor ─────────
+db.ref('resolute/prayer/valor').on('value', snap=>{
+  const v = snap.val()||{};
+  const items = Object.entries(v).sort((a,b)=>(b[1].answered||0)-(a[1].answered||0));
+  const el = document.getElementById('valorList');
+  el.innerHTML = items.length ? items.map(([id,s])=>`
+    <div class="stone">
+      <div class="v-for">${esc(s.forWho)}</div>
+      <div class="v-req">${esc(s.txt)}</div>
+      ${s.how?`<div class="v-ans">"${esc(s.how)}"</div>`:''}
+      <div class="v-date">Asked ${s.asked?fmtDate(s.asked):'—'} · Answered ${fmtDate(s.answered)} · brought by ${NAMES[s.by]||esc(s.by)}</div>
+    </div>`).join('') : '<div class="empty">The wall awaits its first stone.</div>';
+});
+</script>
+</body>
+</html>
