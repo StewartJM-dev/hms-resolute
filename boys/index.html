@@ -4337,6 +4337,45 @@ function renderFamilyDevotionalDisplay(){
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
   if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter') sendPrivateMessage(); });
+
+  // ── Identity lock: only the authenticated agent (or a parent explicitly assisting
+  //    a specific agent from the Gangway) may access an account. No open picker. ──
+  const AGENT_PROFILES = {
+    samuel: {codename:'Agent Alpha',    name:'Samuel',   rank:'Senior Field Agent', theme:'theme-alpha', icon:'\uD83E\uDD85', card:'agent-alpha'},
+    johnjr: {codename:'Agent Bravo',    name:'John Jr.', rank:'Field Agent',        theme:'theme-bravo', icon:'\uD83E\uDD81', card:'agent-bravo'},
+    stephen:{codename:'Agent Dino',     name:'Stephen',  rank:'Field Specialist',   theme:'theme-dino',  icon:'\uD83E\uDD96', card:'agent-dino'},
+    daniel: {codename:'Agent Wildcard', name:'Daniel',   rank:'Field Recruit',      theme:'theme-wild',  icon:'\uD83D\uDC18', card:'agent-wild'}
+  };
+  const qParams = new URLSearchParams(location.search);
+  const assistAs = qParams.get('as');
+  let lockedId = null;
+  let currentSession = null;
+  try{ currentSession = JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){}
+
+  // The 'as' URL param is only ever honored if the CURRENT session shows an
+  // authenticated parent (role:'parent') within the last 12 hours — never on
+  // its own, since a boy could otherwise type ?as=someone-else into the bar.
+  const parentSessionValid = currentSession && currentSession.role==='parent' && (Date.now()-currentSession.ts) < 1000*60*60*12;
+
+  if(assistAs && AGENT_PROFILES[assistAs] && parentSessionValid){
+    lockedId = assistAs; // a real, currently-authenticated parent chose this agent on the Gangway
+  }else if(currentSession && currentSession.role==='boy' && currentSession.person && AGENT_PROFILES[currentSession.person] && (Date.now()-currentSession.ts) < 1000*60*60*12){
+    lockedId = currentSession.person;
+  }
+
+  if(!lockedId){
+    // No valid identity presented at all — back to the Gangway, not an open picker
+    location.href = '../';
+    return;
+  }
+
+  const profile = AGENT_PROFILES[lockedId];
+  // Strip every other agent's card out of the DOM entirely — not just hidden
+  document.querySelectorAll('.agent-card').forEach(card=>{
+    if(!card.classList.contains(profile.card)) card.remove();
+  });
+
+  selectAgent(lockedId, profile.codename, profile.name, profile.rank, profile.theme, profile.icon);
   initFirebase();
 });
 </script>
