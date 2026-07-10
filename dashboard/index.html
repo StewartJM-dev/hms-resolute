@@ -955,6 +955,21 @@ function setSyncStatus(s){
 const CORRECT_PIN = '5683';
 let pinEntry = '';
 
+// ── Gangway session auto-unlock ──
+// If the person already authenticated as an officer at the Gangway,
+// skip this app's own legacy PIN screen entirely.
+(function tryGangwaySession(){
+  try{
+    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+    if(s && s.role==='parent' && (Date.now()-s.ts) < 1000*60*60*12){
+      document.getElementById('pin-screen').style.display = 'none';
+      document.getElementById('main-app').classList.add('active');
+      initFirebase();
+      setTimeout(() => renderOverview(), 800);
+    }
+  }catch(e){}
+})();
+
 function pinPress(d){
   if(pinEntry.length >= 4) return;
   pinEntry += d;
