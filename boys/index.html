@@ -1465,6 +1465,40 @@ function buildMissions(agentId, _d){
     always: true
   });
 
+  // ── COMPUTER MISSIONS (bonus — earn points, and screen time is earned through the family's own rule) ──
+  missions.push({
+    id: 'typing-practice',
+    text: 'Typing practice — 10 minutes',
+    detail: 'Work on speed and accuracy.',
+    points: 5,
+    category: 'computer',
+    always: true
+  });
+  missions.push({
+    id: 'scratch-lesson',
+    text: 'Scratch coding lesson',
+    detail: 'Complete one Scratch tutorial or work on your own project.',
+    points: 8,
+    category: 'computer',
+    always: true
+  });
+  missions.push({
+    id: 'khan-academy',
+    text: 'Khan Academy — one lesson',
+    detail: 'Complete one lesson in math, reading, or science.',
+    points: 8,
+    category: 'computer',
+    always: true
+  });
+  missions.push({
+    id: 'research-report',
+    text: 'Research & report',
+    detail: 'Pick a topic, research it, and write down three facts you learned.',
+    points: 6,
+    category: 'computer',
+    always: true
+  });
+
   // ── DISHES TEAM DAILY ──────────────────────────────
   if(onDishes){
     // Dish team is either Sam+John or Stephen+Daniel
@@ -1961,6 +1995,10 @@ function buildMissionsForDate(agentId, dayDate){
   missions.push({id:'bed', points:5});
   missions.push({id:'bedroom', points:5});
   missions.push({id:'rabbit-own', points:5});
+  missions.push({id:'typing-practice', points:5});
+  missions.push({id:'scratch-lesson', points:8});
+  missions.push({id:'khan-academy', points:8});
+  missions.push({id:'research-report', points:6});
 
   if(onDishes){
     if(agentId==='samuel'||agentId==='johnjr'){
@@ -2058,10 +2096,11 @@ function renderMissionsList(el, missions, done, refPath){
   const teamColor = onDishes ? 'var(--teal2)' : 'var(--gold)';
 
   // Category order
-  const catOrder = ['bedroom','kitchen','floors','animals','laundry','bathroom','trash'];
+  const catOrder = ['bedroom','kitchen','floors','animals','laundry','bathroom','trash','computer'];
   const catLabels = {
     bedroom:'Bedroom',kitchen:'Kitchen',floors:'Floors',
-    animals:'Animals',laundry:'Laundry',bathroom:'Bathroom',trash:'Trash'
+    animals:'Animals',laundry:'Laundry',bathroom:'Bathroom',trash:'Trash',
+    computer:'Computer Missions'
   };
 
   // Group by category
