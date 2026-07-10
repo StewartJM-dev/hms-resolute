@@ -53,21 +53,30 @@ body{
 }
 .hero-title{ position:relative; z-index:2; text-align:center; padding:24px 20px 22px; }
 
-.smoke-wisp{
+.sun-glow{
   position:absolute; z-index:1; pointer-events:none;
-  width:130px; height:130px; border-radius:50%;
-  background:radial-gradient(circle, rgba(230,230,235,.42) 0%, rgba(210,210,220,.22) 45%, transparent 72%);
-  filter:blur(5px);
-  animation:smokeRise 9s ease-out infinite;
+  left:78%; top:58%; width:70px; height:70px; margin:-35px 0 0 -35px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(255,235,180,.55) 0%, rgba(255,210,120,.28) 40%, transparent 70%);
+  filter:blur(3px);
+  animation:sunPulse 4.5s ease-in-out infinite;
+}
+@keyframes sunPulse{
+  0%,100% { opacity:.6; transform:scale(1); }
+  50%     { opacity:1; transform:scale(1.25); }
+}
+.sparkle{
+  position:absolute; z-index:1; pointer-events:none;
+  width:5px; height:5px; border-radius:50%;
+  background:#fff8e0; box-shadow:0 0 6px 2px rgba(255,240,190,.9);
+  animation:sparkleTwinkle 2.6s ease-in-out infinite;
   opacity:0;
 }
-.smoke-wisp.s2{ animation-delay:3s; width:105px; height:105px; }
-.smoke-wisp.s3{ animation-delay:6s; width:90px; height:90px; }
-@keyframes smokeRise{
-  0%   { opacity:0; transform:translate(0,0) scale(.6); }
-  15%  { opacity:.9; }
-  60%  { opacity:.5; }
-  100% { opacity:0; transform:translate(14px,-90px) scale(1.7); }
+.sparkle.sp2{ animation-delay:.9s; }
+.sparkle.sp3{ animation-delay:1.7s; }
+@keyframes sparkleTwinkle{
+  0%,100% { opacity:0; transform:scale(.4); }
+  50%     { opacity:1; transform:scale(1.1); }
 }
 .crest{ width:78px; height:78px; border-radius:50%; margin:0 auto 12px;
   box-shadow:0 4px 18px rgba(0,0,0,.6), 0 0 0 2px rgba(212,175,90,.5); display:block;}
@@ -235,9 +244,10 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
 
 <div class="hero">
   <img class="hero-bg" src="assets/hero-battleship.jpg" alt="HMS Resolute underway" loading="eager">
-  <div class="smoke-wisp" style="left:58%; top:18%;"></div>
-  <div class="smoke-wisp s2" style="left:62%; top:22%;"></div>
-  <div class="smoke-wisp s3" style="left:55%; top:20%;"></div>
+  <div class="sun-glow"></div>
+  <div class="sparkle" style="left:80%; top:56%;"></div>
+  <div class="sparkle sp2" style="left:75%; top:60%;"></div>
+  <div class="sparkle sp3" style="left:82%; top:62%;"></div>
   <div class="hero-title">
     <img class="crest" src="assets/crest.png" alt="HMS Resolute crest">
     <div class="pennant">His Majesty's Service</div>
