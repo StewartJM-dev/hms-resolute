@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HMS Resolute · Crew Deck</title>
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0b1d33;--navy2:#12294a;--brass:#b08d3e;--brass2:#d4af5a;
+  --steel:#5d6b7a;--steel2:#8494a5;--signal:#f2efe6;--ink:#101820;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Crimson Pro',Georgia,serif;
+  background:radial-gradient(ellipse at 50% -10%,rgba(212,175,90,.08),transparent 55%),
+    linear-gradient(170deg,var(--navy) 0%,#081426 60%,#060f1d 100%);
+  color:var(--signal); min-height:100vh; padding-bottom:50px;
+}
+header{ text-align:center; padding:30px 16px 10px; }
+.hcrest{ width:60px; height:60px; border-radius:50%; box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 0 2px rgba(212,175,90,.4); margin-bottom:10px;}
+.pennant{ font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--brass2);}
+h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(24px,6vw,34px);letter-spacing:.06em; margin-top:4px;}
+.whoami{ font-family:'Lato',sans-serif;font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--steel2);margin-top:10px;}
+.whoami b{ color:var(--brass2); }
+main{ max-width:900px; margin:14px auto 0; padding:0 14px;}
+
+.shipdiagram-wrap{ width:100%; }
+.shipdiagram{ width:100%; height:auto; display:block; border-radius:10px; border:1px solid rgba(212,175,90,.3); box-shadow:0 8px 26px rgba(0,0,0,.5);}
+.callout{ cursor:pointer; }
+.callout .leader{ stroke:rgba(212,175,90,.55); stroke-width:2; stroke-dasharray:5 4; fill:none; transition:stroke .15s; }
+.callout .dot{ fill:var(--brass2); stroke:rgba(6,15,29,.8); stroke-width:3; transition:r .15s; }
+.callout .pill{ fill:rgba(6,15,29,.85); stroke:rgba(212,175,90,.6); stroke-width:1.5; transition:fill .15s, stroke .15s; }
+.callout .plabel{ font-family:'Cinzel',serif; font-size:34px; fill:var(--brass2); text-anchor:middle; pointer-events:none; letter-spacing:.4px;}
+.callout:hover .leader, .callout:active .leader{ stroke:var(--brass2); stroke-dasharray:none; }
+.callout:hover .dot, .callout:active .dot{ r:11; }
+.callout:hover .pill, .callout:active .pill{ fill:rgba(176,141,62,.3); stroke:var(--brass2); }
+
+.mapcaption{
+  text-align:center; min-height:38px; margin-top:12px; padding:8px;
+  font-family:'Lato',sans-serif; font-size:13px; color:var(--steel2);
+  border-top:1px dashed rgba(132,148,165,.3);
+}
+.mapcaption b{ color:var(--brass2); font-family:'Cinzel',serif; letter-spacing:.05em; }
+
+.preview{
+  display:none; margin-top:14px; border:1px solid rgba(212,175,90,.35); border-radius:10px;
+  overflow:hidden; background:rgba(0,0,0,.25);
+}
+.preview.on{ display:flex; flex-direction:column; }
+.preview-img{ width:100%; height:170px; object-fit:cover; display:block; background:linear-gradient(135deg,rgba(176,141,62,.25),rgba(11,29,51,.6)); }
+.preview-body{ padding:18px; }
+.preview-name{ font-family:'Cinzel',serif; font-size:19px; color:var(--brass2); letter-spacing:.05em; }
+.preview-desc{ font-size:14px; color:var(--steel2); margin-top:6px; line-height:1.5; }
+.preview-enter{
+  margin-top:16px; width:100%; padding:14px; border:none; border-radius:6px; cursor:pointer;
+  font-family:'Cinzel',serif; font-size:15px; letter-spacing:.1em;
+  background:linear-gradient(180deg,var(--brass2),var(--brass)); color:var(--ink);
+}
+.depart{ display:block; text-align:center; margin-top:20px; color:var(--steel2); font-family:'Lato',sans-serif; font-size:12px; letter-spacing:.1em; text-decoration:none;}
+</style>
+</head>
+<body>
+
+<header>
+  <img class="hcrest" src="../assets/crest.png" alt="HMS Resolute crest">
+  <div class="pennant">His Majesty's Service</div>
+  <h1>H·M·S RESOLUTE</h1>
+  <div class="whoami">Aboard: <b id="whoName">—</b></div>
+</header>
+
+<main>
+  <div class="shipdiagram-wrap">
+    <svg class="shipdiagram" viewBox="0 0 1774 887" xmlns="http://www.w3.org/2000/svg">
+      <image href="../assets/ship-cutaway.jpg" x="0" y="0" width="1774" height="887"/>
+
+      <g class="callout" onclick="selectDeck('Crow\'s Nest','../crowsnest/','Spotted providence — the family watch-log of God\'s hand at work.','../crowsnest/assets/crowsnest-interior.jpg')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Crow's Nest" data-sub="the watch above">
+        <line class="leader" x1="1165" y1="175" x2="1165" y2="95"/>
+        <circle class="dot" cx="1165" cy="175" r="10"/>
+        <rect class="pill" x="1040" y="30" width="250" height="60" rx="10"/>
+        <text class="plabel" x="1165" y="68">Crow's Nest</text>
+      </g>
+
+      <g class="callout" onclick="selectDeck('War Room','../warroom/','Prayer requests, the daily sheet, and the Wall of Valor.','../warroom/assets/warroom-interior.jpg')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="War Room" data-sub="strategy &amp; prayer">
+        <line class="leader" x1="980" y1="388" x2="1180" y2="330"/>
+        <circle class="dot" cx="980" cy="388" r="10"/>
+        <rect class="pill" x="1180" y="300" width="230" height="60" rx="10"/>
+        <text class="plabel" x="1295" y="338">War Room</text>
+      </g>
+
+      <g class="callout" onclick="selectDeck('Agent HQ','./','Missions, devotional voting, and training.','assets/agenthq-interior.jpg')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Agent HQ" data-sub="crew missions &amp; training">
+        <line class="leader" x1="475" y1="485" x2="300" y2="450"/>
+        <circle class="dot" cx="475" cy="485" r="10"/>
+        <rect class="pill" x="90" y="418" width="230" height="60" rx="10"/>
+        <text class="plabel" x="205" y="456">Agent HQ</text>
+      </g>
+
+      <g class="callout" onclick="selectDeck('The Galley','galley.html','Recipes — browse the cookbook.','assets/galley-interior.jpg')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Galley" data-sub="recipes">
+        <line class="leader" x1="475" y1="607" x2="330" y2="700"/>
+        <circle class="dot" cx="475" cy="607" r="9"/>
+        <rect class="pill" x="150" y="700" width="210" height="60" rx="10"/>
+        <text class="plabel" x="255" y="738">Galley</text>
+      </g>
+
+      <g class="callout" onclick="selectDeck('Wardroom','../saga/','Off-duty rest. The Adamah Saga.','../saga/assets/wardroom-interior.jpg')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Wardroom" data-sub="off-duty rest">
+        <line class="leader" x1="995" y1="607" x2="1150" y2="700"/>
+        <circle class="dot" cx="995" cy="607" r="10"/>
+        <rect class="pill" x="1150" y="700" width="220" height="60" rx="10"/>
+        <text class="plabel" x="1260" y="738">Wardroom</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="mapcaption" id="mapCaption">Tap a deck to see what's aboard.</div>
+  <div class="preview" id="preview">
+    <img class="preview-img" id="previewImg" src="" alt="">
+    <div class="preview-body">
+      <div class="preview-name" id="previewName"></div>
+      <div class="preview-desc" id="previewDesc"></div>
+      <button class="preview-enter" id="previewBtn">Enter →</button>
+    </div>
+  </div>
+
+  <a class="depart" href="../">← Depart (log out)</a>
+</main>
+
+<script>
+const CREW_NAMES = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
+try{
+  const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+  if(s && s.person){ document.getElementById('whoName').textContent = CREW_NAMES[s.person] || s.person; }
+}catch(e){}
+
+function mapSay(el){
+  document.getElementById('mapCaption').innerHTML = '<b>'+el.dataset.name+'</b> — '+el.dataset.sub;
+}
+function mapClear(){
+  document.getElementById('mapCaption').textContent = "Tap a deck to see what's aboard.";
+}
+function selectDeck(name, href, desc, img){
+  document.getElementById('previewImg').src = img;
+  document.getElementById('previewName').textContent = name;
+  document.getElementById('previewDesc').textContent = desc;
+  document.getElementById('previewBtn').textContent = 'Enter ' + name.replace(/^The /,'') + ' →';
+  document.getElementById('previewBtn').onclick = () => location.href = href;
+  const panel = document.getElementById('preview');
+  panel.classList.add('on');
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+</script>
+</body>
+</html>
