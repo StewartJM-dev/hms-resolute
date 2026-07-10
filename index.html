@@ -482,7 +482,7 @@ async function startScan(){
   btn.disabled = true; btn.textContent = 'Opening camera…';
   try{
     try{
-      scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+      scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}});
     }catch(envErr){
       // device only has one camera (or rear camera unavailable) — fall back to whatever's there
       scanStream = await navigator.mediaDevices.getUserMedia({video:true});
@@ -510,10 +510,16 @@ function tick(){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
     const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code = jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
-    if(code && code.data && Date.now()-lastScanHandled > 2500){
-      lastScanHandled = Date.now();
-      handleCard(code.data.trim());
+    try{
+      const code = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
+      if(code && code.data && Date.now()-lastScanHandled > 2500){
+        lastScanHandled = Date.now();
+        handleCard(code.data.trim());
+      }
+    }catch(qrErr){
+      say('loginMsg','err','Scanner error: '+qrErr.message+' — use Fallback PIN.');
+      stopScan();
+      return;
     }
   }
   scanRAF = requestAnimationFrame(tick);
