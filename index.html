@@ -264,67 +264,66 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
       <svg class="shipdiagram" viewBox="0 0 1774 887" xmlns="http://www.w3.org/2000/svg">
         <image href="assets/ship-cutaway.jpg" x="0" y="0" width="1774" height="887"/>
 
-        <!-- Crest + title melded onto the ship's own sky -->
         <g class="ship-title-crest">
-          <image href="assets/crest.png" x="837" y="14" width="100" height="100"/>
-          <text class="ship-title-hms" x="887" y="140">HIS MAJESTY'S SERVICE</text>
-          <text class="ship-title-name" x="887" y="188">HMS RESOLUTE</text>
+          <image href="assets/crest.png" x="837" y="14" width="90" height="90"/>
+          <text class="ship-title-hms" x="887" y="130">HIS MAJESTY'S SERVICE</text>
+          <text class="ship-title-name" x="887" y="176">HMS RESOLUTE</text>
         </g>
 
         <g class="callout reg" onclick="selectDeck('Ship\'s Registry','registry.html','Officers only. Muster roll, ID cards, credentials.',null,'📜')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Ship's Registry" data-sub="officers only">
-          <line class="leader" x1="142" y1="89" x2="255" y2="45"/>
-          <circle class="dot" cx="142" cy="89" r="8"/>
-          <rect class="pill" x="140" y="14" width="230" height="58" rx="10"/>
-          <text class="plabel" x="255" y="52">Registry</text>
+          <line class="leader" x1="110" y1="420" x2="200" y2="480"/>
+          <circle class="dot" cx="110" cy="420" r="8"/>
+          <rect class="pill" x="90" y="490" width="220" height="56" rx="10"/>
+          <text class="plabel" x="200" y="526">Registry</text>
         </g>
 
         <g class="callout" onclick="selectDeck('Crow\'s Nest','crowsnest/','Spotted providence — the family watch-log of God\'s hand at work.',null,'🔭')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Crow's Nest" data-sub="the watch above">
-          <line class="leader" x1="1313" y1="177" x2="1420" y2="80"/>
-          <circle class="dot" cx="1313" cy="177" r="10"/>
-          <rect class="pill" x="1300" y="46" width="240" height="58" rx="10"/>
-          <text class="plabel" x="1420" y="84">Crow's Nest</text>
+          <line class="leader" x1="1165" y1="175" x2="1165" y2="95"/>
+          <circle class="dot" cx="1165" cy="175" r="10"/>
+          <rect class="pill" x="1040" y="30" width="250" height="60" rx="10"/>
+          <text class="plabel" x="1165" y="68">Crow's Nest</text>
         </g>
 
         <g class="callout" onclick="selectDeck('The Bridge','bridge/','Captain\'s station. Instruments, devotional, planning, and the Registry.','bridge/assets/bridge-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Bridge" data-sub="command &amp; overview">
-          <line class="leader" x1="1029" y1="355" x2="1150" y2="250"/>
-          <circle class="dot" cx="1029" cy="355" r="10"/>
-          <rect class="pill" x="1150" y="220" width="220" height="58" rx="10"/>
-          <text class="plabel" x="1260" y="258">Bridge</text>
-        </g>
-
-        <g class="callout" onclick="selectDeck('Agent HQ','boys/','Ship\'s boys\' quarters. Missions, devotional voting, and training.',null,'🫡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Agent HQ" data-sub="crew missions &amp; training">
-          <line class="leader" x1="532" y1="514" x2="330" y2="460"/>
-          <circle class="dot" cx="532" cy="514" r="10"/>
-          <rect class="pill" x="120" y="432" width="230" height="58" rx="10"/>
-          <text class="plabel" x="235" y="470">Agent HQ</text>
-        </g>
-
-        <g class="callout" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()" data-name="The Galley" data-sub="meals &amp; provisioning">
-          <line class="leader" x1="532" y1="727" x2="470" y2="810"/>
-          <circle class="dot" cx="532" cy="727" r="9"/>
-          <rect class="pill" x="350" y="810" width="210" height="58" rx="10"/>
-          <text class="plabel" x="455" y="848">Galley</text>
-        </g>
-
-        <g class="callout" onclick="selectDeck('Officers\' Country','dashboard/','Executive Officer\'s station. Rounds, Quartermaster, Quarterdeck.',null,'🏡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Officers' Country" data-sub="home management">
-          <line class="leader" x1="781" y1="621" x2="800" y2="800"/>
-          <circle class="dot" cx="781" cy="621" r="10"/>
-          <rect class="pill" x="610" y="800" width="380" height="58" rx="10"/>
-          <text class="plabel" x="800" y="838">Officers' Country</text>
+          <line class="leader" x1="905" y1="300" x2="770" y2="240"/>
+          <circle class="dot" cx="905" cy="300" r="10"/>
+          <rect class="pill" x="600" y="208" width="220" height="60" rx="10"/>
+          <text class="plabel" x="710" y="246">Bridge</text>
         </g>
 
         <g class="callout" onclick="selectDeck('War Room','warroom/','Prayer requests, the daily sheet, and the Wall of Valor.','warroom/assets/warroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="War Room" data-sub="strategy &amp; prayer">
-          <line class="leader" x1="1029" y1="514" x2="1230" y2="450"/>
-          <circle class="dot" cx="1029" cy="514" r="10"/>
-          <rect class="pill" x="1230" y="418" width="230" height="58" rx="10"/>
-          <text class="plabel" x="1345" y="456">War Room</text>
+          <line class="leader" x1="980" y1="388" x2="1180" y2="330"/>
+          <circle class="dot" cx="980" cy="388" r="10"/>
+          <rect class="pill" x="1180" y="300" width="230" height="60" rx="10"/>
+          <text class="plabel" x="1295" y="338">War Room</text>
+        </g>
+
+        <g class="callout" onclick="selectDeck('Agent HQ','boys/','Ship\'s boys\' quarters. Missions, devotional voting, and training.',null,'🫡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Agent HQ" data-sub="crew missions &amp; training">
+          <line class="leader" x1="475" y1="485" x2="300" y2="450"/>
+          <circle class="dot" cx="475" cy="485" r="10"/>
+          <rect class="pill" x="90" y="418" width="230" height="60" rx="10"/>
+          <text class="plabel" x="205" y="456">Agent HQ</text>
+        </g>
+
+        <g class="callout" onclick="selectDeck('Officers\' Country','dashboard/','Executive Officer\'s station. Rounds, Quartermaster, Quarterdeck.',null,'🏡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Officers' Country" data-sub="home management">
+          <line class="leader" x1="995" y1="485" x2="1220" y2="485"/>
+          <circle class="dot" cx="995" cy="485" r="10"/>
+          <rect class="pill" x="1220" y="455" width="290" height="60" rx="10"/>
+          <text class="plabel" x="1365" y="493">Officers' Country</text>
+        </g>
+
+        <g class="callout" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()" data-name="The Galley" data-sub="meals &amp; provisioning">
+          <line class="leader" x1="475" y1="607" x2="330" y2="700"/>
+          <circle class="dot" cx="475" cy="607" r="9"/>
+          <rect class="pill" x="150" y="700" width="210" height="60" rx="10"/>
+          <text class="plabel" x="255" y="738">Galley</text>
         </g>
 
         <g class="callout" onclick="selectDeck('Wardroom','saga/','Off-duty rest. The Adamah Saga and family annotations.','saga/assets/wardroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Wardroom" data-sub="off-duty rest">
-          <line class="leader" x1="1242" y1="621" x2="1260" y2="800"/>
-          <circle class="dot" cx="1242" cy="621" r="10"/>
-          <rect class="pill" x="1150" y="800" width="220" height="58" rx="10"/>
-          <text class="plabel" x="1260" y="838">Wardroom</text>
+          <line class="leader" x1="995" y1="607" x2="1150" y2="700"/>
+          <circle class="dot" cx="995" cy="607" r="10"/>
+          <rect class="pill" x="1150" y="700" width="220" height="60" rx="10"/>
+          <text class="plabel" x="1260" y="738">Wardroom</text>
         </g>
       </svg>
     </div>
