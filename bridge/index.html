@@ -511,10 +511,6 @@ body{
     <!-- THE SYSTEMS -->
   <div class="shead">The Seven Systems</div>
   <div class="systems" id="systems"></div>
-
-    <!-- THE FLEET -->
-  <div class="shead">The Fleet</div>
-  <div class="fleet" id="fleet"></div>
   </div>
 
   <div class="foot">
@@ -646,18 +642,6 @@ const SYSTEMS = [
   {ico:"📡", name:"Communications / Crew", role:"Dawn, the boys, troop, ministry, friendships. The crew you sail with and lead."}
 ];
 
-// THE FLEET — linked subsystem sites (update hrefs as they're built)
-const FLEET = [
-  {ico:"🏡", name:"Officers' Country", desc:"Dawn's command — household, kitchen & the boys' oversight.", href:"../dashboard/", status:"live"},
-  {ico:"🍇", name:"Captain's Quarters", desc:"Private, just for John & Dawn — the way to the Vineyard.", href:"../vineyard/", status:"live"},
-  {ico:"🛡️", name:"O.W.C.A.", desc:"The boys' command center — missions, pay, agents.", href:"../boys/", status:"live"},
-  {ico:"🍲", name:"The Kitchen", desc:"Meals, recipes & the family cookbook.", href:"../kitchen/", status:"live"},
-  {ico:"📖", name:"The Saga", desc:"Adamah — the reader. Released chapters for the family.", href:"../saga/", status:"live"},
-  {ico:"🧭", name:"Navigation", desc:"The week's course and this season's heading.", href:"#", status:"soon"},
-  {ico:"⛪", name:"Ministry & Troop", desc:"Trail Life PA-1997, men's ministry, church.", href:"#", status:"soon"},
-  {ico:"🛠️", name:"Maintenance", desc:"The captain's own upkeep — health, rest, faith.", href:"#", status:"soon"}
-];
-
 // ----- render -----
 function renderWeek(){
   const todayIdx = new Date().getDay(); // 0 = Sunday
@@ -683,15 +667,6 @@ function renderSystems(){
       <div class="ico">${s.ico}</div>
       <div class="stext"><b>${s.name}</b><div class="role">${s.role}</div></div>
     </div>`).join('');
-}
-function renderFleet(){
-  document.getElementById('fleet').innerHTML = FLEET.map(f=>`
-    <a class="port ${f.status}" href="${f.href}" ${f.status==='soon'?'onclick="return false;"':''}>
-      <span class="badge">${f.status==='live'?'Live':'Soon'}</span>
-      <div class="pico">${f.ico}</div>
-      <div class="pname">${f.name}</div>
-      <div class="pdesc">${f.desc}</div>
-    </a>`).join('');
 }
 
 // ════════════════════════════════════════════
@@ -1165,7 +1140,6 @@ function renderStatusBoard(crew){
 
 renderWeek();
 renderSystems();
-renderFleet();
 initFirebase();
 </script>
 
