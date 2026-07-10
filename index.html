@@ -481,7 +481,12 @@ async function startScan(){
   const btn = document.getElementById('camBtn');
   btn.disabled = true; btn.textContent = 'Opening camera…';
   try{
-    scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});
+    try{
+      scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    }catch(envErr){
+      // device only has one camera (or rear camera unavailable) — fall back to whatever's there
+      scanStream = await navigator.mediaDevices.getUserMedia({video:true});
+    }
     video.srcObject = scanStream;
     await video.play();
     btn.textContent = 'Scanner Active — present card';
