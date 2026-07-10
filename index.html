@@ -124,17 +124,22 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
 /* Deck chooser (post-login for parents) */
 .deck-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 
-/* ship map */
-.shipmap-wrap{ margin-bottom:6px; }
-.shipmap-svg{ width:100%; height:auto; display:block; }
-.hot{ cursor:pointer; transition:fill-opacity .15s, filter .15s; }
-.hot .hz{ fill:rgba(212,175,90,.10); stroke:rgba(212,175,90,.55); stroke-width:1.5; }
-.hot:hover .hz, .hot:active .hz{ fill:rgba(212,175,90,.30); filter:drop-shadow(0 0 6px rgba(212,175,90,.5)); }
-.hot .hlabel{ font-family:'Cinzel',serif; font-size:13px; fill:var(--brass2); text-anchor:middle; pointer-events:none; letter-spacing:.5px; }
-.hot .hicon{ font-size:20px; text-anchor:middle; pointer-events:none; }
-.hot.small .hlabel{ font-size:10px; }
-.hot.reg .hz{ stroke:rgba(132,148,165,.5); fill:rgba(93,107,122,.12); }
-.hot.reg:hover .hz{ fill:rgba(132,148,165,.28); }
+/* ship art map */
+.shipart-wrap{ position:relative; width:100%; aspect-ratio:1774/887; border-radius:10px; overflow:hidden;
+  border:1px solid rgba(212,175,90,.3); box-shadow:0 8px 26px rgba(0,0,0,.5); margin-bottom:6px; }
+.shipart-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+.chip{
+  position:absolute; transform:translate(-50%,-50%); cursor:pointer;
+  display:flex; align-items:center; gap:5px; padding:5px 9px 5px 7px; border-radius:99px;
+  background:rgba(6,15,29,.72); border:1px solid rgba(212,175,90,.55);
+  font-family:'Cinzel',serif; font-size:11px; color:var(--brass2); letter-spacing:.03em;
+  white-space:nowrap; backdrop-filter:blur(2px); transition:transform .12s, background .12s;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+}
+.chip:hover, .chip:active{ background:rgba(176,141,62,.35); transform:translate(-50%,-50%) scale(1.06); }
+.chip .ci{ font-size:12px; }
+.chip.reg{ border-color:rgba(132,148,165,.5); color:var(--steel2); font-size:10px; padding:4px 8px 4px 6px; }
+.chip.small{ font-size:9.5px; padding:4px 7px 4px 6px; }
 .mapcaption{
   text-align:center; min-height:38px; margin-top:10px; padding:8px;
   font-family:'Lato',sans-serif; font-size:12.5px; color:var(--steel2);
@@ -253,86 +258,53 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
   <div class="card-head">ALL DECKS · UNIVERSAL CLEARANCE</div>
   <div class="card-body">
     <div class="whoami">Aboard: <b id="whoName">—</b></div>
-    <div class="shipmap-wrap">
-      <svg class="shipmap-svg" viewBox="0 0 1000 380" xmlns="http://www.w3.org/2000/svg">
-        <!-- waterline -->
-        <line x1="10" y1="330" x2="990" y2="330" stroke="rgba(132,148,165,.25)" stroke-dasharray="4 5"/>
-        <!-- hull silhouette (decorative, non-interactive) -->
-        <path d="M30,300 Q15,290 20,270 L40,150 Q45,138 60,138 L940,138 Q955,138 960,150 L975,265 Q980,288 955,300 Q900,318 500,318 Q120,318 30,300 Z"
-          fill="rgba(11,29,51,.35)" stroke="rgba(212,175,90,.35)" stroke-width="2"/>
-        <!-- mast -->
-        <line x1="200" y1="40" x2="200" y2="90" stroke="rgba(212,175,90,.5)" stroke-width="3"/>
+    <div class="shipart-wrap">
+      <img src="assets/ship-cutaway.jpg" alt="HMS Resolute cutaway">
 
-        <!-- CROW'S NEST -->
-        <g class="hot" data-name="Crow's Nest" data-sub="Spotted providence · the family watch-log" onclick="selectDeck('Crow\'s Nest','crowsnest/','Spotted providence — the family watch-log of God\'s hand at work.',null,'🔭')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <circle class="hz" cx="200" cy="34" r="26"/>
-          <text class="hicon" x="200" y="30">🔭</text>
-          <text class="hlabel small" x="200" y="50">Nest</text>
-        </g>
+      <div class="chip" style="top:20%;left:74%;" onclick="selectDeck('Crow\'s Nest','crowsnest/','Spotted providence — the family watch-log of God\'s hand at work.',null,'🔭')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Crow's Nest" data-sub="the watch above">
+        <span class="ci">🔭</span> Nest
+      </div>
 
-        <!-- BRIDGE -->
-        <g class="hot" data-name="The Bridge" data-sub="Captain's station · instruments, devotional, planning" onclick="selectDeck('The Bridge','bridge/','Captain\'s station. Instruments, devotional, planning, and the Registry.','bridge/assets/bridge-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="120" y="90" width="160" height="60" rx="6"/>
-          <text class="hicon" x="200" y="118">🧭</text>
-          <text class="hlabel" x="200" y="140">Bridge</text>
-        </g>
+      <div class="chip" style="top:40%;left:58%;" onclick="selectDeck('The Bridge','bridge/','Captain\'s station. Instruments, devotional, planning, and the Registry.','bridge/assets/bridge-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Bridge" data-sub="command &amp; overview">
+        <span class="ci">🧭</span> Bridge
+      </div>
 
-        <!-- AGENT HQ (forward hull) -->
-        <g class="hot" data-name="Agent HQ" data-sub="Ship's boys' quarters · missions, devotional voting" onclick="selectDeck('Agent HQ','boys/','Ship\'s boys\' quarters. Missions, devotional voting, and training.',null,'🫡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="55" y="165" width="175" height="140" rx="6"/>
-          <text class="hicon" x="142" y="225">🫡</text>
-          <text class="hlabel" x="142" y="250">Agent HQ</text>
-        </g>
+      <div class="chip" style="top:58%;left:30%;" onclick="selectDeck('Agent HQ','boys/','Ship\'s boys\' quarters. Missions, devotional voting, and training.',null,'🫡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Agent HQ" data-sub="crew missions &amp; training">
+        <span class="ci">🫡</span> Agent HQ
+      </div>
 
-        <!-- WAR ROOM -->
-        <g class="hot" data-name="War Room" data-sub="Prayer requests · daily sheet · Wall of Valor" onclick="selectDeck('War Room','warroom/','Prayer requests, the daily sheet, and the Wall of Valor.','warroom/assets/warroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="245" y="175" width="150" height="130" rx="6"/>
-          <text class="hicon" x="320" y="230">⚔️</text>
-          <text class="hlabel" x="320" y="255">War Room</text>
-        </g>
+      <div class="chip" style="top:58%;left:58%;" onclick="selectDeck('War Room','warroom/','Prayer requests, the daily sheet, and the Wall of Valor.','warroom/assets/warroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="War Room" data-sub="strategy &amp; prayer">
+        <span class="ci">⚔️</span> War Room
+      </div>
 
-        <!-- HOMESTEAD (largest, amidships) -->
-        <g class="hot" data-name="The Homestead" data-sub="XO's station · Rounds, Quartermaster, Quarterdeck" onclick="selectDeck('The Homestead','dashboard/','Executive Officer\'s station. Rounds, Quartermaster, Quarterdeck.',null,'🏡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="410" y="160" width="260" height="145" rx="6"/>
-          <text class="hicon" x="510" y="220">🏡</text>
-          <text class="hlabel" x="510" y="245">Homestead</text>
-        </g>
-        <!-- GALLEY (nested sub-station within Homestead) -->
-        <g class="hot small" data-name="The Galley" data-sub="Provisions · meals, recipes, planning" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="598" y="245" width="62" height="52" rx="5"/>
-          <text class="hicon" x="629" y="270" style="font-size:15px;">🍳</text>
-          <text class="hlabel small" x="629" y="288">Galley</text>
-        </g>
+      <div class="chip" style="top:70%;left:44%;" onclick="selectDeck('The Homestead','dashboard/','Executive Officer\'s station. Rounds, Quartermaster, Quarterdeck.',null,'🏡')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Homestead" data-sub="home management">
+        <span class="ci">🏡</span> Homestead
+      </div>
 
-        <!-- WARDROOM -->
-        <g class="hot" data-name="Wardroom" data-sub="Off-duty · the Adamah Saga, family annotations" onclick="selectDeck('Wardroom','saga/','Off-duty rest. The Adamah Saga and family annotations.','saga/assets/wardroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="685" y="175" width="150" height="130" rx="6"/>
-          <text class="hicon" x="760" y="230">📖</text>
-          <text class="hlabel" x="760" y="255">Wardroom</text>
-        </g>
+      <div class="chip small" style="top:82%;left:30%;" onclick="event.stopPropagation();selectDeck('The Galley','kitchen/','Provisions — meals, recipes, and planning.',null,'🍳')" onmouseenter="event.stopPropagation();mapSay(this)" onmouseleave="mapClear()" data-name="The Galley" data-sub="meals &amp; provisioning">
+        <span class="ci">🍳</span> Galley
+      </div>
 
-        <!-- VINEYARD (aft, private) -->
-        <g class="hot" data-name="The Vineyard" data-sub="Private deck · date nights, shared devotional (own PIN)" onclick="selectDeck('The Vineyard','vineyard/','Private deck. Date nights and shared devotional (own PIN).',null,'🍇')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="850" y="180" width="110" height="115" rx="6"/>
-          <text class="hicon" x="905" y="230">🍇</text>
-          <text class="hlabel small" x="905" y="252">Vineyard</text>
-        </g>
+      <div class="chip" style="top:70%;left:70%;" onclick="selectDeck('Wardroom','saga/','Off-duty rest. The Adamah Saga and family annotations.','saga/assets/wardroom-interior.jpg',null)" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Wardroom" data-sub="off-duty rest">
+        <span class="ci">📖</span> Wardroom
+      </div>
 
-        <!-- REGISTRY (utility, officers only, secondary styling) -->
-        <g class="hot reg" data-name="Ship's Registry" data-sub="Officers only · muster roll, ID cards" onclick="selectDeck('Ship\'s Registry','registry.html','Officers only. Muster roll, ID cards, credentials.',null,'📜')" onmouseenter="mapSay(this)" onmouseleave="mapClear()">
-          <rect class="hz" x="20" y="30" width="90" height="34" rx="5"/>
-          <text class="hlabel small" x="65" y="52">📜 Registry</text>
-        </g>
-      </svg>
-      <div class="mapcaption" id="mapCaption">Tap a deck to see what's aboard.</div>
-      <div class="preview" id="preview">
-        <img class="preview-img" id="previewImg" src="" alt="">
-        <div class="preview-img placeholder" id="previewPlaceholder" style="display:none;"></div>
-        <div class="preview-body">
-          <div class="preview-name" id="previewName"></div>
-          <div class="preview-desc" id="previewDesc"></div>
-          <button class="preview-enter" id="previewBtn">Enter →</button>
-        </div>
+      <div class="chip small" style="top:82%;left:58%;" onclick="selectDeck('The Vineyard','vineyard/','Private deck. Date nights and shared devotional (own PIN).',null,'🍇')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="The Vineyard" data-sub="private deck">
+        <span class="ci">🍇</span> Vineyard
+      </div>
+
+      <div class="chip reg" style="top:10%;left:8%;" onclick="selectDeck('Ship\'s Registry','registry.html','Officers only. Muster roll, ID cards, credentials.',null,'📜')" onmouseenter="mapSay(this)" onmouseleave="mapClear()" data-name="Ship's Registry" data-sub="officers only">
+        📜 Registry
+      </div>
+    </div>
+    <div class="mapcaption" id="mapCaption">Tap a deck to see what's aboard.</div>
+    <div class="preview" id="preview">
+      <img class="preview-img" id="previewImg" src="" alt="">
+      <div class="preview-img placeholder" id="previewPlaceholder" style="display:none;"></div>
+      <div class="preview-body">
+        <div class="preview-name" id="previewName"></div>
+        <div class="preview-desc" id="previewDesc"></div>
+        <button class="preview-enter" id="previewBtn">Enter →</button>
       </div>
     </div>
     <div class="assist-row">
