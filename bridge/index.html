@@ -296,18 +296,18 @@ body{
 .word-suggest-note{text-align:center;font-size:13px;opacity:.7;font-style:italic;line-height:1.5;padding:0 10px;}
 
 /* ===== Instrument gauges ===== */
-.master-gauge{display:flex;justify-content:center;margin-bottom:8px;}
-.gauge-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;}
-.gauge-card{background:radial-gradient(ellipse at 50% 30%,rgba(46,63,122,.3),rgba(10,16,26,.5));
-  border:1px solid rgba(200,160,70,.25);border-radius:14px;padding:14px 10px 12px;text-align:center;}
-.gauge-card .gc-name{font-family:'Cinzel',serif;font-size:14px;color:#f6efe0;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:6px;}
-.gauge-card .gc-readout{font-family:'Lato',sans-serif;font-size:12px;color:var(--gold2,#e8b84a);margin-top:6px;letter-spacing:.5px;}
-.gauge-card .gc-sub{font-size:11px;opacity:.65;margin-top:2px;}
-.gauge-svg{width:100%;max-width:130px;height:auto;}
-.gauge-track{fill:none;stroke:rgba(255,255,255,.1);stroke-width:9;stroke-linecap:round;}
-.gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease,stroke .4s;}
-.gauge-num{font-family:'Cinzel',serif;font-weight:700;fill:#fff;}
-.gauge-pct{font-family:'Lato',sans-serif;fill:var(--gold2,#e8b84a);}
+.gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:8px;}
+.gauge-card{background:rgba(14,20,34,.6);border:1px solid rgba(90,130,190,.28);border-radius:10px;
+  padding:14px 8px 12px;text-align:center;}
+.gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;
+  color:#7fa8d9;margin-bottom:2px;}
+.gauge-card .gc-icon{font-size:22px;margin-bottom:2px;}
+.gauge-card .gc-readout{font-family:'Lato',sans-serif;font-size:11px;color:var(--gold2,#e8b84a);margin-top:6px;letter-spacing:.4px;}
+.gauge-card .gc-sub{font-size:10.5px;opacity:.6;margin-top:2px;}
+.gauge-svg{width:100%;max-width:120px;height:auto;display:block;margin:0 auto;}
+.gauge-track{fill:none;stroke:rgba(255,255,255,.08);stroke-width:9;stroke-linecap:round;}
+.gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
+.gauge-pctline{font-family:'Cinzel',serif;font-weight:700;font-size:22px;margin-top:2px;}
 
 /* ===== Submarine status board (Christmas tree) ===== */
 .xmas-tree{background:linear-gradient(180deg,#0a0e16,#12182400);border:1px solid rgba(200,160,70,.25);border-radius:14px;padding:8px 6px;margin-bottom:10px;}
@@ -415,11 +415,8 @@ body{
 
   <!-- ===== INSTRUMENTS TAB ===== -->
   <div class="btab" id="btab-instruments">
-    <div class="shead">Fleet Readiness</div>
-    <div class="master-gauge" id="master-gauge"></div>
-
     <div class="shead">Crew Instruments — Today</div>
-    <div class="gauge-grid" id="gauge-grid"></div>
+    <div class="gauge-row" id="gauge-row"></div>
 
     <div class="shead">Status Board</div>
     <div class="xmas-tree" id="xmas-tree"></div>
@@ -956,26 +953,18 @@ function toggleDaily(key,val){ if(_db) _db.ref('bridge/daily/'+dayKey()+'/'+key)
 const MISSION_TARGET = 12; // soft denominator for the gauge
 
 // build an SVG arc gauge. pct 0-100. returns svg string.
-function gaugeSVG(pct, label, big){
-  const size = big ? 200 : 130;
-  const r = big ? 80 : 52;
-  const cx = size/2, cy = size/2;
+function gaugeSVG(pct, color){
+  const size = 120, r = 48, cx = size/2, cy = size/2;
   const circ = 2*Math.PI*r;
-  // use 270° arc (gap at bottom)
-  const arcFrac = 0.75;
+  const arcFrac = 0.58; // dome shape, gap centered at top
   const dash = circ*arcFrac;
   const offset = dash*(1 - pct/100);
-  const color = pct>=100 ? '#2fd45f' : pct>=60 ? '#e8b84a' : pct>=30 ? '#e8922a' : '#e05050';
-  const rot = 135; // start angle so the gap is at the bottom
-  const numSize = big ? 38 : 26;
-  const pctSize = big ? 13 : 11;
-  return `<svg class="gauge-svg" viewBox="0 0 ${size} ${size}" style="${big?'max-width:200px;':''}">
+  const rot = -14; // centers the gap at the top for this arc fraction
+  return `<svg class="gauge-svg" viewBox="0 0 ${size} ${size}">
     <circle class="gauge-track" cx="${cx}" cy="${cy}" r="${r}"
       stroke-dasharray="${dash} ${circ}" transform="rotate(${rot} ${cx} ${cy})"/>
     <circle class="gauge-fill" cx="${cx}" cy="${cy}" r="${r}" stroke="${color}"
       stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${offset}" transform="rotate(${rot} ${cx} ${cy})"/>
-    <text class="gauge-num" x="${cx}" y="${cy+ (big?6:4)}" text-anchor="middle" font-size="${numSize}">${pct}</text>
-    <text class="gauge-pct" x="${cx}" y="${cy+(big?26:20)}" text-anchor="middle" font-size="${pctSize}">${label||'%'}</text>
   </svg>`;
 }
 
@@ -999,21 +988,29 @@ function loadInstruments(){
   }).catch(()=>{});
 }
 
+const AGENT_COLORS = {samuel:'#4d9fff', johnjr:'#34d399', stephen:'#f5a623', daniel:'#ec4899'};
 function renderGauges(crew){
-  // master = average of crew pct
   const avg = crew.length ? Math.round(crew.reduce((s,c)=>s+c.pct,0)/crew.length) : 0;
-  const mg = document.getElementById('master-gauge');
-  if(mg) mg.innerHTML = '<div class="gauge-card" style="grid-column:1/-1;max-width:240px;margin:0 auto;border-color:rgba(200,160,70,.4);">'+
-    '<div class="gc-name">⚓ Whole Crew</div>'+gaugeSVG(avg,'ready',true)+
-    '<div class="gc-readout">Fleet readiness today</div></div>';
-  const gg = document.getElementById('gauge-grid');
-  if(gg) gg.innerHTML = crew.map(c=>{
+  const gr = document.getElementById('gauge-row');
+  if(!gr) return;
+  const fleetCard = '<div class="gauge-card">'+
+    '<div class="gc-name">Fleet Readiness</div>'+
+    '<div class="gc-icon">⚓</div>'+
+    gaugeSVG(avg,'#4d9fff')+
+    '<div class="gauge-pctline" style="color:#4d9fff;">'+avg+'%</div>'+
+    '</div>';
+  const crewCards = crew.map(c=>{
+    const color = AGENT_COLORS[c.a.id] || '#4d9fff';
     const scoreTxt = (c.score===null||c.score===undefined)?'—':('$'+(c.score/100).toFixed(2));
-    return '<div class="gauge-card"><div class="gc-name">'+c.a.icon+' '+c.a.name+'</div>'+
-      gaugeSVG(c.pct,'%',false)+
+    return '<div class="gauge-card">'+
+      '<div class="gc-name">'+c.a.name+'</div>'+
+      '<div class="gc-icon">'+c.a.icon+'</div>'+
+      gaugeSVG(c.pct,color)+
+      '<div class="gauge-pctline" style="color:'+color+';">'+c.pct+'%</div>'+
       '<div class="gc-readout">'+c.completed+' of '+MISSION_TARGET+' missions</div>'+
       '<div class="gc-sub">'+scoreTxt+'</div></div>';
   }).join('');
+  gr.innerHTML = crewCards + fleetCard;
 }
 
 
