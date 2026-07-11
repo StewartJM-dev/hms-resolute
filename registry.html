@@ -89,7 +89,8 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
   border:2px solid var(--brass); border-radius:12px;
   aspect-ratio:1.586; display:flex; flex-direction:column; position:relative; overflow:hidden;
 }
-.id-name-logo{ width:26px; height:26px; border-radius:50%; margin-top:3px; display:block; }
+.id-name-logo{ width:26px; height:26px; border-radius:50%; display:block; flex-shrink:0; }
+.id-logo-qr-row{ display:flex; align-items:center; gap:10px; margin-top:5px; }
 .id-headerbar{
   background:linear-gradient(160deg,#13294a 0%,#0b1d33 100%);
   padding:7px 14px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
@@ -107,8 +108,7 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
   font-family:'Lato',sans-serif; font-size:6.5px; text-align:center; padding:2px 0; letter-spacing:.05em;
 }
 .id-info{ flex:1; padding-top:2px; }
-.id-photo-col{ display:flex; flex-direction:column; gap:6px; align-items:center; flex-shrink:0; }
-.id-qr{ background:#fff; padding:4px; border-radius:5px; width:74px; height:74px; flex-shrink:0; border:1px solid #ddd;}
+.id-qr{ background:#fff; padding:3px; border-radius:5px; width:56px; height:56px; flex-shrink:0; border:1px solid #ddd;}
 .id-qr img, .id-qr canvas{ width:100%!important; height:100%!important;}
 .id-bottomrow{ display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px; }
 
@@ -127,8 +127,8 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
 .id-hms{ font-family:'Lato',sans-serif; font-size:8px; font-weight:600; letter-spacing:.24em; color:#ffffff;}
 .id-icon{ font-size:20px;}
 .id-name{ font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#0b1d33; line-height:1.15;}
-.id-pos{ font-family:'Lato',sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass); margin-top:4px; font-weight:600;}
-.id-rank{ font-family:'Lato',sans-serif; font-size:8px; letter-spacing:.1em; text-transform:uppercase; color:#5d6b7a; margin-top:3px;}
+.id-pos{ font-family:'Lato',sans-serif; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass); margin-top:10px; font-weight:600;}
+.id-rank{ font-family:'Lato',sans-serif; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:#5d6b7a; margin-top:6px;}
 .reissue{ text-align:center; margin-top:6px;}
 .reissue button{ background:none; border:none; color:var(--steel); font-size:11px; cursor:pointer; text-decoration:underline; font-family:'Lato',sans-serif;}
 .print-note{ text-align:center; font-size:13px; font-style:italic; color:var(--steel2); margin:12px 0;}
@@ -410,18 +410,18 @@ async function loadCards(){
           <div class="id-icon">${c.icon}</div>
         </div>
         <div class="id-body">
-          <div class="id-photo-col">
-            <div class="id-photo" onclick="document.getElementById('photo-input-${id}').click()">
-              <img id="photo-img-${id}" style="${savedPhoto?'':'display:none;'}" ${savedPhoto?`src="${savedPhoto}"`:''}>
-              <div class="id-photo-placeholder" id="photo-placeholder-${id}" style="${savedPhoto?'display:none;':''}">&#128100;</div>
-              <div class="id-photo-hint">TAP TO ${savedPhoto?'CHANGE':'ADD'} PHOTO</div>
-            </div>
-            <div class="id-qr" id="qr-${id}"></div>
+          <div class="id-photo" onclick="document.getElementById('photo-input-${id}').click()">
+            <img id="photo-img-${id}" style="${savedPhoto?'':'display:none;'}" ${savedPhoto?`src="${savedPhoto}"`:''}>
+            <div class="id-photo-placeholder" id="photo-placeholder-${id}" style="${savedPhoto?'display:none;':''}">&#128100;</div>
+            <div class="id-photo-hint">TAP TO ${savedPhoto?'CHANGE':'ADD'} PHOTO</div>
           </div>
           <input type="file" id="photo-input-${id}" accept="image/*" style="display:none;" onchange="handlePhotoUpload('${id}', this)">
           <div class="id-info">
             <div class="id-name">${c.name}</div>
-            <img class="id-name-logo" src="assets/crest.png" alt="">
+            <div class="id-logo-qr-row">
+              <img class="id-name-logo" src="assets/crest.png" alt="">
+              <div class="id-qr" id="qr-${id}"></div>
+            </div>
             <div class="id-pos">${c.pos}</div>
             <div class="id-rank">Rank: ${c.rank} &middot; Crew, HMS Resolute</div>
           </div>
@@ -429,7 +429,7 @@ async function loadCards(){
       </div>
       <div class="reissue"><button onclick="reissue('${id}')">&#8635; Reissue ${c.name}'s card (voids old)</button></div>`;
     wrap.appendChild(div);
-    if(rec) new QRCode(document.getElementById('qr-'+id), {text:rec.token, width:74, height:74, correctLevel:QRCode.CorrectLevel.M});
+    if(rec) new QRCode(document.getElementById('qr-'+id), {text:rec.token, width:56, height:56, correctLevel:QRCode.CorrectLevel.M});
     else document.getElementById('qr-'+id).textContent='no card';
   });
 }
