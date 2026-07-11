@@ -266,6 +266,8 @@ body{
 .daily-banner .db-link{font-size:11px;color:var(--gold2,#e8b84a);text-decoration:none;opacity:.8;border:1px solid rgba(200,160,70,.3);border-radius:7px;padding:4px 9px;flex-shrink:0;}
 
 /* ===== Family chat on Bridge ===== */
+.filter-btn{padding:7px 13px;border-radius:20px;border:1px solid rgba(200,146,42,.35);background:transparent;color:var(--offwhite,#e8e3d8);font-family:'Lato',sans-serif;font-size:12px;cursor:pointer;}
+.filter-btn.active{background:var(--gold,#c8922a);color:#16120c;font-weight:700;border-color:var(--gold,#c8922a);}
 .bchat-thread{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;padding:4px 2px;margin-bottom:12px;}
 .bchat-msg{max-width:80%;padding:9px 13px;border-radius:13px;font-size:15px;line-height:1.4;}
 .bchat-msg .bcm-from{font-size:10px;letter-spacing:.5px;text-transform:uppercase;opacity:.65;margin-bottom:3px;font-family:'Lato',sans-serif;}
@@ -403,6 +405,20 @@ body{
     <button id="tx-send" onclick="sendTransmission()">Transmit ▸</button>
     <div id="tx-status" class="tx-stat"></div>
   </div>
+
+    <!-- PRIVATE THREADS -->
+    <div class="shead">Private Threads</div>
+    <div id="bpt-selector" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="filter-btn active" onclick="openBridgeThread('samuel','Samuel',this)">🦅 Samuel</button>
+      <button class="filter-btn" onclick="openBridgeThread('johnjr','John Jr.',this)">🦁 John Jr.</button>
+      <button class="filter-btn" onclick="openBridgeThread('stephen','Stephen',this)">🦖 Stephen</button>
+      <button class="filter-btn" onclick="openBridgeThread('daniel','Daniel',this)">🐘 Daniel</button>
+    </div>
+    <div class="bchat-thread" id="bpt-thread"></div>
+    <div class="bchat-input-row">
+      <input type="text" id="bpt-input" placeholder="Reply privately…">
+      <button onclick="sendBridgePrivateReply()">Send</button>
+    </div>
 
     <!-- FAMILY CHAT -->
     <div class="shead">Family Channel</div>
@@ -801,7 +817,7 @@ function showBTab(name, btn){
   document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='comms'){ loadBridgeChat(); }
+  if(name==='comms'){ loadBridgeChat(); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); }
   if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
   window.scrollTo(0,0);
@@ -810,6 +826,39 @@ function showBTab(name, btn){
 // ════════════════════════════════════════════
 // FAMILY CHAT (Bridge side) — same stewart/groupchat the boys use
 // ════════════════════════════════════════════
+let bridgePrivateThreadListener = null;
+let bridgePrivateThreadAgent = null;
+function openBridgeThread(agentId, name, btnEl){
+  if(!_db) return;
+  bridgePrivateThreadAgent = agentId;
+  document.querySelectorAll('#bpt-selector .filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btnEl) btnEl.classList.add('active');
+  const el = document.getElementById('bpt-thread');
+  if(bridgePrivateThreadListener) bridgePrivateThreadListener.off && bridgePrivateThreadListener.off();
+  const ref = _db.ref(`stewart/messages/${agentId}`);
+  ref.limitToLast(60).on('value', s=>{
+    const v=s.val()||{};
+    const items=Object.values(v).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+    if(!el) return;
+    if(!items.length){ el.innerHTML='<div class="bchat-empty">No messages yet with '+esc(name)+'.</div>'; return; }
+    el.innerHTML=items.map(m=>{
+      const isParent = m.from==='Dad'||m.from==='Mom'||m.from==='HQ';
+      const time=m.timestamp?new Date(m.timestamp).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}):'';
+      return '<div class="bchat-msg '+(isParent?'me':'them')+'">'+
+        '<div class="bcm-from">'+esc(m.from||'')+'</div>'+esc(m.text||'')+
+        '<div class="bcm-time">'+time+'</div></div>';
+    }).join('');
+    el.scrollTop=el.scrollHeight;
+  });
+  bridgePrivateThreadListener = ref;
+}
+function sendBridgePrivateReply(){
+  if(!_db || !bridgePrivateThreadAgent) return;
+  const inp=document.getElementById('bpt-input');
+  const text=inp.value.trim(); if(!text) return;
+  _db.ref(`stewart/messages/${bridgePrivateThreadAgent}`).push({ text, from:'Dad', timestamp:Date.now() }).then(()=>{ inp.value=''; });
+}
+
 function loadBridgeChat(){
   if(!_db) return;
   _db.ref('stewart/groupchat').limitToLast(60).on('value', s=>{
