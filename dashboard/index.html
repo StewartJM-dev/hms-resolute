@@ -488,6 +488,7 @@ body{
       <div id="overview-day-banner" style="margin-bottom:12px;"></div>
       <div class="sec-hd">Your Daily Rhythm</div>
       <div id="overview-dawn-checklist" style="margin-bottom:14px;"></div>
+      <div id="overview-whiteglove-nudge" style="margin-bottom:14px;"></div>
       <div class="sec-hd">Agent Status Today</div>
       <div class="gauge-row" id="overview-agents"></div>
       <div class="sec-hd">Weekly Pay</div>
@@ -658,6 +659,8 @@ body{
 
       <div id="dawn-day-banner" style="margin-bottom:12px;"></div>
 
+      <div id="whiteglove-section" style="margin-bottom:16px;"></div>
+
       <div class="sec-hd">My Daily Rhythm</div>
       <div id="dawn-daily-missions" style="margin-bottom:14px;"></div>
 
@@ -818,7 +821,7 @@ body{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Comms
     </button>
-    <button class="bnb" onclick="showTab('dawn',this);renderDawnTab();renderFamilyDevotionalInput();renderDawnDevotionalInput();renderHomestead();">
+    <button class="bnb" onclick="showTab('dawn',this);renderDawnTab();renderFamilyDevotionalInput();renderDawnDevotionalInput();renderHomestead();renderWhiteGlove();">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
       XO's Quarters
     </button>
@@ -1749,6 +1752,7 @@ function renderOverview(){
   if(!_db){ return; }
   loadReadingGoals();
   renderDawnTab();
+  renderWGOverviewNudge();
   const today = localDateStr();
   const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const dayName = dayNames[new Date().getDay()];
@@ -2337,6 +2341,152 @@ function getDeepCleanAgent(){
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
   return DAWN_ROOM_ROTATION[(weekNum + 2) % 4]; // offset by 2 from bathroom rotation
+}
+
+// ══════════════════════════════════════════════════════
+// WHITE GLOVE INSPECTIONS
+// ══════════════════════════════════════════════════════
+const WG_ROOMS = [
+  {id:'galley', label:'The Galley', icon:'🍳'},
+  {id:'commondeck', label:'The Common Deck', icon:'🛋️'},
+  {id:'head', label:'The Head', icon:'🚿'},
+  {id:'berths', label:'Berths', icon:'🛏️'}
+];
+let wgPending = {}; // in-progress selections before saving
+
+function getWGWindow(){
+  const hr = new Date().getHours();
+  if(hr < 13) return {key:'morning', label:'Morning', range:'before 1pm'};
+  if(hr < 17) return {key:'afternoon', label:'Afternoon', range:'1pm\u20135pm'};
+  return {key:'evening', label:'Evening', range:'after 5pm'};
+}
+
+function renderWGOverviewNudge(){
+  if(!_db) return;
+  const el = document.getElementById('overview-whiteglove-nudge');
+  if(!el) return;
+  const today = localDateStr();
+  const win = getWGWindow();
+  _db.ref(`stewart/whiteglove/${today}/${win.key}`).once('value', snap => {
+    if(snap.exists()){ el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="card" style="border:2px solid var(--gold);background:linear-gradient(135deg,rgba(232,184,74,.08),rgba(92,61,30,.04));cursor:pointer;" onclick="document.querySelector('.bnb[onclick*=\\'dawn\\']').click();">
+      <div class="card-bd" style="padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-family:'Cinzel',serif;font-weight:700;font-size:13px;color:var(--brown);">\u26F5 White Glove Due \u2014 ${win.label}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Tap to inspect in XO's Quarters</div>
+        </div>
+        <div style="font-size:18px;color:var(--brown);">\u203A</div>
+      </div>
+    </div>`;
+  });
+}
+
+function renderWhiteGlove(){
+  if(!_db) return;
+  const el = document.getElementById('whiteglove-section');
+  if(!el) return;
+  const today = localDateStr();
+  const win = getWGWindow();
+
+  _db.ref(`stewart/whiteglove/${today}`).once('value', snap => {
+    const dayData = snap.val() || {};
+    const already = dayData[win.key];
+
+    if(already){
+      const passCount = WG_ROOMS.filter(r => already.rooms && already.rooms[r.id]).length;
+      const time = already.loggedAt ? new Date(already.loggedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+      el.innerHTML = `<div class="card" style="border:1px solid #2d6a47;">
+        <div class="card-bd" style="padding:12px 14px;">
+          <div style="font-family:'Cinzel',serif;font-weight:700;font-size:13px;color:#2d6a47;">\u2713 ${win.label} Inspection Logged \u2014 ${time}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${passCount} of ${WG_ROOMS.length} compartments passed.</div>
+          <button onclick="startWhiteGloveInspection()" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer;">Log again</button>
+        </div>
+      </div>` + renderWGHistory(dayData, win.key);
+      return;
+    }
+
+    // Not yet logged this window — show the prompt
+    el.innerHTML = `<div class="card" style="border:2px solid var(--gold);background:linear-gradient(135deg,rgba(232,184,74,.08),rgba(92,61,30,.04));">
+      <div class="card-bd" style="padding:14px;">
+        <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);">\u26F5 White Glove Inspection Due \u2014 ${win.label}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;">Three tests, every compartment: floor clear enough to walk in socks, a counter clear enough to set a plate down, every trash can empty.</div>
+        <button onclick="startWhiteGloveInspection()" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--brown);color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Start Inspection</button>
+      </div>
+    </div>` + renderWGHistory(dayData, win.key);
+  });
+}
+
+function renderWGHistory(dayData, excludeKey){
+  const others = ['morning','afternoon','evening'].filter(k => k!==excludeKey && dayData[k]);
+  if(!others.length) return '';
+  const rows = others.map(k => {
+    const d = dayData[k];
+    const passCount = WG_ROOMS.filter(r => d.rooms && d.rooms[r.id]).length;
+    const time = d.loggedAt ? new Date(d.loggedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    const label = k.charAt(0).toUpperCase()+k.slice(1);
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11.5px;">
+      <span>${label} \u2014 ${time}</span><span style="color:${passCount===WG_ROOMS.length?'#2d6a47':'#b5451b'};font-weight:700;">${passCount}/${WG_ROOMS.length}</span>
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:8px;padding:0 4px;">${rows}</div>`;
+}
+
+function startWhiteGloveInspection(){
+  wgPending = {};
+  WG_ROOMS.forEach(r => wgPending[r.id] = null);
+  const el = document.getElementById('whiteglove-section');
+  const win = getWGWindow();
+  el.innerHTML = `<div class="card" style="border:2px solid var(--gold);">
+    <div class="card-bd" style="padding:14px;">
+      <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);margin-bottom:10px;">\u26F5 ${win.label} Inspection</div>
+      <div id="wg-room-rows"></div>
+      <button onclick="saveWhiteGloveInspection()" id="wg-save-btn" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--border);color:var(--muted);font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:not-allowed;" disabled>Log Inspection (rate every compartment)</button>
+    </div>
+  </div>`;
+  renderWGRoomRows();
+}
+
+function renderWGRoomRows(){
+  const el = document.getElementById('wg-room-rows');
+  if(!el) return;
+  el.innerHTML = WG_ROOMS.map(r => {
+    const state = wgPending[r.id];
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;"><span style="margin-right:6px;">${r.icon}</span>${r.label}</div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="setWGRoom('${r.id}',true)" style="padding:6px 12px;border-radius:6px;border:1px solid ${state===true?'#2d6a47':'var(--border)'};background:${state===true?'#2d6a47':'transparent'};color:${state===true?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;">Pass</button>
+        <button onclick="setWGRoom('${r.id}',false)" style="padding:6px 12px;border-radius:6px;border:1px solid ${state===false?'#b5451b':'var(--border)'};background:${state===false?'#b5451b':'transparent'};color:${state===false?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;">Fail</button>
+      </div>
+    </div>`;
+  }).join('');
+  const allSet = WG_ROOMS.every(r => wgPending[r.id] !== null);
+  const btn = document.getElementById('wg-save-btn');
+  if(btn){
+    btn.disabled = !allSet;
+    btn.style.background = allSet ? 'var(--brown)' : 'var(--border)';
+    btn.style.color = allSet ? '#fff' : 'var(--muted)';
+    btn.style.cursor = allSet ? 'pointer' : 'not-allowed';
+    btn.textContent = allSet ? 'Log Inspection' : 'Log Inspection (rate every compartment)';
+  }
+}
+
+function setWGRoom(roomId, passed){
+  wgPending[roomId] = passed;
+  renderWGRoomRows();
+}
+
+function saveWhiteGloveInspection(){
+  if(!_db) return;
+  const allSet = WG_ROOMS.every(r => wgPending[r.id] !== null);
+  if(!allSet) return;
+  const today = localDateStr();
+  const win = getWGWindow();
+  _db.ref(`stewart/whiteglove/${today}/${win.key}`).set({
+    rooms: {...wgPending},
+    loggedAt: Date.now()
+  }).then(() => {
+    renderWhiteGlove();
+  });
 }
 
 function renderDawnTab(){
