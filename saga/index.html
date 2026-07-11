@@ -63,7 +63,15 @@ body{
 .mast .by{font-family:'Lato',sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold2);opacity:.7;margin-top:10px;}
 .mast .book{font-style:italic;opacity:.7;font-size:15px;margin-top:12px;}
 .rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px 0;opacity:.4;}
-.wr-back{display:inline-block;margin-top:10px;color:var(--gold2);text-decoration:none;font-family:'Lato',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.75;}
+.gw-link{
+  position:fixed; top:14px; left:14px; z-index:9999;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 13px; border-radius:20px;
+  background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
+  color:#d4af5a; text-decoration:none;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.gw-link:active{ background:rgba(176,141,62,.32); }
 
 /* chapter list */
 .toc-intro{text-align:center;font-style:italic;opacity:.65;font-size:15px;margin-bottom:20px;line-height:1.5;}
@@ -105,7 +113,7 @@ body{
 
 <!-- WARDROOM LOBBY -->
 <div id="wardroom-lobby">
-  <a class="wr-back" href="../">← Gangway</a>
+  <a class="gw-link" href="../">← Gangway</a>
   <div class="saga-banner"><img src="assets/wardroom-interior.jpg" alt="" loading="eager"></div>
   <div class="mast">
     <div class="orn">✦ ✦ ✦</div>
@@ -137,7 +145,7 @@ body{
 
   <!-- TABLE OF CONTENTS -->
   <div id="toc">
-    <a class="wr-back" href="../">← Gangway</a>
+    <a class="gw-link" href="../">← Gangway</a>
     <div class="saga-banner"><img src="assets/wardroom-interior.jpg" alt="" loading="lazy"></div>
     <div class="mast">
       <div class="orn">✦ ✦ ✦</div>
