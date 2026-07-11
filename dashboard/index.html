@@ -92,6 +92,24 @@ body{
 /* TOP BAR */
 .oc-banner{ width:100%; max-height:190px; overflow:hidden; }
 .oc-banner img{ width:100%; height:100%; object-fit:cover; object-position:center 45%; display:block; }
+.gw-link{
+  position:fixed; top:14px; left:14px; z-index:9999;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 13px; border-radius:20px;
+  background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
+  color:#d4af5a; text-decoration:none;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.gw-link:active{ background:rgba(176,141,62,.32); }
+.gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:12px;}
+.gauge-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
+.gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.gauge-card .gc-icon{font-size:22px;margin-bottom:2px;}
+.gauge-card .gc-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+.gauge-svg{width:100%;max-width:110px;height:auto;display:block;margin:0 auto;}
+.gauge-track{fill:none;stroke:var(--border);stroke-width:9;stroke-linecap:round;}
+.gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
+.gauge-pctline{font-family:'Cinzel',serif;font-weight:700;font-size:20px;margin-top:2px;}
 .topbar{
   background:var(--green);
   border-bottom:3px solid var(--gold);
@@ -389,7 +407,11 @@ body{
 /* weekly chore grid */
 .bwc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
 .bwc-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fff;}
-.bwc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border);}
+.bwc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border);cursor:pointer;}
+.bwc-chevron{font-size:11px;opacity:.5;margin-left:8px;transition:transform .15s;}
+.bwc-card.open .bwc-chevron{transform:rotate(180deg);}
+.bwc-days{display:none;}
+.bwc-card.open .bwc-days{display:block;}
 .bwc-name{font-family:'Cinzel',serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
 .bwc-total{font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;}
 .bwc-total.bwc-t-full{background:rgba(45,138,94,.18);color:#1a4a2e;}
@@ -449,34 +471,19 @@ body{
       <div class="topbar-logo">Officers' <span>Country</span></div>
     </div>
     <div class="topbar-right">
-      <a href="../" title="Gangway" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.25);color:inherit;text-decoration:none;font-size:14px;">⚓</a>
       <span class="topbar-sync" id="sync-status" style="color:rgba(255,255,255,.5);">&#9675; Connecting</span>
-      <a href="../kitchen/" class="topbar-home" title="The Galley">&#127858;</a>
-      <a href="../bridge/" class="topbar-home" title="The Bridge">&#9875;</a>
-      <a href="../vineyard/" class="topbar-home" title="The Vineyard">&#127815;</a>
       <button class="topbar-lock" onclick="lockApp()">Lock</button>
     </div>
   </div>
+  <a class="gw-link" href="../">← Gangway</a>
 
   <div class="content">
 
     <!-- TAB: OVERVIEW -->
     <div class="tab active" id="tab-overview">
       <div id="overview-day-banner" style="margin-bottom:12px;"></div>
-      <a href="../saga/" style="display:block;text-decoration:none;color:inherit;margin-bottom:14px;">
-        <div class="card" style="background:linear-gradient(135deg,#1e2d5a,#1a4a2e);border:1px solid var(--gold);">
-          <div class="card-bd" style="display:flex;align-items:center;gap:14px;padding:14px 16px;">
-            <div style="font-size:30px;flex-shrink:0;">&#128214;</div>
-            <div style="flex:1;">
-              <div style="font-family:'Cinzel',serif;font-weight:700;font-size:16px;color:var(--gold2,#e8b84a);">The Adamah Saga</div>
-              <div style="font-size:13.5px;color:#f0ece2;opacity:.9;margin-top:3px;line-height:1.4;">Book One is coming soon &mdash; John is writing it for you to read first. Tap to follow along.</div>
-            </div>
-            <div style="font-family:'Lato',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:rgba(200,146,42,.25);color:var(--gold2,#e8b84a);border:1px solid rgba(200,146,42,.5);padding:4px 9px;border-radius:10px;flex-shrink:0;">Soon</div>
-          </div>
-        </div>
-      </a>
       <div class="sec-hd">Agent Status Today</div>
-      <div class="agent-grid" id="overview-agents"></div>
+      <div class="gauge-row" id="overview-agents"></div>
       <div class="sec-hd">Weekly Pay</div>
       <div id="overview-pay" style="margin-bottom:12px;"></div>
       <div id="overview-familynight" style="margin-bottom:12px;"></div>
@@ -484,19 +491,19 @@ body{
       <div class="card" style="margin-bottom:12px;">
         <div class="card-bd" id="reading-overview"></div>
       </div>
-      <div class="sec-hd">Quick Transmission</div>
-      <div class="card indigo-hd">
-        <div class="card-hd"><div class="card-hd-icon">&#128225;</div><div class="card-hd-title">Send to Agents</div></div>
+      <div class="sec-hd">Reading Goals</div>
+      <div class="card" style="margin-bottom:12px;">
         <div class="card-bd">
-          <textarea id="quick-trans-text" placeholder="Message to all agents..." style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:7px;font-family:'Lato',sans-serif;font-size:13px;background:var(--cream);resize:none;height:60px;margin-bottom:8px;" maxlength="280"></textarea>
-          <div style="display:flex;gap:8px;">
-            <select id="quick-trans-from" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-family:'Lato',sans-serif;font-size:12px;background:var(--card);">
-              <option value="HQ">From: HQ</option>
-              <option value="Dad">From: Dad</option>
-              <option value="Mom">From: Mom</option>
-            </select>
-            <button onclick="sendQuickTransmission()" style="padding:8px 16px;border:none;border-radius:7px;background:var(--indigo);color:white;font-family:'Cinzel',serif;font-size:11px;font-weight:700;cursor:pointer;">Send</button>
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Samuel &amp; John Jr. read chapters daily toward a weekly goal. Stephen &amp; Daniel read one full book per day &mdash; no goal needed.</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;font-weight:700;">Samuel &mdash; chapters/day</span>
+            <input type="number" id="goal-samuel" min="1" max="20" value="3" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px;">
           </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
+            <span style="font-size:13px;font-weight:700;">John Jr. &mdash; chapters/day</span>
+            <input type="number" id="goal-johnjr" min="1" max="20" value="3" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px;">
+          </div>
+          <button onclick="saveReadingGoals()" class="btn-primary" style="margin-top:10px;">Save Goals</button>
         </div>
       </div>
     </div>
@@ -515,13 +522,6 @@ body{
           </div>
         </div>
       </a>
-
-      <div class="sec-hd">Officers' Country</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-        <a href="../kitchen/" style="text-decoration:none;color:inherit;" class="card"><div class="card-bd" style="text-align:center;padding:16px;"><div style="font-size:26px;">&#127858;</div><div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;margin-top:6px;">The Galley</div><div style="font-size:12px;opacity:.7;margin-top:2px;">Meals, recipes, cookbook</div></div></a>
-        <a href="../bridge/" style="text-decoration:none;color:inherit;" class="card"><div class="card-bd" style="text-align:center;padding:16px;"><div style="font-size:26px;">&#9875;</div><div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;margin-top:6px;">The Bridge</div><div style="font-size:12px;opacity:.7;margin-top:2px;">Systems Seven</div></div></a>
-        <a href="../vineyard/" style="text-decoration:none;color:inherit;" class="card"><div class="card-bd" style="text-align:center;padding:16px;"><div style="font-size:26px;">&#127815;</div><div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;margin-top:6px;">Private Quarters</div><div style="font-size:12px;opacity:.7;margin-top:2px;">The Vineyard (own PIN)</div></div></a>
-      </div>
 
       <div class="sec-hd">Ready Room</div>
       <div class="card" style="margin-bottom:14px;">
@@ -647,13 +647,14 @@ body{
     <!-- TAB: MISSIONS -->
     <div class="tab" id="tab-missions">
       <div id="missions-day-header" style="margin-bottom:12px;"></div>
+      <button class="btn-secondary" onclick="printDailyChores()" style="width:100%;margin-bottom:14px;">&#128424; Print Today's Chore Chart</button>
+
+      <div class="sec-hd">Detailed Mission Status</div>
+      <div id="missions-detail"></div>
 
       <div class="sec-hd">This Week — Chore Grid</div>
       <div id="week-grid-wrap" style="margin-bottom:8px;"></div>
       <div style="font-size:11px;opacity:.6;text-align:center;margin-bottom:18px;">Every chore, every day this week, at a glance.</div>
-
-      <div class="sec-hd">Detailed Mission Status</div>
-      <div id="missions-detail"></div>
     </div>
 
 
@@ -808,22 +809,6 @@ body{
 
     <!-- TAB: SETTINGS -->
     <div class="tab" id="tab-settings">
-      <div class="sec-hd">Reading Goals</div>
-      <div class="card" style="margin-bottom:10px;">
-        <div class="card-bd">
-          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">Samuel &amp; John Jr. read chapters daily toward a weekly goal. Stephen &amp; Daniel read one full book per day &mdash; no goal needed.</p>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-            <span style="font-size:13px;font-weight:700;">Samuel &mdash; chapters/day</span>
-            <input type="number" id="goal-samuel" min="1" max="20" value="3" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px;">
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
-            <span style="font-size:13px;font-weight:700;">John Jr. &mdash; chapters/day</span>
-            <input type="number" id="goal-johnjr" min="1" max="20" value="3" style="width:60px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;font-size:13px;">
-          </div>
-          <button onclick="saveReadingGoals()" class="btn-primary" style="margin-top:10px;">Save Goals</button>
-        </div>
-      </div>
-
       <div class="sec-hd">About</div>
       <div class="card">
         <div class="card-bd" style="font-size:12px;color:var(--muted);line-height:1.6;">
@@ -1709,6 +1694,61 @@ function getExpectedMissions(agentId){
   return [...new Set(base)];
 }
 
+function gaugeSVG(pct, color){
+  const size = 110, r = 46, cx = size/2, cy = size/2;
+  const circ = 2*Math.PI*r;
+  const arcFrac = 0.58; // dome shape, gap centered at top
+  const dash = circ*arcFrac;
+  const offset = dash*(1 - pct/100);
+  const rot = -14;
+  return `<svg class="gauge-svg" viewBox="0 0 ${size} ${size}">
+    <circle class="gauge-track" cx="${cx}" cy="${cy}" r="${r}"
+      stroke-dasharray="${dash} ${circ}" transform="rotate(${rot} ${cx} ${cy})"/>
+    <circle class="gauge-fill" cx="${cx}" cy="${cy}" r="${r}" stroke="${color}"
+      stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${offset}" transform="rotate(${rot} ${cx} ${cy})"/>
+  </svg>`;
+}
+
+function printDailyChores(){
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  const dow = today.getDay();
+  if(dow===0||dow===6){
+    alert('It\'s a family day today — no chore chart needed.');
+    return;
+  }
+  const sections = AGENTS.map(a => {
+    const missions = buildMissionsUnified(a.id, today);
+    const rows = missions.map(m =>
+      `<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid #ccc;">
+        <div style="width:18px;height:18px;border:2px solid #333;border-radius:3px;flex-shrink:0;margin-top:2px;"></div>
+        <div style="font-size:14px;">${m.text}</div>
+      </div>`
+    ).join('');
+    return `<div style="margin-bottom:24px;page-break-inside:avoid;">
+      <div style="font-family:Georgia,serif;font-size:18px;font-weight:700;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px;">${a.icon} ${a.name} — ${a.codename}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  const printWin = window.open('', '_blank', 'width=800,height=900');
+  printWin.document.write(`
+    <!DOCTYPE html><html><head><title>Daily Chore Chart — ${dateStr}</title>
+    <style>
+      body{font-family:Georgia,serif;padding:30px;color:#111;}
+      h1{font-size:22px;margin-bottom:2px;}
+      .sub{font-size:13px;color:#555;margin-bottom:24px;}
+      @media print{ body{padding:10px;} }
+    </style></head><body>
+    <h1>HMS Resolute — Daily Chore Chart</h1>
+    <div class="sub">${dateStr}</div>
+    ${sections}
+    </body></html>
+  `);
+  printWin.document.close();
+  printWin.onload = () => { printWin.focus(); printWin.print(); };
+}
+
 // Single source of truth for "how is this agent doing today" — used by both
 // Overview's quick-glance card and the Missions tab's detailed checklist,
 // so the two views can never quietly drift out of sync with each other.
@@ -1764,18 +1804,13 @@ function renderOverview(){
       const {completed, total, pct} = computeMissionStats(a.id, done);
       const allDone = completed===total&&total>0;
       const earned = allDone&&!isWeekend;
-      return `<div class="agent-card" style="border-color:${allDone?'#2d6a47':pct>50?'#c8922a':'var(--border)'};">
-        <div class="agent-card-hd" style="background:${a.color};">
-          <div><div class="agent-card-name">${a.name}</div><div class="agent-card-sub">${a.codename}</div></div>
-          <div style="font-size:18px;">${allDone?'✅':pct>50?'⚡':'⏳'}</div>
-        </div>
-        <div class="agent-card-bd">
-          <div class="agent-prog-bar"><div class="agent-prog-fill" style="width:${pct}%;background:${allDone?'#2d6a47':pct>50?'#c8922a':'#b5451b'};"></div></div>
-          <div class="agent-stat">
-            <span class="agent-missions">${completed}/${total} missions</span>
-            <span class="agent-pay" style="color:${earned?'#2d6a47':isWeekend?'var(--muted)':'#b5451b'};">${isWeekend?'Family day':earned?'$1.00':'$0.00'}</span>
-          </div>
-        </div>
+      return `<div class="gauge-card">
+        <div class="gc-name">${a.name}</div>
+        <div class="gc-icon">${a.icon}</div>
+        ${gaugeSVG(pct, a.color)}
+        <div class="gauge-pctline" style="color:${a.color};">${pct}%</div>
+        <div class="gc-sub">${completed}/${total} missions</div>
+        <div class="gc-sub" style="color:${earned?'#2d6a47':isWeekend?'var(--muted)':'#b5451b'};font-weight:700;">${isWeekend?'Family day':earned?'$1.00':'$0.00'}</div>
       </div>`;
     }).join('');
   });
@@ -1824,16 +1859,6 @@ function renderOverview(){
   });
 
   renderReadingOverview();
-}
-
-function sendQuickTransmission(){
-  const msg = document.getElementById('quick-trans-text').value.trim();
-  const from = document.getElementById('quick-trans-from').value;
-  if(!msg||!_db) return;
-  _db.ref('stewart/transmissions').push({message:msg,from,timestamp:Date.now()}).then(()=>{
-    document.getElementById('quick-trans-text').value='';
-    const btn = document.querySelector('#tab-overview button[onclick*="sendQuick"]');
-  });
 }
 
 // ══════════════════════════════════════════════════════
@@ -1974,8 +1999,8 @@ function renderThreadMessages(msgs){
     else if(isParent) icon = HANS_ICON;
     else icon = (AGENT_ICONS[m.agentId] || '&#128100;');
     const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
-    const extraStyle = isHeinz ? 'background:rgba(120,40,140,.18);border:1px solid rgba(160,60,180,.4);'
-                      : (isHans ? 'background:rgba(200,146,42,.14);border:1px solid rgba(200,146,42,.3);' : '');
+    const extraStyle = isHeinz ? 'background:rgba(120,40,140,.18);border:1px solid rgba(160,60,180,.4);color:var(--ink);'
+                      : (isHans ? 'background:rgba(200,146,42,.14);border:1px solid rgba(200,146,42,.3);color:var(--ink);' : '');
     return `<div style="display:flex;align-items:flex-end;gap:6px;${isParent?'':'flex-direction:row-reverse;align-self:flex-end;'}max-width:85%;${isParent?'':'margin-left:auto;'}">
       <div style="font-size:18px;flex-shrink:0;">${icon}</div>
       <div class="msg-bubble ${isParent?'sent':'received'}" style="max-width:100%;${extraStyle}">
@@ -2176,10 +2201,10 @@ function renderWeekGrid(){
       const ratio = weekAssigned ? weekDone/weekAssigned : 0;
       const totalCls = ratio>=1 ? 'bwc-t-full' : (weekDone>0 ? 'bwc-t-partial' : 'bwc-t-none');
 
-      html += '<div class="bwc-card">'+
-        '<div class="bwc-head"><span class="bwc-name">'+a.icon+' '+a.name+'</span>'+
-        '<span class="bwc-total '+totalCls+'">'+weekDone+' / '+weekAssigned+' this week</span></div>'+
-        daysHtml+
+      html += '<div class="bwc-card" id="bwc-'+a.id+'">'+
+        '<div class="bwc-head" onclick="toggleBwcCard(\''+a.id+'\')"><span class="bwc-name">'+a.icon+' '+a.name+'</span>'+
+        '<span><span class="bwc-total '+totalCls+'">'+weekDone+' / '+weekAssigned+' this week</span><span class="bwc-chevron">▾</span></span></div>'+
+        '<div class="bwc-days">'+daysHtml+'</div>'+
       '</div>';
     });
     html += '</div>';
@@ -2187,6 +2212,11 @@ function renderWeekGrid(){
     const wrap=document.getElementById('week-grid-wrap');
     if(wrap) wrap.innerHTML=html;
   }).catch(()=>{});
+}
+
+function toggleBwcCard(agentId){
+  const card = document.getElementById('bwc-'+agentId);
+  if(card) card.classList.toggle('open');
 }
 
 function showCellDetail(agentId, dateStr, agentName){
@@ -3049,15 +3079,18 @@ function renderTeachMeSessions(){
       const doneItems = t.checklist.filter((_,i) => checklistDone[i]).length;
 
       return `<div class="card" style="margin-bottom:10px;${isComplete?'opacity:.7':''}">
-        <div style="padding:9px 13px;background:${isComplete?'var(--muted)':'var(--green2)'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div style="padding:9px 13px;background:${isComplete?'var(--muted)':'var(--green2)'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleTeachCard('${t.id}')">
           <div style="font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:white;">${t.icon} ${t.title}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.8);">${isComplete?'✓ Done '+saved.completedDate:doneItems+'/'+totalItems}</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:10px;color:rgba(255,255,255,.8);">${isComplete?'✓ Done '+saved.completedDate:doneItems+'/'+totalItems}</div>
+            <span id="teach-chev-${t.id}" style="font-size:10px;color:rgba(255,255,255,.7);transition:transform .15s;">▾</span>
+          </div>
         </div>
-        <div class="card-bd">
+        <div class="card-bd" id="teach-body-${t.id}" style="display:none;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">${t.desc}</div>
           <div style="margin-bottom:8px;">
             ${t.checklist.map((item,i) =>
-              `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleTeachItem('${t.id}',${i})">
+              `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="event.stopPropagation();toggleTeachItem('${t.id}',${i})">
                 <div style="width:16px;height:16px;border-radius:3px;border:2px solid ${checklistDone[i]?'var(--green2)':'var(--border)'};background:${checklistDone[i]?'var(--green2)':'transparent'};flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;">
                   ${checklistDone[i]?'<span style="color:white;font-size:9px;">✓</span>':''}
                 </div>
@@ -3069,20 +3102,29 @@ function renderTeachMeSessions(){
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;">Boys Present</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               ${AGENTS.map(a =>
-                `<button onclick="toggleTeachAgent('${t.id}','${a.id}')" style="padding:4px 10px;border-radius:20px;font-size:10px;cursor:pointer;border:1px solid ${(saved.boys||[]).includes(a.id)?a.color:'var(--border)'};background:${(saved.boys||[]).includes(a.id)?a.color:'transparent'};color:${(saved.boys||[]).includes(a.id)?'white':'var(--muted)'};">
+                `<button onclick="event.stopPropagation();toggleTeachAgent('${t.id}','${a.id}')" style="padding:4px 10px;border-radius:20px;font-size:10px;cursor:pointer;border:1px solid ${(saved.boys||[]).includes(a.id)?a.color:'var(--border)'};background:${(saved.boys||[]).includes(a.id)?a.color:'transparent'};color:${(saved.boys||[]).includes(a.id)?'white':'var(--muted)'};">
                   ${a.name}
                 </button>`
               ).join('')}
             </div>
           </div>
           ${!isComplete ?
-            `<button onclick="completeTeachSession('${t.id}')" style="width:100%;padding:8px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:12px;font-weight:700;cursor:pointer;">Mark Session Complete</button>` :
+            `<button onclick="event.stopPropagation();completeTeachSession('${t.id}')" style="width:100%;padding:8px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:12px;font-weight:700;cursor:pointer;">Mark Session Complete</button>` :
             `<div style="font-size:11px;color:var(--muted);text-align:center;">Completed ${saved.completedDate} — ${(saved.boys||[]).map(b=>AGENT_NAMES_SHORT[b]).join(', ')}</div>`
           }
         </div>
       </div>`;
     }).join('');
   });
+}
+
+function toggleTeachCard(sessionId){
+  const body = document.getElementById('teach-body-'+sessionId);
+  const chev = document.getElementById('teach-chev-'+sessionId);
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 function toggleTeachItem(sessionId, itemIndex){
