@@ -14,6 +14,27 @@
 :root{--ink:#1a1410;--cream:#f7f2ea;--brown:#5c3d1e;--rust:#b5451b;--gold:#c8922a;--sage:#4a7060;--border:#e0d5c0;--muted:#8a7a65;--card:#fff;--green:#2d6a3f;--gbg:#edf7f0;--abg:#fdf6e3;--amb:#a07000;--rbg:#fdf0eb;--red:#8b3010;--nh:56px;--bh:62px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font-size:15px;overflow-x:hidden;}
+#lock{
+  position:fixed;inset:0;z-index:1000;
+  background:radial-gradient(ellipse at 50% 30%,rgba(200,146,42,.18),transparent 60%),
+    linear-gradient(165deg,var(--ink),#2a1f14 55%,#0e0a06);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;
+}
+#lock h1{font-family:'Playfair Display',serif;font-weight:700;font-size:32px;color:var(--gold);letter-spacing:1px;margin-bottom:6px;}
+#lock .lsub{font-style:italic;color:var(--cream);opacity:.75;font-size:15px;margin-bottom:30px;text-align:center;max-width:280px;line-height:1.4;}
+#lock .pin-dots{display:flex;gap:14px;margin-bottom:26px;}
+#lock .pdot{width:15px;height:15px;border-radius:50%;border:2px solid var(--gold);opacity:.4;transition:.2s;}
+#lock .pdot.filled{opacity:1;background:var(--gold);box-shadow:0 0 12px var(--gold);}
+.keypad{display:grid;grid-template-columns:repeat(3,72px);gap:14px;}
+.key{
+  width:72px;height:72px;border-radius:50%;
+  background:rgba(200,146,42,.15);border:1px solid rgba(200,146,42,.35);
+  color:var(--cream);font-family:'Lato',sans-serif;font-size:26px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;
+}
+.key:active{background:rgba(200,146,42,.35);transform:scale(.94);}
+.key.blank{background:none;border:none;cursor:default;}
+#lock .err{color:var(--rust);min-height:20px;margin-top:16px;font-style:italic;}
 .galley-banner{width:100%;max-height:190px;overflow:hidden;}
 .galley-banner img{width:100%;height:100%;object-fit:cover;object-position:center 45%;display:block;}
 .tnav{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--nh);background:var(--ink);display:flex;align-items:center;justify-content:space-between;padding:0 14px;box-shadow:0 2px 12px rgba(0,0,0,.3);}
@@ -209,6 +230,14 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
+<div id="lock">
+  <h1>The Galley</h1>
+  <div class="lsub">HMS Resolute &middot; Provisions</div>
+  <div class="pin-dots" id="pin-dots"></div>
+  <div class="keypad" id="keypad"></div>
+  <div class="err" id="lock-err"></div>
+</div>
+<div id="app" style="display:none;">
 <div class="galley-banner"><img src="assets/galley-interior.jpg" alt="" loading="eager"></div>
 <nav class="tnav">
   <div style="display:flex;align-items:center;gap:10px;">
@@ -342,7 +371,43 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
   </button>
   <button class="nb" onclick="showScreen('help',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Help</button>
 </nav>
+</div>
 <script>
+
+// ── PIN LOCK ──
+const PIN = "1892";
+let pinEntry = "";
+function buildLock(){
+  const dots = document.getElementById('pin-dots');
+  dots.innerHTML = [0,1,2,3].map(i=>`<div class="pdot" id="pd${i}"></div>`).join('');
+  const pad = document.getElementById('keypad');
+  const keys = ['1','2','3','4','5','6','7','8','9','blank','0','del'];
+  pad.innerHTML = keys.map(k=>{
+    if(k==='blank') return '<div class="key blank"></div>';
+    if(k==='del') return '<button class="key" data-k="del">&#9003;</button>';
+    return `<button class="key" data-k="${k}">${k}</button>`;
+  }).join('');
+  pad.querySelectorAll('.key[data-k]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const k=b.dataset.k;
+      if(k==='del'){ pinEntry=pinEntry.slice(0,-1); }
+      else if(pinEntry.length<4){ pinEntry+=k; }
+      updateDots();
+      if(pinEntry.length===4) checkPin();
+    });
+  });
+}
+function updateDots(){ for(let i=0;i<4;i++){ document.getElementById('pd'+i).classList.toggle('filled', i<pinEntry.length); } }
+function checkPin(){
+  if(pinEntry===PIN){
+    document.getElementById('lock').style.display='none';
+    document.getElementById('app').style.display='block';
+  }else{
+    document.getElementById('lock-err').textContent='Not quite. Try again.';
+    pinEntry=""; setTimeout(()=>{ updateDots(); document.getElementById('lock-err').textContent=''; },800);
+  }
+}
+buildLock();
 
 const CB={
 "MCD Steak Egg & Cheese Bagels":{tier:"adapted",prov:"A copycat recipe John found online and makes because Dawn loves them. Source long forgotten.",y:"4 servings",t:"Broiler/Stovetop",p:"20 min",c:"20 min",s:[{h:"Sauce",i:["2 Tbsp mayonnaise","2 tsp creamy dill mustard"]},{h:"Sauteed Onions",i:["1 small onion","3 Tbsp butter","Dash of pepper"]},{h:"Sandwich",i:["1 lb thin cut steak","1/2 Tbsp Worcestershire sauce","McCormick Montreal Steak Seasoning","4 eggs","4 bagels","American cheese"]}],d:["Combine sauce ingredients and set aside.","Slice onions into thin slivers. Melt butter in skillet, add onions and pepper. Saute on medium heat until tender. Set aside.","Season steak with steak seasoning and tenderize with mallet. Fry steak with 4 Tbsp water. Cut in 4 pieces.","Broil buttered bagels until toasted.","Cook eggs one at a time. Whisk egg until well mixed. Add 1/2 Tbsp butter to skillet. Cook egg on low, flip, fold edges inward to form a square omelet.","Assembly: sauce on bottom bagel, cheese, steak, sauteed onions, egg, more sauce on top."]},
