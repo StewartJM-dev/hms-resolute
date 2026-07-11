@@ -3011,16 +3011,30 @@ function renderActivityBank(venue){
 
   el.innerHTML = list.map(a => {
     const venueLabel = a.venue === 'yard' ? '🌙 Yard' : a.venue === 'barn' ? '🏚️ Barn' : '🏠 Inside';
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:24px;flex-shrink:0;">${a.icon}</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:700;color:var(--ink);">${a.label}</div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:2px;">${venueLabel}</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.4;">${a.desc}</div>
+    return `<div style="border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer;" onclick="toggleActivityRow('${a.id}')">
+        <div style="font-size:22px;flex-shrink:0;">${a.icon}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">${a.label}</div>
+          <div style="font-size:10px;color:var(--muted);">${venueLabel}</div>
+        </div>
+        <span id="act-chev-${a.id}" style="font-size:10px;color:var(--muted);transition:transform .15s;">▾</span>
       </div>
-      <button onclick="runActivityTonight('${a.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:10px;cursor:pointer;flex-shrink:0;white-space:nowrap;">Tonight</button>
+      <div id="act-body-${a.id}" style="display:none;padding:0 0 12px 34px;">
+        <div style="font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:8px;">${a.desc}</div>
+        <button onclick="event.stopPropagation();runActivityTonight('${a.id}')" style="padding:6px 12px;border:none;border-radius:6px;background:var(--green2);color:white;font-size:11px;font-weight:700;cursor:pointer;">Run Tonight</button>
+      </div>
     </div>`;
   }).join('');
+}
+
+function toggleActivityRow(activityId){
+  const body = document.getElementById('act-body-'+activityId);
+  const chev = document.getElementById('act-chev-'+activityId);
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 function runActivityTonight(activityId){
