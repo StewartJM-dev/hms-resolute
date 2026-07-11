@@ -27,7 +27,7 @@ body{
   color:var(--signal); min-height:100vh; padding-bottom:60px;
 }
 .gw-link{
-  position:fixed; top:14px; left:14px; z-index:9999;
+  position:fixed; top:max(14px, env(safe-area-inset-top) + 8px); left:14px; z-index:9999;
   display:inline-flex; align-items:center; gap:5px;
   padding:7px 13px; border-radius:20px;
   background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
