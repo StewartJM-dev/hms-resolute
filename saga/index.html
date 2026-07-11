@@ -103,8 +103,27 @@ body{
 </head>
 <body>
 
+<!-- WARDROOM LOBBY -->
+<div id="wardroom-lobby">
+  <a class="wr-back" href="../">← Gangway</a>
+  <div class="saga-banner"><img src="assets/wardroom-interior.jpg" alt="" loading="eager"></div>
+  <div class="mast">
+    <div class="orn">✦ ✦ ✦</div>
+    <h1>The Wardroom</h1>
+    <div class="sub">Off-duty rest — HMS Resolute</div>
+  </div>
+  <div class="rule"></div>
+  <div class="toc-intro">Where the family reads together, off the clock.</div>
+
+  <button class="chap" onclick="enterSaga()">
+    <div class="cnum">Reading</div>
+    <div class="ctitle">📖 The Adamah Saga</div>
+    <div class="cmeta">by Noah Elias — released chapters, family annotations</div>
+  </button>
+</div>
+
 <!-- LOCK -->
-<div id="lock">
+<div id="lock" style="display:none;">
   <div class="orn">✦ ✦ ✦</div>
   <h1>The Adamah Saga</h1>
   <div class="sub">by Noah Elias</div>
@@ -264,6 +283,10 @@ function closeChapter(){
 
 function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
+function enterSaga(){
+  document.getElementById('wardroom-lobby').style.display = 'none';
+  document.getElementById('lock').style.display = 'flex';
+}
 buildLock();
 </script>
 </body>
