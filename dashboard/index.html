@@ -1684,13 +1684,14 @@ function gaugeSVG(pct, color){
 function printDailyChores(){
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
-  const dow = today.getDay();
-  if(dow===0||dow===6){
-    alert('It\'s a family day today — no chore chart needed.');
-    return;
-  }
   const sections = AGENTS.map(a => {
     const missions = buildMissionsUnified(a.id, today);
+    if(!missions.length){
+      return `<div style="margin-bottom:24px;page-break-inside:avoid;">
+        <div style="font-family:Georgia,serif;font-size:18px;font-weight:700;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px;">${a.icon} ${a.name} — ${a.codename}</div>
+        <div style="font-size:12px;font-style:italic;color:#666;">No missions assigned today.</div>
+      </div>`;
+    }
     const rows = missions.map(m =>
       `<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid #ccc;">
         <div style="width:18px;height:18px;border:2px solid #333;border-radius:3px;flex-shrink:0;margin-top:2px;"></div>
