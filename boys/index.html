@@ -4425,6 +4425,28 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   if(!lockedId){
+    if(parentSessionValid){
+      // A real parent navigated here without pre-selecting a specific agent
+      // (e.g. clicked "Agent HQ" straight off the ship map). Show the picker —
+      // but every card click gets flagged and logged as parent oversight.
+      const parentLabel = currentSession.person==='john' ? 'Captain' : currentSession.person==='dawn' ? 'Executive Officer' : currentSession.person;
+      document.querySelectorAll('.agent-card').forEach(card=>{
+        card.addEventListener('click', function(){
+          const banner = document.getElementById('assist-banner');
+          const txt = document.getElementById('assist-banner-text');
+          if(txt) txt.textContent = '⚑ ' + parentLabel + ' viewing (parent oversight)';
+          if(banner) banner.style.display = 'block';
+          try{
+            firebase.database().ref('resolute/muster').push({
+              t: firebase.database.ServerValue.TIMESTAMP, who: currentSession.person,
+              method:'parent-view', ok:true, device:'boys-hq'
+            });
+          }catch(e){}
+        });
+      });
+      initFirebase();
+      return;
+    }
     // No valid identity presented at all — back to the Gangway, not an open picker
     location.href = '../';
     return;
