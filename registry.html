@@ -80,6 +80,8 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
 .chip.on{ color:var(--brass2); border-color:var(--brass); background:rgba(176,141,62,.15);}
 
 /* ID cards */
+.filter-btn{padding:8px 16px;border-radius:20px;border:1px solid var(--brass);background:transparent;color:var(--signal);font-family:'Lato',sans-serif;font-size:12px;cursor:pointer;}
+.filter-btn.active{background:var(--brass);color:#0b1d33;font-weight:700;}
 .cards-wrap{ display:grid; grid-template-columns:1fr 1fr; gap:14px;}
 @media(max-width:560px){ .cards-wrap{ grid-template-columns:1fr; } }
 .idcard{
@@ -88,8 +90,8 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
   aspect-ratio:1.586; display:flex; flex-direction:column; position:relative; overflow:hidden;
 }
 .idcard::before{
-  content:""; position:absolute; right:-20px; bottom:-20px; width:110px; height:110px;
-  background:url('assets/crest.png') center/contain no-repeat; opacity:.06; pointer-events:none;
+  content:""; position:absolute; left:0; right:0; top:38%; bottom:0; margin:auto; width:150px; height:150px;
+  background:url('assets/crest.png') center/contain no-repeat; opacity:.16; pointer-events:none;
 }
 .id-headerbar{
   background:linear-gradient(160deg,#13294a 0%,#0b1d33 100%);
@@ -111,8 +113,20 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
 .id-qr{ background:#fff; padding:4px; border-radius:5px; width:58px; height:58px; flex-shrink:0; border:1px solid #ddd;}
 .id-qr img, .id-qr canvas{ width:100%!important; height:100%!important;}
 .id-bottomrow{ display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px; }
-.id-ship{ font-family:'Cinzel',serif; font-size:11px; letter-spacing:.2em; color:var(--brass2);}
-.id-hms{ font-family:'Lato',sans-serif; font-size:7.5px; letter-spacing:.28em; color:var(--steel2);}
+
+.idcard-back{
+  background:linear-gradient(160deg,#13294a 0%,#0b1d33 100%);
+  border:2px solid var(--brass); border-radius:12px;
+  aspect-ratio:1.586; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  position:relative; overflow:hidden; padding:10px;
+}
+.back-logo{ width:56px; height:56px; border-radius:50%; box-shadow:0 0 0 2px rgba(212,175,90,.5); margin-bottom:6px;}
+.back-sys7{ font-family:'Cinzel',serif; font-weight:700; font-size:15px; letter-spacing:.12em; color:#f5d878;}
+.back-sub{ font-family:'Lato',sans-serif; font-size:7.5px; letter-spacing:.2em; color:#e8e3d8; margin-top:2px; text-transform:uppercase;}
+.back-motto{ font-family:'Cinzel',serif; font-style:italic; font-size:7px; color:var(--brass2); margin-top:8px; letter-spacing:.05em;}
+.back-rule{ width:60%; height:1px; background:linear-gradient(90deg,transparent,var(--brass),transparent); margin:6px 0; }
+.id-ship{ font-family:'Cinzel',serif; font-size:13px; font-weight:700; letter-spacing:.16em; color:#f5d878;}
+.id-hms{ font-family:'Lato',sans-serif; font-size:7.5px; letter-spacing:.26em; color:#e8e3d8;}
 .id-icon{ font-size:20px;}
 .id-name{ font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:#0b1d33; line-height:1.15;}
 .id-pos{ font-family:'Lato',sans-serif; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass); margin-top:4px; font-weight:600;}
@@ -123,14 +137,17 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
 @media print{
   body{ background:#fff; }
   body *{ visibility:hidden; }
-  #p-cards, #p-cards .cards-wrap, #p-cards .idcard, #p-cards .idcard *{ visibility:visible; }
+  #p-cards, #p-cards .cards-wrap, #p-cards .idcard, #p-cards .idcard *,
+  #p-cards .idcard-back, #p-cards .idcard-back *{ visibility:visible; }
   #p-cards{ position:absolute; inset:0; }
   .idcard{ break-inside:avoid; border:2px solid #333; background:#fdfbf6!important;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; width:3.37in; height:2.125in; margin:0.15in;}
+  .idcard-back{ break-inside:avoid; border:2px solid #333; background:linear-gradient(160deg,#13294a,#0b1d33)!important;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; width:3.37in; height:2.125in; margin:0.15in;}
   .id-headerbar{ background:linear-gradient(160deg,#13294a,#0b1d33)!important;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .id-photo-hint{ display:none!important; }
-  .reissue,.print-note,nav,header,.btn{ display:none!important; }
+  .reissue,.print-note,nav,header,.btn,#btn-show-fronts,#btn-show-backs{ display:none!important; }
 }
 </style>
 </head>
@@ -186,8 +203,14 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
     <!-- CARDS -->
     <div class="pane" id="p-cards">
       <div class="print-note">Print on cardstock, cut, laminate. Standard ID size (3.37" × 2.125"). Reissuing a card voids the old one immediately.</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="filter-btn active" id="btn-show-fronts" onclick="showCardSide('fronts')">Fronts</button>
+        <button class="filter-btn" id="btn-show-backs" onclick="showCardSide('backs')">Backs</button>
+      </div>
       <div class="cards-wrap" id="cardsWrap"></div>
-      <button class="btn" style="margin-top:16px;" onclick="window.print()">🖨 Print All Cards</button>
+      <div class="cards-wrap" id="cardBacksWrap" style="display:none;"></div>
+      <div class="print-note" style="margin-top:10px;">Print Fronts first, flip the sheet over, then print Backs \u2014 test one sheet before doing all four.</div>
+      <button class="btn" style="margin-top:16px;" onclick="window.print()">🖨 Print This Side</button>
     </div>
 
     <!-- CREDENTIALS -->
@@ -340,6 +363,33 @@ function renderFlags(){
 }
 
 // ── ID cards ──
+function renderCardBacks(){
+  const wrap = document.getElementById('cardBacksWrap');
+  if(!wrap) return;
+  const backHtml = `<div class="idcard-back">
+    <img class="back-logo" src="assets/app-icon.png" alt="">
+    <div class="back-sys7">SYSTEMS SEVEN</div>
+    <div class="back-sub">Version 2 &middot; HMS Resolute</div>
+    <div class="back-rule"></div>
+    <div class="back-motto">"Virescit vulnere virtus"</div>
+  </div>`;
+  wrap.innerHTML = Object.keys(CREW).map(()=>backHtml).join('');
+}
+function showCardSide(side){
+  const frontsBtn = document.getElementById('btn-show-fronts');
+  const backsBtn = document.getElementById('btn-show-backs');
+  const frontsWrap = document.getElementById('cardsWrap');
+  const backsWrap = document.getElementById('cardBacksWrap');
+  if(side==='fronts'){
+    frontsWrap.style.display='grid'; backsWrap.style.display='none';
+    frontsBtn.classList.add('active'); backsBtn.classList.remove('active');
+  } else {
+    frontsWrap.style.display='none'; backsWrap.style.display='grid';
+    frontsBtn.classList.remove('active'); backsBtn.classList.add('active');
+    renderCardBacks();
+  }
+}
+
 async function loadCards(){
   const snap = await db.ref('resolute/auth/cards').get();
   const cards = snap.val()||{};
