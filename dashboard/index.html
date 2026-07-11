@@ -2352,7 +2352,31 @@ const WG_ROOMS = [
   {id:'head', label:'The Head', icon:'🚿'},
   {id:'berths', label:'Berths', icon:'🛏️'}
 ];
-let wgPending = {}; // in-progress selections before saving
+const WG_CATEGORIES = [
+  {id:'trash', label:'Trash'},
+  {id:'dishes', label:'Dishes & Silverware'},
+  {id:'clothing', label:'Clothing & Shoes'},
+  {id:'floor', label:'Floor'},
+  {id:'counters', label:'Counters & Surfaces'}
+];
+const WG_OFFICERS = [
+  {id:'samuel', label:'Samuel'},
+  {id:'johnjr', label:'John Jr.'},
+  {id:'stephen', label:'Stephen'},
+  {id:'daniel', label:'Daniel'},
+  {id:'all', label:'All Hands'}
+];
+let wgPending = {}; // in-progress selections before saving, keyed by room -> {trash,dishes,clothing,floor,counters,officer,metStandard}
+
+function wgBlankRoom(){
+  return {trash:null, dishes:null, clothing:null, floor:null, counters:null, officer:null, metStandard:null};
+}
+function wgRoomComplete(r){
+  return WG_CATEGORIES.every(c => r[c.id] !== null) && r.officer !== null && r.metStandard !== null;
+}
+function wgRoomPassed(r){
+  return WG_CATEGORIES.every(c => r[c.id] === true);
+}
 
 function getWGWindow(){
   const hr = new Date().getHours();
@@ -2393,27 +2417,45 @@ function renderWhiteGlove(){
     const already = dayData[win.key];
 
     if(already){
-      const passCount = WG_ROOMS.filter(r => already.rooms && already.rooms[r.id]).length;
+      const roomVals = WG_ROOMS.map(r => already.rooms && already.rooms[r.id]).filter(Boolean);
+      const passCount = roomVals.filter(r => wgRoomPassed(r)).length;
+      const metCount = roomVals.filter(r => r.metStandard === true).length;
       const time = already.loggedAt ? new Date(already.loggedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
       el.innerHTML = `<div class="card" style="border:1px solid #2d6a47;">
         <div class="card-bd" style="padding:12px 14px;">
           <div style="font-family:'Cinzel',serif;font-weight:700;font-size:13px;color:#2d6a47;">\u2713 ${win.label} Inspection Logged \u2014 ${time}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${passCount} of ${WG_ROOMS.length} compartments passed.</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${passCount} of ${WG_ROOMS.length} compartments fully clear \u2014 ${metCount} of ${WG_ROOMS.length} officers met standard.</div>
+          ${wgDetailBreakdown(already)}
           <button onclick="startWhiteGloveInspection()" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer;">Log again</button>
         </div>
       </div>` + renderWGHistory(dayData, win.key);
       return;
     }
 
-    // Not yet logged this window — show the prompt
     el.innerHTML = `<div class="card" style="border:2px solid var(--gold);background:linear-gradient(135deg,rgba(232,184,74,.08),rgba(92,61,30,.04));">
       <div class="card-bd" style="padding:14px;">
         <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);">\u26F5 White Glove Inspection Due \u2014 ${win.label}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;">Three tests, every compartment: floor clear enough to walk in socks, a counter clear enough to set a plate down, every trash can empty.</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;">Check trash, dishes, clothing, floor, and counters in every compartment \u2014 then rate whether whoever was responsible met your standard.</div>
         <button onclick="startWhiteGloveInspection()" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--brown);color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Start Inspection</button>
       </div>
     </div>` + renderWGHistory(dayData, win.key);
   });
+}
+
+function wgDetailBreakdown(inspection){
+  const rows = WG_ROOMS.map(r => {
+    const d = inspection.rooms && inspection.rooms[r.id];
+    if(!d) return '';
+    const failedCats = WG_CATEGORIES.filter(c => d[c.id] === false).map(c => c.label);
+    const officerLabel = (WG_OFFICERS.find(o => o.id === d.officer)||{}).label || '\u2014';
+    const standardTxt = d.metStandard ? 'met standard' : 'did not meet standard';
+    const standardColor = d.metStandard ? '#2d6a47' : '#b5451b';
+    return `<div style="font-size:11px;padding:4px 0;border-top:1px solid var(--border);">
+      <b>${r.icon} ${r.label}</b> \u2014 ${officerLabel}, <span style="color:${standardColor};font-weight:700;">${standardTxt}</span>
+      ${failedCats.length ? '<br><span style="color:#b5451b;">Failed: '+failedCats.join(', ')+'</span>' : '<br><span style="color:#2d6a47;">All clear</span>'}
+    </div>`;
+  }).join('');
+  return `<div style="margin-top:8px;">${rows}</div>`;
 }
 
 function renderWGHistory(dayData, excludeKey){
@@ -2421,7 +2463,8 @@ function renderWGHistory(dayData, excludeKey){
   if(!others.length) return '';
   const rows = others.map(k => {
     const d = dayData[k];
-    const passCount = WG_ROOMS.filter(r => d.rooms && d.rooms[r.id]).length;
+    const roomVals = WG_ROOMS.map(r => d.rooms && d.rooms[r.id]).filter(Boolean);
+    const passCount = roomVals.filter(r => wgRoomPassed(r)).length;
     const time = d.loggedAt ? new Date(d.loggedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
     const label = k.charAt(0).toUpperCase()+k.slice(1);
     return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11.5px;">
@@ -2433,14 +2476,14 @@ function renderWGHistory(dayData, excludeKey){
 
 function startWhiteGloveInspection(){
   wgPending = {};
-  WG_ROOMS.forEach(r => wgPending[r.id] = null);
+  WG_ROOMS.forEach(r => wgPending[r.id] = wgBlankRoom());
   const el = document.getElementById('whiteglove-section');
   const win = getWGWindow();
   el.innerHTML = `<div class="card" style="border:2px solid var(--gold);">
     <div class="card-bd" style="padding:14px;">
       <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);margin-bottom:10px;">\u26F5 ${win.label} Inspection</div>
       <div id="wg-room-rows"></div>
-      <button onclick="saveWhiteGloveInspection()" id="wg-save-btn" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--border);color:var(--muted);font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:not-allowed;" disabled>Log Inspection (rate every compartment)</button>
+      <button onclick="saveWhiteGloveInspection()" id="wg-save-btn" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--border);color:var(--muted);font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:not-allowed;" disabled>Log Inspection (finish every compartment)</button>
     </div>
   </div>`;
   renderWGRoomRows();
@@ -2451,38 +2494,75 @@ function renderWGRoomRows(){
   if(!el) return;
   el.innerHTML = WG_ROOMS.map(r => {
     const state = wgPending[r.id];
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:13px;"><span style="margin-right:6px;">${r.icon}</span>${r.label}</div>
-      <div style="display:flex;gap:6px;">
-        <button onclick="setWGRoom('${r.id}',true)" style="padding:6px 12px;border-radius:6px;border:1px solid ${state===true?'#2d6a47':'var(--border)'};background:${state===true?'#2d6a47':'transparent'};color:${state===true?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;">Pass</button>
-        <button onclick="setWGRoom('${r.id}',false)" style="padding:6px 12px;border-radius:6px;border:1px solid ${state===false?'#b5451b':'var(--border)'};background:${state===false?'#b5451b':'transparent'};color:${state===false?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;">Fail</button>
+    const catRows = WG_CATEGORIES.map(c => {
+      const v = state[c.id];
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;">
+        <div style="font-size:11.5px;color:var(--ink);">${c.label}</div>
+        <div style="display:flex;gap:5px;">
+          <button onclick="setWGCategory('${r.id}','${c.id}',true)" style="padding:4px 9px;border-radius:5px;border:1px solid ${v===true?'#2d6a47':'var(--border)'};background:${v===true?'#2d6a47':'transparent'};color:${v===true?'#fff':'var(--muted)'};font-size:10px;font-weight:700;cursor:pointer;">Clear</button>
+          <button onclick="setWGCategory('${r.id}','${c.id}',false)" style="padding:4px 9px;border-radius:5px;border:1px solid ${v===false?'#b5451b':'var(--border)'};background:${v===false?'#b5451b':'transparent'};color:${v===false?'#fff':'var(--muted)'};font-size:10px;font-weight:700;cursor:pointer;">Not Clear</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const officerBtns = WG_OFFICERS.map(o =>
+      `<button onclick="setWGOfficer('${r.id}','${o.id}')" style="padding:4px 8px;border-radius:5px;border:1px solid ${state.officer===o.id?'var(--brown)':'var(--border)'};background:${state.officer===o.id?'var(--brown)':'transparent'};color:${state.officer===o.id?'#fff':'var(--muted)'};font-size:9.5px;font-weight:700;cursor:pointer;">${o.label}</button>`
+    ).join('');
+
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <div style="font-family:'Cinzel',serif;font-weight:700;font-size:12.5px;margin-bottom:4px;"><span style="margin-right:6px;">${r.icon}</span>${r.label}</div>
+      ${catRows}
+      <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px;">
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;">Responsible today:</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">${officerBtns}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:11px;color:var(--ink);">Met your standard?</div>
+          <div style="display:flex;gap:5px;">
+            <button onclick="setWGStandard('${r.id}',true)" style="padding:5px 11px;border-radius:5px;border:1px solid ${state.metStandard===true?'#2d6a47':'var(--border)'};background:${state.metStandard===true?'#2d6a47':'transparent'};color:${state.metStandard===true?'#fff':'var(--muted)'};font-size:10.5px;font-weight:700;cursor:pointer;">Yes</button>
+            <button onclick="setWGStandard('${r.id}',false)" style="padding:5px 11px;border-radius:5px;border:1px solid ${state.metStandard===false?'#b5451b':'var(--border)'};background:${state.metStandard===false?'#b5451b':'transparent'};color:${state.metStandard===false?'#fff':'var(--muted)'};font-size:10.5px;font-weight:700;cursor:pointer;">No</button>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
-  const allSet = WG_ROOMS.every(r => wgPending[r.id] !== null);
+  updateWGSaveButton();
+}
+
+function updateWGSaveButton(){
+  const allSet = WG_ROOMS.every(r => wgRoomComplete(wgPending[r.id]));
   const btn = document.getElementById('wg-save-btn');
   if(btn){
     btn.disabled = !allSet;
     btn.style.background = allSet ? 'var(--brown)' : 'var(--border)';
     btn.style.color = allSet ? '#fff' : 'var(--muted)';
     btn.style.cursor = allSet ? 'pointer' : 'not-allowed';
-    btn.textContent = allSet ? 'Log Inspection' : 'Log Inspection (rate every compartment)';
+    btn.textContent = allSet ? 'Log Inspection' : 'Log Inspection (finish every compartment)';
   }
 }
 
-function setWGRoom(roomId, passed){
-  wgPending[roomId] = passed;
+function setWGCategory(roomId, catId, val){
+  wgPending[roomId][catId] = val;
+  renderWGRoomRows();
+}
+function setWGOfficer(roomId, officerId){
+  wgPending[roomId].officer = officerId;
+  renderWGRoomRows();
+}
+function setWGStandard(roomId, val){
+  wgPending[roomId].metStandard = val;
   renderWGRoomRows();
 }
 
 function saveWhiteGloveInspection(){
   if(!_db) return;
-  const allSet = WG_ROOMS.every(r => wgPending[r.id] !== null);
+  const allSet = WG_ROOMS.every(r => wgRoomComplete(wgPending[r.id]));
   if(!allSet) return;
   const today = localDateStr();
   const win = getWGWindow();
+  const roomsCopy = {};
+  WG_ROOMS.forEach(r => roomsCopy[r.id] = {...wgPending[r.id]});
   _db.ref(`stewart/whiteglove/${today}/${win.key}`).set({
-    rooms: {...wgPending},
+    rooms: roomsCopy,
     loggedAt: Date.now()
   }).then(() => {
     renderWhiteGlove();
