@@ -34,7 +34,15 @@ header{ text-align:center; padding:30px 16px 6px; }
 .pennant{ font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.35em;text-transform:uppercase;color:var(--brass2); }
 h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(26px,7vw,38px);letter-spacing:.08em; margin-top:4px;}
 .verse{ font-style:italic; color:var(--steel2); font-size:13.5px; max-width:520px; margin:8px auto 0; line-height:1.5; padding:0 12px;}
-.back{ position:absolute; top:16px; left:14px; color:var(--brass2); text-decoration:none; font-family:'Lato',sans-serif; font-size:12px; letter-spacing:.1em;}
+.gw-link{
+  position:fixed; top:14px; left:14px; z-index:9999;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 13px; border-radius:20px;
+  background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
+  color:#d4af5a; text-decoration:none;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.gw-link:active{ background:rgba(176,141,62,.32); }
 .hcrest{ width:54px; height:54px; border-radius:50%; box-shadow:0 3px 12px rgba(0,0,0,.5), 0 0 0 2px rgba(212,175,90,.4); margin-bottom:8px;}
 
 nav{ display:flex; justify-content:center; gap:8px; margin:20px auto 0; max-width:560px; padding:0 12px;}
@@ -133,7 +141,7 @@ input:focus,textarea:focus,select:focus{ outline:none; border-color:var(--brass)
 </head>
 <body>
 
-<a class="back" href="../">← Gangway</a>
+<a class="gw-link" href="../">← Gangway</a>
 <header>
   <img class="hcrest" src="../assets/crest.png" alt="HMS Resolute crest">
   <div class="pennant">Strategy Deck · HMS Resolute</div>
