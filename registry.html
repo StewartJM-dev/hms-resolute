@@ -32,7 +32,7 @@ header{ text-align:center; padding:30px 16px 6px; position:relative;}
 h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(24px,6vw,34px);letter-spacing:.08em;margin-top:4px;}
 .sub{ font-style:italic; color:var(--steel2); font-size:13px; margin-top:4px;}
 .gw-link{
-  position:fixed; top:14px; left:14px; z-index:9999;
+  position:fixed; top:max(14px, env(safe-area-inset-top) + 8px); left:14px; z-index:9999;
   display:inline-flex; align-items:center; gap:5px;
   padding:7px 13px; border-radius:20px;
   background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
