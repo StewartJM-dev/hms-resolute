@@ -64,7 +64,15 @@ body{
 
 /* ===== Masthead ===== */
 .mast{text-align:center;padding:10px 0 4px;}
-.vy-back{display:inline-block;color:var(--vineglow,#d4af5a);text-decoration:none;font-family:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;}
+.gw-link{
+  position:fixed; top:14px; left:14px; z-index:9999;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 13px; border-radius:20px;
+  background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
+  color:#d4af5a; text-decoration:none;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.gw-link:active{ background:rgba(176,141,62,.32); }
 .mast h1{font-family:'Cinzel',serif;font-weight:700;font-size:32px;
   background:linear-gradient(180deg,var(--pink2),var(--pink) 55%,var(--purple3));
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
@@ -256,7 +264,7 @@ textarea::placeholder,input::placeholder{color:rgba(169,143,176,.7);}
 
 <!-- ===== APP ===== -->
 <div class="wrap" id="app" style="display:none;">
-  <a class="vy-back" href="../">← Gangway</a>
+  <a class="gw-link" href="../">← Gangway</a>
   <div class="vine-top">❧ ⚜ ❧</div>
   <div class="mast">
     <h1>The Vineyard</h1>
