@@ -89,10 +89,7 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
   border:2px solid var(--brass); border-radius:12px;
   aspect-ratio:1.586; display:flex; flex-direction:column; position:relative; overflow:hidden;
 }
-.idcard::before{
-  content:""; position:absolute; left:0; right:0; top:38%; bottom:0; margin:auto; width:150px; height:150px;
-  background:url('assets/crest.png') center/contain no-repeat; opacity:.16; pointer-events:none;
-}
+.id-name-logo{ width:26px; height:26px; border-radius:50%; margin-top:3px; display:block; }
 .id-headerbar{
   background:linear-gradient(160deg,#13294a 0%,#0b1d33 100%);
   padding:7px 14px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;
@@ -143,7 +140,7 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
   .idcard{ break-inside:avoid; border:2px solid #333; background:#fdfbf6!important;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; width:3.37in; height:2.125in; margin:0.15in;}
   .idcard-back{ break-inside:avoid; border:2px solid #333; background:linear-gradient(160deg,#13294a,#0b1d33)!important;
-    -webkit-print-color-adjust:exact; print-color-adjust:exact; width:3.37in; height:2.125in; margin:0.15in;}
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; width:3.52in; height:2.27in; margin:0.075in 0.075in 0.075in 0.075in;}
   .id-headerbar{ background:linear-gradient(160deg,#13294a,#0b1d33)!important;
     -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .id-photo-hint{ display:none!important; }
@@ -420,6 +417,7 @@ async function loadCards(){
           <input type="file" id="photo-input-${id}" accept="image/*" style="display:none;" onchange="handlePhotoUpload('${id}', this)">
           <div class="id-info">
             <div class="id-name">${c.name}</div>
+            <img class="id-name-logo" src="assets/crest.png" alt="">
             <div class="id-pos">${c.pos}</div>
             <div class="id-rank">Rank: ${c.rank} &middot; Crew, HMS Resolute</div>
             <div class="id-bottomrow">
