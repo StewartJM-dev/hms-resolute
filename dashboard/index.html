@@ -475,13 +475,19 @@ body{
       <button class="topbar-lock" onclick="lockApp()">Lock</button>
     </div>
   </div>
-  <a class="gw-link" href="../">← Gangway</a>
+  <div style="background:var(--cream);padding:8px 14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+    <a href="../" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">⚓ Gangway</a>
+    <a href="../registry.html" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">📜 Registry &amp; Muster</a>
+    <a href="../vineyard/" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">🍇 Captain's Quarters</a>
+  </div>
 
   <div class="content">
 
     <!-- TAB: OVERVIEW -->
     <div class="tab active" id="tab-overview">
       <div id="overview-day-banner" style="margin-bottom:12px;"></div>
+      <div class="sec-hd">Your Daily Rhythm</div>
+      <div id="overview-dawn-checklist" style="margin-bottom:14px;"></div>
       <div class="sec-hd">Agent Status Today</div>
       <div class="gauge-row" id="overview-agents"></div>
       <div class="sec-hd">Weekly Pay</div>
@@ -613,7 +619,7 @@ body{
     <!-- TAB: MISSIONS -->
     <div class="tab" id="tab-missions">
       <div id="missions-day-header" style="margin-bottom:12px;"></div>
-      <button class="btn-secondary" onclick="printDailyChores()" style="width:100%;margin-bottom:14px;">&#128424; Print Today's Chore Chart</button>
+      <button onclick="printDailyChores()" style="width:100%;margin-bottom:14px;padding:13px;border:none;border-radius:8px;background:var(--brown);color:#fff;font-family:'Cinzel',serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(92,61,30,.3);">&#128424; Print Today's Chore Chart</button>
 
       <div class="sec-hd">Detailed Mission Status</div>
       <div id="missions-detail"></div>
@@ -1754,6 +1760,7 @@ function getWeekDays(){
 function renderOverview(){
   if(!_db){ return; }
   loadReadingGoals();
+  renderDawnTab();
   const today = localDateStr();
   const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const dayName = dayNames[new Date().getDay()];
@@ -2372,16 +2379,19 @@ function renderDawnTab(){
 
   // Daily missions (Sunday = rest, nothing required)
   const missionsEl = document.getElementById('dawn-daily-missions');
+  const overviewEl = document.getElementById('overview-dawn-checklist');
   if(dow===0){
-    missionsEl.innerHTML = `<div class="card"><div class="card-bd" style="text-align:center;padding:20px;">
+    const restHtml = `<div class="card"><div class="card-bd" style="text-align:center;padding:20px;">
       <div style="font-size:28px;margin-bottom:8px;">&#9203;</div>
       <div style="font-family:'Cinzel',serif;font-size:13px;color:var(--brown);">Rest Today</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">No missions on the Sabbath. Be still.</div>
     </div></div>`;
+    missionsEl.innerHTML = restHtml;
+    if(overviewEl) overviewEl.innerHTML = restHtml;
   } else {
     _db.ref(`stewart/dawnmissions/${today}`).once('value', snap => {
       const done = snap.val() || {};
-      missionsEl.innerHTML = DAWN_DAILY_MISSIONS.map(m => {
+      const missionsHtml = DAWN_DAILY_MISSIONS.map(m => {
         const isDone = !!done[m.id];
         return `<div onclick="toggleDawnMission('${m.id}','${today}')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:11px 13px;margin-bottom:7px;cursor:pointer;">
           <div style="width:22px;height:22px;border-radius:5px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:white;">
@@ -2394,6 +2404,8 @@ function renderDawnTab(){
           </div>
         </div>`;
       }).join('');
+      missionsEl.innerHTML = missionsHtml;
+      if(overviewEl) overviewEl.innerHTML = missionsHtml;
     });
   }
 
