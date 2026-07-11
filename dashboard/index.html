@@ -93,7 +93,7 @@ body{
 .oc-banner{ width:100%; max-height:190px; overflow:hidden; }
 .oc-banner img{ width:100%; height:100%; object-fit:cover; object-position:center 45%; display:block; }
 .gw-link{
-  position:fixed; top:14px; left:14px; z-index:9999;
+  position:fixed; top:max(14px, env(safe-area-inset-top) + 8px); left:14px; z-index:9999;
   display:inline-flex; align-items:center; gap:5px;
   padding:7px 13px; border-radius:20px;
   background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
@@ -487,6 +487,7 @@ body{
       <div class="sec-hd">Weekly Pay</div>
       <div id="overview-pay" style="margin-bottom:12px;"></div>
       <div id="overview-familynight" style="margin-bottom:12px;"></div>
+      <div id="super-fn-dashboard" style="margin-bottom:12px;"></div>
       <div class="sec-hd">Field Library This Week</div>
       <div class="card" style="margin-bottom:12px;">
         <div class="card-bd" id="reading-overview"></div>
@@ -515,7 +516,7 @@ body{
           <div class="card-bd" style="display:flex;align-items:center;gap:14px;padding:14px 16px;">
             <div style="font-size:28px;flex-shrink:0;">&#127815;</div>
             <div style="flex:1;">
-              <div style="font-family:'Cinzel',serif;font-weight:700;font-size:16px;color:#f4a7c4;">The Vineyard</div>
+              <div style="font-family:'Cinzel',serif;font-weight:700;font-size:16px;color:#f4a7c4;">Captain's Quarters</div>
               <div style="font-size:13.5px;color:#f0ece2;opacity:.9;margin-top:3px;">Ours alone &mdash; tend it together. Tap to open.</div>
             </div>
             <div style="color:#f4a7c4;font-size:18px;">&#8250;</div>
@@ -781,10 +782,6 @@ body{
           <div class="empty-state">Loading vote data...</div>
         </div>
       </div>
-
-      <!-- SUPER FAMILY NIGHT -->
-      <div class="sec-hd">Super Family Night</div>
-      <div id="super-fn-dashboard" style="margin-bottom:12px;"></div>
 
       <!-- STONE COLLECTION TRACKER -->
       <div class="sec-hd">Stone Collection Log</div>
@@ -3167,11 +3164,14 @@ function renderProjectList(projects, savedData, elementId){
     const pct = Math.round((donePhases/totalPhases)*100);
 
     return `<div class="card" style="margin-bottom:10px;">
-      <div style="padding:9px 13px;background:${isComplete?'var(--muted)':'var(--brown)'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="padding:9px 13px;background:${isComplete?'var(--muted)':'var(--brown)'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleProjectCard('${elementId}-${p.id}')">
         <div style="font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:white;">${p.icon} ${p.title}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.8);">${isComplete?'✓ Complete':pct+'%'}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:10px;color:rgba(255,255,255,.8);">${isComplete?'✓ Complete':pct+'%'}</div>
+          <span id="proj-chev-${elementId}-${p.id}" style="font-size:10px;color:rgba(255,255,255,.7);transition:transform .15s;">▾</span>
+        </div>
       </div>
-      <div class="card-bd">
+      <div class="card-bd" id="proj-body-${elementId}-${p.id}" style="display:none;">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">${p.desc}</div>
         <div style="background:rgba(0,0,0,.06);border-radius:4px;height:4px;overflow:hidden;margin-bottom:10px;">
           <div style="height:100%;width:${pct}%;background:var(--green2);border-radius:4px;transition:width .5s;"></div>
@@ -3182,7 +3182,7 @@ function renderProjectList(projects, savedData, elementId){
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
               <div style="font-size:12px;font-weight:700;color:${phSaved.done?'var(--green2)':'var(--ink)'};">${phSaved.done?'✓ ':''} ${ph.title}</div>
               ${!phSaved.done ?
-                `<button onclick="completePhase('${p.id}','${ph.id}','${elementId}')" style="padding:4px 10px;border:none;border-radius:5px;background:var(--green2);color:white;font-size:10px;cursor:pointer;">Done</button>` :
+                `<button onclick="event.stopPropagation();completePhase('${p.id}','${ph.id}','${elementId}')" style="padding:4px 10px;border:none;border-radius:5px;background:var(--green2);color:white;font-size:10px;cursor:pointer;">Done</button>` :
                 `<span style="font-size:10px;color:var(--muted);">${phSaved.date||''}</span>`
               }
             </div>
@@ -3196,6 +3196,15 @@ function renderProjectList(projects, savedData, elementId){
       </div>
     </div>`;
   }).join('');
+}
+
+function toggleProjectCard(fullId){
+  const body = document.getElementById('proj-body-'+fullId);
+  const chev = document.getElementById('proj-chev-'+fullId);
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(chev) chev.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 function renderHouseProjects(){
