@@ -31,7 +31,15 @@ header{ text-align:center; padding:30px 16px 6px; position:relative;}
 .pennant{ font-family:'Lato',sans-serif;font-size:10px;letter-spacing:.35em;text-transform:uppercase;color:var(--brass2);}
 h1{ font-family:'Cinzel',serif;font-weight:900;font-size:clamp(24px,6vw,34px);letter-spacing:.08em;margin-top:4px;}
 .sub{ font-style:italic; color:var(--steel2); font-size:13px; margin-top:4px;}
-.back{ position:absolute; top:16px; left:14px; color:var(--brass2); text-decoration:none; font-family:'Lato',sans-serif; font-size:12px;}
+.gw-link{
+  position:fixed; top:14px; left:14px; z-index:9999;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 13px; border-radius:20px;
+  background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
+  color:#d4af5a; text-decoration:none;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.gw-link:active{ background:rgba(176,141,62,.32); }
 .hcrest{ width:54px; height:54px; border-radius:50%; box-shadow:0 3px 12px rgba(0,0,0,.5), 0 0 0 2px rgba(212,175,90,.4); margin-bottom:8px;}
 .reg-banner{ width:100%; max-height:190px; overflow:hidden; border-radius:10px; margin-bottom:16px; border:1px solid rgba(212,175,90,.3);}
 .reg-banner img{ width:100%; height:100%; object-fit:cover; object-position:center 45%; display:block; }
@@ -110,7 +118,7 @@ input{ width:100%; padding:12px; border-radius:6px; font-size:17px; background:r
 </head>
 <body>
 
-<a class="back" href="./">← Gangway</a>
+<a class="gw-link" href="./">← Gangway</a>
 <header>
   <img class="hcrest" src="assets/crest.png" alt="HMS Resolute crest">
   <div class="pennant">Officers Only · HMS Resolute</div>
