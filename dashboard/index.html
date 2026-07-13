@@ -419,7 +419,11 @@ body{
 .bwc-total.bwc-t-none{background:rgba(200,80,77,.12);color:#a03028;}
 .bwc-day{margin-bottom:9px;}
 .bwc-day:last-child{margin-bottom:0;}
-.bwc-day-hd{display:flex;align-items:baseline;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;}
+.bwc-day-hd{display:flex;align-items:baseline;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:3px;cursor:pointer;}
+.bwc-day-body{display:none;}
+.bwc-day.open .bwc-day-body{display:block;}
+.bwc-day-chevron{font-size:9px;margin-left:5px;transition:transform .2s;display:inline-block;}
+.bwc-day.open .bwc-day-chevron{transform:rotate(180deg);}
 .bwc-day-hd .bwc-day-count{font-weight:700;}
 .bwc-day.bwc-today .bwc-day-hd{color:var(--ink);}
 .bwc-day.bwc-today{background:rgba(200,160,42,.06);border-radius:6px;padding:5px 6px;margin-left:-6px;margin-right:-6px;}
@@ -2166,11 +2170,12 @@ function renderWeekGrid(){
           }).join('');
         }
 
-        daysHtml += '<div class="bwc-day'+(isToday?' bwc-today':'')+(isFuture?' bwc-future':'')+'">'+
-          '<div class="bwc-day-hd"><span>'+dayLabel+'</span>'+
+        const dayId = 'bwc-day-'+a.id+'-'+d;
+        daysHtml += '<div class="bwc-day'+(isToday?' bwc-today open':'')+(isFuture?' bwc-future':'')+'" id="'+dayId+'">'+
+          '<div class="bwc-day-hd" onclick="toggleBwcDay(\''+dayId+'\')"><span>'+dayLabel+'<span class="bwc-day-chevron">&#9662;</span></span>'+
           (isFuture ? '<span class="bwc-upcoming">Upcoming</span>' : '<span class="bwc-day-count">'+doneCount+'/'+assigned.length+'</span>')+
           '</div>'+
-          '<ul class="bwc-checklist">'+itemsHtml+'</ul>'+
+          '<div class="bwc-day-body"><ul class="bwc-checklist">'+itemsHtml+'</ul></div>'+
         '</div>';
       });
 
@@ -2193,6 +2198,11 @@ function renderWeekGrid(){
 function toggleBwcCard(agentId){
   const card = document.getElementById('bwc-'+agentId);
   if(card) card.classList.toggle('open');
+}
+
+function toggleBwcDay(dayId){
+  const day = document.getElementById(dayId);
+  if(day) day.classList.toggle('open');
 }
 
 function showCellDetail(agentId, dateStr, agentName){
@@ -2348,10 +2358,10 @@ function getDeepCleanAgent(){
 // WHITE GLOVE INSPECTIONS
 // ══════════════════════════════════════════════════════
 const WG_ROOMS = [
-  {id:'galley', label:'The Galley', icon:'🍳'},
-  {id:'commondeck', label:'The Common Deck', icon:'🛋️'},
-  {id:'head', label:'The Head', icon:'🚿'},
-  {id:'berths', label:'Berths', icon:'🛏️'}
+  {id:'galley', label:'The Galley (Kitchen)', icon:'🍳'},
+  {id:'commondeck', label:'The Common Deck (Living Room)', icon:'🛋️'},
+  {id:'head', label:'The Head (Bathroom)', icon:'🚿'},
+  {id:'berths', label:'Berths (Bedrooms)', icon:'🛏️'}
 ];
 const WG_CATEGORIES = [
   {id:'trash', label:'Trash'},
@@ -2437,7 +2447,7 @@ function renderWhiteGlove(){
       <div class="card-bd" style="padding:14px;">
         <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);">\u26F5 White Glove Inspection Due \u2014 ${win.label}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;">Check trash, dishes, clothing, floor, and counters in every compartment \u2014 then rate whether whoever was responsible met your standard.</div>
-        <button onclick="startWhiteGloveInspection()" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--brown);color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Start Inspection</button>
+        <button onclick="startWhiteGloveInspection()" style="width:100%;margin-top:10px;padding:13px;border:none;border-radius:8px;background:var(--rust);color:#fff;font-family:'Cinzel',serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(181,69,27,.4);">&#9813; Start Inspection</button>
       </div>
     </div>` + renderWGHistory(dayData, win.key);
   });
