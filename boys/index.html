@@ -600,13 +600,14 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
     <div style="border-top:1px solid rgba(232,184,74,.25);padding-top:16px;margin-bottom:6px;">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
         <span style="font-size:18px;">🎖️</span>
-        <strong style="font-family:'Orbitron',sans-serif;font-size:12.5px;letter-spacing:1px;color:var(--teal2);text-transform:uppercase;">New Duty: Captain of the Watch</strong>
+        <strong style="font-family:'Orbitron',sans-serif;font-size:12.5px;letter-spacing:1px;color:var(--teal2);text-transform:uppercase;">New Duty: Officer of the Watch</strong>
       </div>
-      <p style="font-size:12.5px;color:rgba(255,255,255,.75);line-height:1.6;margin-bottom:10px;">Every day, a new sailor takes the watch. Three times a day — morning, midday, and evening — the Captain makes their rounds:</p>
+      <p style="font-size:12.5px;color:rgba(255,255,255,.75);line-height:1.6;margin-bottom:10px;">Every day, a new sailor takes the watch. Three times a day — morning, midday, and evening — the Officer makes their rounds:</p>
       <ul style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.7;margin:0 0 10px 18px;padding:0;">
         <li>Bread sealed tight on the hutch</li>
         <li>Fridge buttoned up, shelf by shelf</li>
         <li>Every light doused before moving on</li>
+        <li>Sink and counter clear of dishes</li>
       </ul>
       <p style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.6;font-style:italic;">No extra doubloons for this one, Agent — it's just what keeping a tight ship looks like.</p>
     </div>
@@ -777,6 +778,7 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
           <div class="hw-card-title">Mission Status</div>
         </div>
         <div class="hw-card-body">
+          <div id="screen-time-bank"></div>
           <div id="missions-list">
             <div class="empty">Loading missions...</div>
           </div>
@@ -1487,7 +1489,7 @@ function buildMissions(agentId, _d){
   const wed = isWednesday(_d);
   const day = getDayName(_d);
   const isBathroomWeek = (agentId === getBathroomAgent(_d));
-  const isCaptainOfWatch = (agentId === getCaptainOfWatch(_d));
+  const isOfficerOfWatch = (agentId === getOfficerOfWatch(_d));
 
   // Is this agent on dishes today?
   const onDishes = (agentId === 'samuel' || agentId === 'johnjr')
@@ -1634,6 +1636,14 @@ function buildMissions(agentId, _d){
       text: 'Wipe down the table after meals',
       detail: 'Wipe the whole table after every meal — breakfast, lunch, and dinner.',
       points: 5,
+      category: 'kitchen',
+      always: true
+    });
+    missions.push({
+      id: 'pots-pans-wash',
+      text: 'Wash breakfast & lunch pots and pans',
+      detail: 'If any pots or pans got used for breakfast or lunch, wash them by hand — keep the sink and counter clear. (Dinner pots and pans are Mom\'s.)',
+      points: 10,
       category: 'kitchen',
       always: true
     });
@@ -1934,32 +1944,30 @@ function buildMissions(agentId, _d){
     }
   }
 
-  // ── CAPTAIN OF THE WATCH (daily rotating inspection role, no points) ──
-  if(isCaptainOfWatch){
-    const watchDetail = 'Bread loaves on the hutch sealed shut. Fridge covered shelf by shelf — lids on, bags sealed. All lights off, bathroom included.';
-    missions.push({
-      id: 'cotw-morning',
-      text: 'Captain of the Watch: Morning Round',
-      detail: watchDetail,
-      points: 0,
-      category: 'captain-of-the-watch',
-      always: true
-    });
-    missions.push({
-      id: 'cotw-midday',
-      text: 'Captain of the Watch: Midday Round',
-      detail: watchDetail,
-      points: 0,
-      category: 'captain-of-the-watch',
-      always: true
-    });
-    missions.push({
-      id: 'cotw-evening',
-      text: 'Captain of the Watch: Evening Round',
-      detail: watchDetail,
-      points: 0,
-      category: 'captain-of-the-watch',
-      always: true
+  // ── OFFICER OF THE WATCH (daily rotating inspection role, no points) ──
+  if(isOfficerOfWatch){
+    const watchRounds = [
+      {key: 'morning', label: 'Morning Round'},
+      {key: 'midday', label: 'Midday Round'},
+      {key: 'evening', label: 'Evening Round'}
+    ];
+    const watchChecks = [
+      {key: 'bread', text: 'Bread sealed on the hutch', detail: 'Every loaf bagged shut — none left open.'},
+      {key: 'fridge', text: 'Fridge covered, shelf by shelf', detail: 'Lids on, bags sealed, nothing left uncovered.'},
+      {key: 'lights', text: 'All lights off', detail: 'Bathroom included — every light doused before moving on.'},
+      {key: 'sink', text: 'Sink & counter clear', detail: 'No dishes sitting in the sink or on the counter.'}
+    ];
+    watchRounds.forEach(r => {
+      watchChecks.forEach(c => {
+        missions.push({
+          id: `oow-${r.key}-${c.key}`,
+          text: `Officer of the Watch (${r.label}): ${c.text}`,
+          detail: c.detail,
+          points: 0,
+          category: 'officer-of-the-watch',
+          always: true
+        });
+      });
     });
   }
 
@@ -2018,7 +2026,7 @@ function applyBehaviorDeductions(score100, deductionPoints){
 }
 
 // Get the dish mission IDs for a given pair (used in transfer detection)
-const DISH_MISSION_IDS = ['dishwasher-load-1','dishwasher-unload-1','dishwasher-load-2','dishwasher-unload-2','dishwasher-load-3','dishwasher-unload-3','table-clear','table-wipe'];
+const DISH_MISSION_IDS = ['dishwasher-load-1','dishwasher-unload-1','dishwasher-load-2','dishwasher-unload-2','dishwasher-load-3','dishwasher-unload-3','table-clear','table-wipe','pots-pans-wash'];
 
 // Check if the OTHER team's dish missions from yesterday are still incomplete,
 // and if THIS agent's team completed them today on top of their own.
@@ -2091,9 +2099,9 @@ function buildMissionsForDate(agentId, dayDate){
   const onLaundry = isLaundryDayFor(agentId, dayOfWeek);
   const bathroomOrder = ['samuel','johnjr','stephen','daniel'];
   const isBathroomWeek = (agentId === bathroomOrder[weekNum % 4]);
-  const captainOrder = ['samuel','johnjr','stephen','daniel'];
+  const officerOrder = ['samuel','johnjr','stephen','daniel'];
   const dayNum = Math.floor((dayDate - startOfYear) / (24*60*60*1000));
-  const isCaptainOfWatch = (agentId === captainOrder[dayNum % 4]);
+  const isOfficerOfWatch = (agentId === officerOrder[dayNum % 4]);
 
   const missions = [];
   missions.push({id:'bed', points:5});
@@ -2114,6 +2122,7 @@ function buildMissionsForDate(agentId, dayDate){
       if(agentId==='daniel') missions.push({id:`dishwasher-load-${r}`, points:10});
     }
     missions.push({id:'table-clear', points:5});
+    missions.push({id:'pots-pans-wash', points:10});
     missions.push({id:'table-wipe', points:5});
   }
   if(onSetup){
@@ -2149,10 +2158,12 @@ function buildMissionsForDate(agentId, dayDate){
   if(agentId==='samuel'||agentId==='johnjr'||agentId==='stephen') missions.push({id:'fridge', points:10});
   if(agentId==='stephen') missions.push({id:'hutch', points:10});
   if(isBathroomWeek) missions.push({id:'bathroom-clean', points:15});
-  if(isCaptainOfWatch){
-    missions.push({id:'cotw-morning', points:0});
-    missions.push({id:'cotw-midday', points:0});
-    missions.push({id:'cotw-evening', points:0});
+  if(isOfficerOfWatch){
+    ['morning','midday','evening'].forEach(r => {
+      ['bread','fridge','lights','sink'].forEach(c => {
+        missions.push({id:`oow-${r}-${c}`, points:0});
+      });
+    });
   }
 
   missions.push({id:'rabbit-cage', points:15});
@@ -2207,9 +2218,9 @@ function renderMissionsList(el, missions, done, refPath){
   const teamColor = onDishes ? 'var(--teal2)' : 'var(--gold)';
 
   // Category order
-  const catOrder = ['captain-of-the-watch','bedroom','kitchen','floors','animals','laundry','bathroom','trash','computer'];
+  const catOrder = ['officer-of-the-watch','bedroom','kitchen','floors','animals','laundry','bathroom','trash','computer'];
   const catLabels = {
-    'captain-of-the-watch':'Captain of the Watch',
+    'officer-of-the-watch':'Officer of the Watch',
     bedroom:'Bedroom',kitchen:'Kitchen',floors:'Floors',
     animals:'Animals',laundry:'Laundry',bathroom:'Bathroom',trash:'Trash',
     computer:'Computer Missions'
@@ -2237,9 +2248,26 @@ function renderMissionsList(el, missions, done, refPath){
       <div style="font-size:10px;color:rgba(255,255,255,.4);">${donePoints} / ${totalPoints} points &mdash; ${pct}% complete</div>
     </div>`;
 
+  // Computer missions unlock only once every other mission for the day is done.
+  // They don't count toward their own gate (obviously).
+  const gateMissions = missions.filter(m => m.category !== 'computer');
+  const allGateDone = gateMissions.length > 0 && gateMissions.every(m => done[m.id]);
+
+  if(refPath){ // only once we have real completion data (not the empty pre-render pass)
+    checkScreenTimeAward(agentId, allGateDone);
+  }
+  renderScreenTimeBank(agentId);
+
   catOrder.forEach(cat => {
     if(!grouped[cat]) return;
     html += `<div style="font-family:'Orbitron',sans-serif;font-size:7px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);margin:10px 0 6px;">${catLabels[cat]||cat}</div>`;
+    if(cat === 'computer' && !allGateDone){
+      html += `<div style="background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.15);border-radius:8px;padding:14px;margin-bottom:8px;text-align:center;">
+        <div style="font-size:20px;margin-bottom:6px;">&#128274;</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5);line-height:1.6;">Finish every other mission today to unlock computer time &mdash; and earn 15 minutes of screen time.</div>
+      </div>`;
+      return;
+    }
     grouped[cat].forEach(m => {
       const isDone = !!done[m.id];
       html += `<div class="mission-card" onclick="toggleMission('${m.id}','${refPath}')">
@@ -2254,6 +2282,64 @@ function renderMissionsList(el, missions, done, refPath){
   });
 
   el.innerHTML = html;
+}
+
+// ── SCREEN TIME BANK ──
+// Finishing every non-computer mission for the day earns 15 minutes,
+// once per day, banked up to a max of 30 minutes. Cash out 15 or 30
+// at a time whenever there's enough banked.
+const SCREEN_TIME_DAILY_AWARD = 15;
+const SCREEN_TIME_MAX_BALANCE = 30;
+
+function checkScreenTimeAward(agentId, allGateDone){
+  if(!_db || !allGateDone) return;
+  const today = localDateStr();
+  const awardedRef = _db.ref(`stewart/screenTimeAwarded/${agentId}/${today}`);
+  awardedRef.once('value', snap => {
+    if(snap.val()) return; // already awarded today
+    const balRef = _db.ref(`stewart/screenTimeBalance/${agentId}`);
+    balRef.once('value', balSnap => {
+      const current = balSnap.val() || 0;
+      const newBal = Math.min(SCREEN_TIME_MAX_BALANCE, current + SCREEN_TIME_DAILY_AWARD);
+      balRef.set(newBal);
+      awardedRef.set(true);
+      renderScreenTimeBank(agentId);
+      showCelebration('&#127918;', 'Screen Time Earned!', `All missions complete! ${SCREEN_TIME_DAILY_AWARD} minutes banked, Agent.`);
+    });
+  });
+}
+
+function renderScreenTimeBank(agentId){
+  const el = document.getElementById('screen-time-bank');
+  if(!el || !_db) return;
+  _db.ref(`stewart/screenTimeBalance/${agentId}`).once('value', snap => {
+    const balance = snap.val() || 0;
+    const can15 = balance >= 15;
+    const can30 = balance >= 30;
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.05);border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+        <div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,.4);">SCREEN TIME BANK</div>
+          <div style="font-size:16px;font-weight:700;color:var(--gold);">${balance} min</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button ${can15?'':'disabled'} onclick="cashOutScreenTime('${agentId}',15)" style="padding:7px 10px;border-radius:6px;border:1px solid ${can15?'rgba(232,184,74,.5)':'rgba(255,255,255,.12)'};background:none;color:${can15?'var(--gold)':'rgba(255,255,255,.25)'};font-size:11px;cursor:${can15?'pointer':'default'};">Cash Out 15</button>
+          <button ${can30?'':'disabled'} onclick="cashOutScreenTime('${agentId}',30)" style="padding:7px 10px;border-radius:6px;border:1px solid ${can30?'rgba(232,184,74,.5)':'rgba(255,255,255,.12)'};background:none;color:${can30?'var(--gold)':'rgba(255,255,255,.25)'};font-size:11px;cursor:${can30?'pointer':'default'};">Cash Out 30</button>
+        </div>
+      </div>`;
+  });
+}
+
+function cashOutScreenTime(agentId, amount){
+  if(!_db) return;
+  const balRef = _db.ref(`stewart/screenTimeBalance/${agentId}`);
+  balRef.once('value', snap => {
+    const current = snap.val() || 0;
+    if(current < amount) return;
+    balRef.set(current - amount);
+    showCelebration('&#127918;', amount + ' Minutes Cashed Out!', 'Enjoy your screen time, Agent!');
+    renderScreenTimeBank(agentId);
+  });
 }
 
 function toggleMission(missionId, refPath){
@@ -2288,7 +2374,7 @@ function toggleMission(missionId, refPath){
 
 const AGENTS = ['samuel','johnjr','stephen','daniel'];
 const AGENT_NAMES = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
-const DISH_MISSIONS = ['dishwasher-load-1','dishwasher-unload-1','dishwasher-load-2','dishwasher-unload-2','dishwasher-load-3','dishwasher-unload-3','table-clear','table-wipe'];
+const DISH_MISSIONS = ['dishwasher-load-1','dishwasher-unload-1','dishwasher-load-2','dishwasher-unload-2','dishwasher-load-3','dishwasher-unload-3','table-clear','table-wipe','pots-pans-wash'];
 const WEEKLY_MISSIONS = ['laundry-sam','laundry-john','laundry-stephen','laundry-daniel',
   'hutch','fridge','bathroom-clean','rabbit-cage','bathroom-trash'];
 
@@ -2301,12 +2387,12 @@ function getBathroomAgent(_d){
   return order[weekNum % 4];
 }
 
-// Captain of the Watch — daily rotating inspection role. Checks the small
+// Officer of the Watch — daily rotating inspection role. Checks the small
 // recurring trouble spots (bread left open, fridge not covered, lights left
 // on) three times a day. Part of the checks-and-balances system, same idea
 // as Dawn's White Glove inspections. No points — this is oversight, not a
 // chore. Rotates to a new boy every single day (not reset weekly).
-function getCaptainOfWatch(_d){
+function getOfficerOfWatch(_d){
   const order = ['samuel','johnjr','stephen','daniel'];
   const now = _d ? new Date(_d) : new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -2378,7 +2464,7 @@ function getDayStatus(agentId, dateStr, missionData, transferData){
         required.push(`dishwasher-load-${r}`);
       }
     }
-    required.push('table-clear','table-wipe');
+    required.push('table-clear','table-wipe','pots-pans-wash');
   } else {
     required.push('table-set');
     if(agentId==='samuel'||agentId==='johnjr') required.push('drinks');
@@ -3413,8 +3499,8 @@ function closeCelebration(){
   stopConfetti();
 }
 
-// ── SHIP'S MANUAL / TUTORIAL (Version 2 + Captain of the Watch) ──
-const TUTORIAL_VERSION = 'v2-captain-of-the-watch';
+// ── SHIP'S MANUAL / TUTORIAL (Version 2 + Officer of the Watch) ──
+const TUTORIAL_VERSION = 'v2-officer-of-the-watch-sink';
 
 function showTutorial(){
   document.getElementById('tutorial-overlay').style.display = 'flex';
@@ -3589,7 +3675,7 @@ function getExpectedMissionsLocal(agentId){
       else if(agentId==='daniel') base.push(`dishwasher-load-${r}`);
       else base.push(`dishwasher-load-${r}`, `dishwasher-unload-${r}`);
     }
-    base.push('table-clear','table-wipe');
+    base.push('table-clear','table-wipe','pots-pans-wash');
   } else {
     if(!base.includes('table-set')) base.push('table-set');
     if(agentId==='samuel'||agentId==='johnjr') base.push('drinks');
