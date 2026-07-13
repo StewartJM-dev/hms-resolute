@@ -1440,6 +1440,7 @@ function buildMissions(agentId, _d){
   const wed = isWednesday(_d);
   const day = getDayName(_d);
   const isBathroomWeek = (agentId === getBathroomAgent(_d));
+  const isQuartermasterWeek = (agentId === getQuartermasterAgent(_d));
 
   // Is this agent on dishes today?
   const onDishes = (agentId === 'samuel' || agentId === 'johnjr')
@@ -1873,6 +1874,26 @@ function buildMissions(agentId, _d){
     }
   }
 
+  // ── QUARTERMASTER (weekly rotating inspection role) ──
+  if(isQuartermasterWeek){
+    missions.push({
+      id: 'qm-bread-check',
+      text: 'Quartermaster: Check the bread',
+      detail: 'Look over the bread loaves on the hutch — every bag sealed shut, none left open.',
+      points: 5,
+      category: 'quartermaster',
+      weekly: true
+    });
+    missions.push({
+      id: 'qm-fridge-check',
+      text: 'Quartermaster: Check the fridge',
+      detail: 'Go shelf by shelf — lids on, bags sealed, nothing left uncovered.',
+      points: 5,
+      category: 'quartermaster',
+      weekly: true
+    });
+  }
+
   // Filter by day type
   return missions.filter(m => {
     if(m.always) return true;
@@ -2001,6 +2022,8 @@ function buildMissionsForDate(agentId, dayDate){
   const onLaundry = isLaundryDayFor(agentId, dayOfWeek);
   const bathroomOrder = ['samuel','johnjr','stephen','daniel'];
   const isBathroomWeek = (agentId === bathroomOrder[weekNum % 4]);
+  const quartermasterOrder = ['samuel','johnjr','stephen','daniel'];
+  const isQuartermasterWeek = (agentId === quartermasterOrder[(weekNum + 1) % 4]);
 
   const missions = [];
   missions.push({id:'bed', points:5});
@@ -2054,6 +2077,10 @@ function buildMissionsForDate(agentId, dayDate){
   if(agentId==='samuel'||agentId==='johnjr'||agentId==='stephen') missions.push({id:'fridge', points:10});
   if(agentId==='stephen') missions.push({id:'hutch', points:10});
   if(isBathroomWeek) missions.push({id:'bathroom-clean', points:15});
+  if(isQuartermasterWeek){
+    missions.push({id:'qm-bread-check', points:5});
+    missions.push({id:'qm-fridge-check', points:5});
+  }
 
   missions.push({id:'rabbit-cage', points:15});
 
@@ -2198,6 +2225,18 @@ function getBathroomAgent(_d){
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
   return order[weekNum % 4];
+}
+
+// Quartermaster — weekly rotating inspection role. Checks the small
+// recurring trouble spots (bread left open, fridge not covered) rather
+// than doing a cleaning task. Same rotation shape as the bathroom role,
+// offset by one week so the two don't always land on the same boy.
+function getQuartermasterAgent(_d){
+  const order = ['samuel','johnjr','stephen','daniel'];
+  const now = _d ? new Date(_d) : new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
+  return order[(weekNum + 1) % 4];
 }
 
 // Get Monday of current week as YYYY-MM-DD
