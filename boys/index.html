@@ -1516,48 +1516,61 @@ function buildMissions(agentId, _d){
     // Dish team is either Sam+John or Stephen+Daniel
     // Sam+John: both alternate load and unload between themselves
     // Stephen+Daniel: Stephen UNLOADS, Daniel LOADS — always, no exceptions
+    // Dishwasher runs up to 3 times a day — load, run, and put away after each run.
+
+    const ROUNDS = [
+      {n: 1, label: 'Round 1'},
+      {n: 2, label: 'Round 2'},
+      {n: 3, label: 'Round 3'}
+    ];
 
     if(agentId === 'samuel' || agentId === 'johnjr'){
       const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
-      missions.push({
-        id: 'dishwasher-load',
-        text: `Load the dishwasher — with ${partner}`,
-        detail: `You and ${partner} handle dishes today. Load all dirty dishes after meals.`,
-        points: 10,
-        category: 'kitchen',
-        always: true
-      });
-      missions.push({
-        id: 'dishwasher-unload',
-        text: `Unload dishwasher & put away — with ${partner}`,
-        detail: `Empty the clean dishes and put everything in its place. Work with ${partner}.`,
-        points: 10,
-        category: 'kitchen',
-        always: true
+      ROUNDS.forEach(r => {
+        missions.push({
+          id: `dishwasher-load-${r.n}`,
+          text: `Load the dishwasher — ${r.label} — with ${partner}`,
+          detail: `You and ${partner} handle dishes today. Load it up whenever it's full — up to 3 times a day.`,
+          points: 10,
+          category: 'kitchen',
+          always: true
+        });
+        missions.push({
+          id: `dishwasher-unload-${r.n}`,
+          text: `Unload & put away — ${r.label} — with ${partner}`,
+          detail: `As soon as this run finishes, empty it and put everything away before the next load goes in.`,
+          points: 10,
+          category: 'kitchen',
+          always: true
+        });
       });
     }
 
     if(agentId === 'stephen'){
       // Stephen ONLY unloads — Daniel loads
-      missions.push({
-        id: 'dishwasher-unload',
-        text: 'Unload dishwasher & put away — with Daniel',
-        detail: 'Empty the clean dishes and put everything in its place. Daniel will load.',
-        points: 10,
-        category: 'kitchen',
-        always: true
+      ROUNDS.forEach(r => {
+        missions.push({
+          id: `dishwasher-unload-${r.n}`,
+          text: `Unload & put away — ${r.label} — with Daniel`,
+          detail: `As soon as this run finishes, empty it and put everything away. Daniel will load the next one.`,
+          points: 10,
+          category: 'kitchen',
+          always: true
+        });
       });
     }
 
     if(agentId === 'daniel'){
       // Daniel ONLY loads — Stephen unloads
-      missions.push({
-        id: 'dishwasher-load',
-        text: 'Load the dishwasher — with Stephen',
-        detail: 'Load all the dirty dishes after meals. Stephen will unload and put away.',
-        points: 10,
-        category: 'kitchen',
-        always: true
+      ROUNDS.forEach(r => {
+        missions.push({
+          id: `dishwasher-load-${r.n}`,
+          text: `Load the dishwasher — ${r.label} — with Stephen`,
+          detail: `Load it up whenever it's full — up to 3 times a day. Stephen will unload and put away after each run.`,
+          points: 10,
+          category: 'kitchen',
+          always: true
+        });
       });
     }
 
@@ -1958,7 +1971,7 @@ function applyBehaviorDeductions(score100, deductionPoints){
 }
 
 // Get the dish mission IDs for a given pair (used in transfer detection)
-const DISH_MISSION_IDS = ['dishwasher-load','dishwasher-unload','table-clear','table-wipe'];
+const DISH_MISSION_IDS = ['dishwasher-load-1','dishwasher-unload-1','dishwasher-load-2','dishwasher-unload-2','dishwasher-load-3','dishwasher-unload-3','table-clear','table-wipe'];
 
 // Check if the OTHER team's dish missions from yesterday are still incomplete,
 // and if THIS agent's team completed them today on top of their own.
@@ -2045,12 +2058,14 @@ function buildMissionsForDate(agentId, dayDate){
   missions.push({id:'research-report', points:6});
 
   if(onDishes){
-    if(agentId==='samuel'||agentId==='johnjr'){
-      missions.push({id:'dishwasher-load', points:10});
-      missions.push({id:'dishwasher-unload', points:10});
+    for(let r=1; r<=3; r++){
+      if(agentId==='samuel'||agentId==='johnjr'){
+        missions.push({id:`dishwasher-load-${r}`, points:10});
+        missions.push({id:`dishwasher-unload-${r}`, points:10});
+      }
+      if(agentId==='stephen') missions.push({id:`dishwasher-unload-${r}`, points:10});
+      if(agentId==='daniel') missions.push({id:`dishwasher-load-${r}`, points:10});
     }
-    if(agentId==='stephen') missions.push({id:'dishwasher-unload', points:10});
-    if(agentId==='daniel') missions.push({id:'dishwasher-load', points:10});
     missions.push({id:'table-clear', points:5});
     missions.push({id:'table-wipe', points:5});
   }
@@ -2226,7 +2241,7 @@ function toggleMission(missionId, refPath){
 
 const AGENTS = ['samuel','johnjr','stephen','daniel'];
 const AGENT_NAMES = {samuel:'Samuel',johnjr:'John Jr.',stephen:'Stephen',daniel:'Daniel'};
-const DISH_MISSIONS = ['dishwasher-load','dishwasher-unload','table-clear','table-wipe'];
+const DISH_MISSIONS = ['dishwasher-load-1','dishwasher-unload-1','dishwasher-load-2','dishwasher-unload-2','dishwasher-load-3','dishwasher-unload-3','table-clear','table-wipe'];
 const WEEKLY_MISSIONS = ['laundry-sam','laundry-john','laundry-stephen','laundry-daniel',
   'hutch','fridge','bathroom-clean','rabbit-cage','bathroom-trash'];
 
@@ -2307,7 +2322,16 @@ function getDayStatus(agentId, dateStr, missionData, transferData){
 
   // Dishes team
   if(onDishes){
-    required.push('dishwasher-load','dishwasher-unload','table-clear','table-wipe');
+    for(let r=1; r<=3; r++){
+      if(agentId==='samuel'||agentId==='johnjr'){
+        required.push(`dishwasher-load-${r}`, `dishwasher-unload-${r}`);
+      } else if(agentId==='stephen'){
+        required.push(`dishwasher-unload-${r}`);
+      } else if(agentId==='daniel'){
+        required.push(`dishwasher-load-${r}`);
+      }
+    }
+    required.push('table-clear','table-wipe');
   } else {
     required.push('table-set');
     if(agentId==='samuel'||agentId==='johnjr') required.push('drinks');
@@ -3490,9 +3514,12 @@ function getExpectedMissionsLocal(agentId){
   const onLaundryDay = isLaundryDayFor(agentId, new Date().getDay());
 
   if(onDishes){
-    if(agentId==='stephen') base.push('dishwasher-unload','table-clear','table-wipe');
-    else if(agentId==='daniel') base.push('dishwasher-load','table-clear','table-wipe');
-    else base.push('dishwasher-load','dishwasher-unload','table-clear','table-wipe');
+    for(let r=1; r<=3; r++){
+      if(agentId==='stephen') base.push(`dishwasher-unload-${r}`);
+      else if(agentId==='daniel') base.push(`dishwasher-load-${r}`);
+      else base.push(`dishwasher-load-${r}`, `dishwasher-unload-${r}`);
+    }
+    base.push('table-clear','table-wipe');
   } else {
     if(!base.includes('table-set')) base.push('table-set');
     if(agentId==='samuel'||agentId==='johnjr') base.push('drinks');
