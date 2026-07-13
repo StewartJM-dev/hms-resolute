@@ -1440,7 +1440,7 @@ function buildMissions(agentId, _d){
   const wed = isWednesday(_d);
   const day = getDayName(_d);
   const isBathroomWeek = (agentId === getBathroomAgent(_d));
-  const isQuartermasterWeek = (agentId === getQuartermasterAgent(_d));
+  const isCaptainOfWatch = (agentId === getCaptainOfWatch(_d));
 
   // Is this agent on dishes today?
   const onDishes = (agentId === 'samuel' || agentId === 'johnjr')
@@ -1874,23 +1874,32 @@ function buildMissions(agentId, _d){
     }
   }
 
-  // ── QUARTERMASTER (weekly rotating inspection role) ──
-  if(isQuartermasterWeek){
+  // ── CAPTAIN OF THE WATCH (daily rotating inspection role, no points) ──
+  if(isCaptainOfWatch){
+    const watchDetail = 'Bread loaves on the hutch sealed shut. Fridge covered shelf by shelf — lids on, bags sealed. All lights off, bathroom included.';
     missions.push({
-      id: 'qm-bread-check',
-      text: 'Quartermaster: Check the bread',
-      detail: 'Look over the bread loaves on the hutch — every bag sealed shut, none left open.',
-      points: 5,
-      category: 'quartermaster',
-      weekly: true
+      id: 'cotw-morning',
+      text: 'Captain of the Watch: Morning Round',
+      detail: watchDetail,
+      points: 0,
+      category: 'captain-of-the-watch',
+      always: true
     });
     missions.push({
-      id: 'qm-fridge-check',
-      text: 'Quartermaster: Check the fridge',
-      detail: 'Go shelf by shelf — lids on, bags sealed, nothing left uncovered.',
-      points: 5,
-      category: 'quartermaster',
-      weekly: true
+      id: 'cotw-midday',
+      text: 'Captain of the Watch: Midday Round',
+      detail: watchDetail,
+      points: 0,
+      category: 'captain-of-the-watch',
+      always: true
+    });
+    missions.push({
+      id: 'cotw-evening',
+      text: 'Captain of the Watch: Evening Round',
+      detail: watchDetail,
+      points: 0,
+      category: 'captain-of-the-watch',
+      always: true
     });
   }
 
@@ -2022,8 +2031,9 @@ function buildMissionsForDate(agentId, dayDate){
   const onLaundry = isLaundryDayFor(agentId, dayOfWeek);
   const bathroomOrder = ['samuel','johnjr','stephen','daniel'];
   const isBathroomWeek = (agentId === bathroomOrder[weekNum % 4]);
-  const quartermasterOrder = ['samuel','johnjr','stephen','daniel'];
-  const isQuartermasterWeek = (agentId === quartermasterOrder[(weekNum + 1) % 4]);
+  const captainOrder = ['samuel','johnjr','stephen','daniel'];
+  const dayNum = Math.floor((dayDate - startOfYear) / (24*60*60*1000));
+  const isCaptainOfWatch = (agentId === captainOrder[dayNum % 4]);
 
   const missions = [];
   missions.push({id:'bed', points:5});
@@ -2077,9 +2087,10 @@ function buildMissionsForDate(agentId, dayDate){
   if(agentId==='samuel'||agentId==='johnjr'||agentId==='stephen') missions.push({id:'fridge', points:10});
   if(agentId==='stephen') missions.push({id:'hutch', points:10});
   if(isBathroomWeek) missions.push({id:'bathroom-clean', points:15});
-  if(isQuartermasterWeek){
-    missions.push({id:'qm-bread-check', points:5});
-    missions.push({id:'qm-fridge-check', points:5});
+  if(isCaptainOfWatch){
+    missions.push({id:'cotw-morning', points:0});
+    missions.push({id:'cotw-midday', points:0});
+    missions.push({id:'cotw-evening', points:0});
   }
 
   missions.push({id:'rabbit-cage', points:15});
@@ -2227,16 +2238,17 @@ function getBathroomAgent(_d){
   return order[weekNum % 4];
 }
 
-// Quartermaster — weekly rotating inspection role. Checks the small
-// recurring trouble spots (bread left open, fridge not covered) rather
-// than doing a cleaning task. Same rotation shape as the bathroom role,
-// offset by one week so the two don't always land on the same boy.
-function getQuartermasterAgent(_d){
+// Captain of the Watch — daily rotating inspection role. Checks the small
+// recurring trouble spots (bread left open, fridge not covered, lights left
+// on) three times a day. Part of the checks-and-balances system, same idea
+// as Dawn's White Glove inspections. No points — this is oversight, not a
+// chore. Rotates to a new boy every single day (not reset weekly).
+function getCaptainOfWatch(_d){
   const order = ['samuel','johnjr','stephen','daniel'];
   const now = _d ? new Date(_d) : new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
-  return order[(weekNum + 1) % 4];
+  const dayNum = Math.floor((now - startOfYear) / (24*60*60*1000));
+  return order[dayNum % 4];
 }
 
 // Get Monday of current week as YYYY-MM-DD
