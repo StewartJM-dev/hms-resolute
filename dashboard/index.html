@@ -1149,13 +1149,17 @@ function renderDawnShipsOrders(){
     _db.ref(`stewart/devotional/dawn/${devWeekKey}/${today}`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/vineyard`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/pots`).once('value'),
-    _db.ref(`stewart/dawnDailyOrders/${weekStart}/mealplan`).once('value')
-  ]).then(([devSnap, vineSnap, potsSnap, mealSnap]) => {
+    _db.ref(`stewart/dawnDailyOrders/${weekStart}/mealplan`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/warroom`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/crowsnest`).once('value')
+  ]).then(([devSnap, vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap]) => {
     const checks = [];
     if(!devSnap.val()) checks.push({text:'Daily devotions', auto:true});
     if(!vineSnap.val()) checks.push({text:'Tend to the Vineyard', key:'vineyard', scope:today});
     if(!potsSnap.val()) checks.push({text:'Wash dinner pots and pans', key:'pots', scope:today});
     if(!mealSnap.val()) checks.push({text:'Generate meal plan for the week', key:'mealplan', scope:weekStart});
+    if(!warRoomSnap.val()) checks.push({text:'Visit the War Room — submit a prayer request and pray for yours and others', key:'warroom', scope:today});
+    if(!crowsNestSnap.val()) checks.push({text:'Visit the Crow\'s Nest — add a praise or see what someone else is grateful for', key:'crowsnest', scope:today});
 
     renderDawnShipsOrdersUI(checks, officerNames[officer] || officer);
   }).catch(()=>{
