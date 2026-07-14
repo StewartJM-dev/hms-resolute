@@ -888,6 +888,16 @@ function localDateStr(date){
   const day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 }
+
+// IMPORTANT: new Date("YYYY-MM-DD") parses as UTC midnight, which silently
+// shifts to the PREVIOUS calendar day in any US timezone (behind UTC) —
+// causing missions, pay, and schedules to land on the wrong day. Always use
+// this instead of new Date(dateStr) when dateStr is a "YYYY-MM-DD" string.
+function parseLocalDate(dateStr){
+  if(dateStr instanceof Date) return dateStr;
+  const parts = String(dateStr).split('-').map(Number);
+  return new Date(parts[0], parts[1]-1, parts[2]);
+}
 function escapeHtml(s){
   return String(s||'')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -1084,7 +1094,7 @@ function recalculateScore(agentId, dateStr){
     const deductions = dSnap.val() || {}; // {reasonKey: points, ...}
 
     // Build expected missions for that date (use date-aware logic)
-    const dayDate = new Date(dateStr);
+    const dayDate = parseLocalDate(dateStr);
     const dayOfWeek = dayDate.getDay();
     if(dayOfWeek===0||dayOfWeek===6){
       // Weekend — no score
@@ -3078,7 +3088,7 @@ function renderGrowthLog(){
       const entry = data[weekStart];
       const application = entry.application || '';
       const reflection = entry.reflection || '';
-      const d = new Date(weekStart);
+      const d = parseLocalDate(weekStart);
       const label = d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
 
       return `<div class="card" style="margin-bottom:8px;">
@@ -3944,7 +3954,7 @@ function getDevotionalWeekKey(){
 function renderFamilyDevotionalInput(){
   if(!_db) return;
   const weekKey = getDevotionalWeekKey();
-  const d = new Date(weekKey);
+  const d = parseLocalDate(weekKey);
   const weekLabel = d.toLocaleDateString('en-US',{month:'long', day:'numeric'});
 
   _db.ref(`stewart/devotional/family/${weekKey}`).once('value', snap => {
@@ -4031,7 +4041,7 @@ function renderDevotionalHistory(){
     el.innerHTML = `<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Previous Weeks</div>` +
       weeks.map(wk => {
         const entry = data[wk];
-        const d = new Date(wk);
+        const d = parseLocalDate(wk);
         const label = d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
         return `<div style="border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-bottom:6px;cursor:pointer;" onclick="loadDevotionalWeek('${wk}')">
           <div style="font-size:12px;font-weight:700;color:var(--ink);">Week of ${label}${entry.title?' — '+entry.title:''}</div>
@@ -4173,7 +4183,7 @@ function renderDawnDevotionalInput(){
     // Build day tabs Mon-Sun
     const days = [];
     for(let i=0; i<7; i++){
-      const d = new Date(weekKey);
+      const d = parseLocalDate(weekKey);
       d.setDate(d.getDate()+i);
       days.push(localDateStr(d));
     }
@@ -4207,7 +4217,7 @@ function selectDawnDay(dateStr){
     const el = document.getElementById('dawn-day-entry');
     if(!el) return;
 
-    const d = new Date(dateStr);
+    const d = parseLocalDate(dateStr);
     const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
 
     el.innerHTML = `
