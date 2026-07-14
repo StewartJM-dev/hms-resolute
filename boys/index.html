@@ -585,6 +585,17 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
   </div>
 </div>
 
+<!-- ═══ SIGN-OUT REMINDER (triggered when mouse nears bottom-right corner) ═══ -->
+<div id="signout-reminder-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:380px;width:100%;background:linear-gradient(180deg,#0d1b2a,#050a10);border:1px solid rgba(232,184,74,.4);border-radius:14px;padding:26px 22px;text-align:center;">
+    <div style="font-size:38px;margin-bottom:8px;">🪪</div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin-bottom:14px;">Before You Go, Agent</div>
+    <div style="font-size:13.5px;color:rgba(255,255,255,.85);line-height:1.7;margin-bottom:10px;">Return your ID and this computer to your mother, the XO.</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.65);line-height:1.6;margin-bottom:18px;">If you're the last one using it today, put the laptop <strong style="color:var(--gold);">and the charger</strong> in the box when you hand it back.</div>
+    <button onclick="closeSignoutReminder()" style="width:100%;padding:12px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD ⚓</button>
+  </div>
+</div>
+
 
 <!-- ═══ AGENT SELECT SCREEN ═══ -->
 <div class="screen active" id="screen-select">
@@ -3497,6 +3508,11 @@ function closeTutorial(){
   document.getElementById('tutorial-overlay').style.display = 'none';
 }
 
+function closeSignoutReminder(){
+  const overlay = document.getElementById('signout-reminder-overlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
 function getOrdersWeekStart(){
   const d = new Date();
   const day = (d.getDay()+6)%7;
@@ -4818,6 +4834,21 @@ function renderFamilyDevotionalDisplay(){
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
   if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter') sendPrivateMessage(); });
+
+  // ── Sign-out reminder: triggers once per visit when the mouse nears the
+  //    bottom-right corner of the page (where they head to sign out / close up). ──
+  let signoutShown = false;
+  const SIGNOUT_CORNER_MARGIN = 90; // px from the corner that counts as "near"
+  document.addEventListener('mousemove', e => {
+    if(signoutShown) return;
+    const nearRight = (window.innerWidth - e.clientX) < SIGNOUT_CORNER_MARGIN;
+    const nearBottom = (window.innerHeight - e.clientY) < SIGNOUT_CORNER_MARGIN;
+    if(nearRight && nearBottom){
+      signoutShown = true;
+      const overlay = document.getElementById('signout-reminder-overlay');
+      if(overlay) overlay.style.display = 'flex';
+    }
+  });
 
   // ── Identity lock: only the authenticated agent (or a parent explicitly assisting
   //    a specific agent from the Gangway) may access an account. No open picker. ──
