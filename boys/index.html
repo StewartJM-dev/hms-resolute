@@ -3108,6 +3108,12 @@ const HANS_LINES = {
   deductions: [
     "Agent {NAME}, HQ noted a little something today. It happens! Even the finest inventions in Gimmelshtump had a few... let's call them 'unplanned outcomes.' Shake it off and press on.",
     "{NAME}, there was a small deduction logged today. Not the end of the world, Agent — just a chance to reset and show what you're really made of tomorrow."
+  ],
+  general: [
+    "Ah, {NAME}! Good to see you, Agent. Carry on with today's orders — you know what to do!",
+    "{NAME}! Reporting for duty, I see. HQ is proud of you already, and it's not even done yet.",
+    "Well if it isn't Agent {NAME}. Back in Gimmelshtump we had a saying — actually never mind, just go do great things today.",
+    "There you are, {NAME}! Every great mission starts with showing up. You've already done that part!"
   ]
 };
 
@@ -3304,6 +3310,13 @@ function runHansEngine(){
       state.behind = true;
     }
 
+    // 7. FALLBACK: Hans shows up every login no matter what — if nothing
+    // else was eligible to fire (already shown earlier today), give a
+    // simple general greeting so he's never just absent.
+    if(toPost.length === 0){
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.general), name, completed, total)});
+    }
+
     state.lastCompleted = completed;
     try { localStorage.setItem('hans-'+agentId+'-'+today, JSON.stringify(state)); } catch(e){}
 
@@ -3317,11 +3330,11 @@ function runHansEngine(){
       const nameColor = 'var(--gold)';
       const icon = `<img src="assets/hans.png" alt="Hans" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
       el.innerHTML = `
-        <div style="border-top:1px solid rgba(255,255,255,.12);margin:4px 0 16px;padding-top:16px;display:flex;gap:10px;align-items:flex-start;">
-          <div style="width:38px;height:38px;border-radius:50%;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">${icon}</div>
-          <div style="flex:1;background:${bg};border:1px solid ${border};border-radius:10px;border-top-left-radius:2px;padding:10px 13px;">
-            <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:${nameColor};margin-bottom:3px;">Hans</div>
-            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.5;">${item.text}</div>
+        <div style="border-top:1px solid rgba(255,255,255,.12);margin:4px 0 16px;padding-top:18px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+          <div style="width:84px;height:84px;border-radius:50%;background:${bg};border:2px solid ${border};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,.35);">${icon}</div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1.5px;color:${nameColor};margin-bottom:6px;">HANS</div>
+          <div style="max-width:320px;background:${bg};border:1px solid ${border};border-radius:12px;padding:12px 16px;">
+            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.55;">${item.text}</div>
           </div>
         </div>`;
     }
