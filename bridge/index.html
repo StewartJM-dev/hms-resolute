@@ -379,7 +379,7 @@ body{
   <div class="week" id="week"></div>
 
     <!-- CREW STATUS (live from family app) -->
-  <div class="shead">Crew Status — Today</div>
+  <div class="shead">🎖️ Captain's Walkthrough — Today</div>
   <div class="crew" id="crew"><div class="crew-loading">Reading the family channel…</div></div>
   </div>
 
@@ -1114,12 +1114,34 @@ function renderBridgeWeekGrid(){
   }).catch(()=>{});
 }
 
+function getOfficerOfWatch(_d){
+  const order = ['samuel','johnjr','stephen','daniel'];
+  const now = _d ? new Date(_d) : new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const dayNum = Math.floor((now - startOfYear) / (24*60*60*1000));
+  return order[dayNum % 4];
+}
+
+function getWGWindowBridge(){
+  const hr = new Date().getHours();
+  if (hr < 13) return {key:'morning', label:'Morning'};
+  if (hr < 17) return {key:'afternoon', label:'Afternoon'};
+  return {key:'evening', label:'Evening'};
+}
+
 function renderStatusBoard(crew){
-  // pull family-night, saga cadence, daily banner
+  const today = localDateStr();
+  const oowAgent = getOfficerOfWatch();
+  const oowNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+  const wgWin = getWGWindowBridge();
+
+  // pull family-night, saga cadence, daily banner, officer of the watch, white glove
   Promise.all([
     _db.ref('stewart/familynight').once('value'),
-    _db.ref('bridge/daily/'+dayKey()).once('value')
-  ]).then(([fnSnap, dailySnap])=>{
+    _db.ref('bridge/daily/'+dayKey()).once('value'),
+    _db.ref(`stewart/missions/${oowAgent}/${today}`).once('value'),
+    _db.ref(`stewart/whiteglove/${today}/${wgWin.key}`).once('value')
+  ]).then(([fnSnap, dailySnap, oowSnap, wgSnap])=>{
     const rows = [];
     // each boy: green if 100%, amber if some, red if none
     crew.forEach(c=>{
@@ -1127,6 +1149,23 @@ function renderStatusBoard(crew){
       const status = c.pct>=100?'All clear':(c.completed>0?c.completed+'/'+MISSION_TARGET:'None yet');
       rows.push({label:c.a.icon+' '+c.a.name, lamp, status});
     });
+
+    // Officer of the Watch — 12 checks (3 rounds x bread/fridge/lights/sink)
+    const oowDone = oowSnap.val() || {};
+    const oowRounds = ['morning','midday','evening'];
+    const oowChecks = ['bread','fridge','lights','sink'];
+    let oowCompleted = 0;
+    oowRounds.forEach(r => oowChecks.forEach(c => { if(oowDone[`oow-${r}-${c}`]) oowCompleted++; }));
+    const oowTotal = 12;
+    const oowLamp = oowCompleted>=oowTotal ? 'green' : (oowCompleted>0 ? 'amber' : 'red');
+    rows.push({label:'\u{1F396}\uFE0F Officer of Watch ('+oowNames[oowAgent]+')', lamp:oowLamp, status:oowCompleted+'/'+oowTotal});
+
+    // White Glove — current window
+    const wg = wgSnap.val();
+    const wgLamp = wg ? 'green' : 'amber';
+    const wgStatus = wg ? 'Logged \u2014 '+wgWin.label : 'Due \u2014 '+wgWin.label;
+    rows.push({label:'\u2699\uFE0F White Glove', lamp:wgLamp, status:wgStatus});
+
     // Saga cadence lamp
     let sagaLamp='off', sagaStatus='no rhythm';
     if(typeof SAGA_CADENCE!=='undefined' && SAGA_CADENCE){
