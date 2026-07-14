@@ -3054,6 +3054,10 @@ const HANS_LINES = {
   behind: [
     "Agent {NAME}, you're running a little behind on missions — but DON'T despair! I've been behind my whole life and look at me! ...okay, bad example. But you can catch up!",
     "{NAME}, the day's getting on and there are still missions to do. No shame! I once procrastinated so long my evil scheme became irrelevant. Yours won't! There's still time!"
+  ],
+  deductions: [
+    "Agent {NAME}, HQ noted a little something today. It happens! Even the finest inventions in Gimmelshtump had a few... let's call them 'unplanned outcomes.' Shake it off and press on.",
+    "{NAME}, there was a small deduction logged today. Not the end of the world, Agent — just a chance to reset and show what you're really made of tomorrow."
   ]
 };
 
@@ -3152,9 +3156,6 @@ const HANS_BOUNCEBACK = [
 // Determine the path: 'evil' (summon Heinz) or 'good' (summon Hans)
 // Evil if: nothing done, OR behind pace in afternoon, OR there are deductions today.
 function hansHeinzPath(completed, total, deductionTotal, hour){
-  if(deductionTotal > 0) return 'evil';
-  if(total > 0 && completed === 0 && hour >= 9) return 'evil';
-  if(hour >= 14 && total > 0 && completed < total/2) return 'evil';
   return 'good';
 }
 
@@ -3215,26 +3216,15 @@ function runHansEngine(){
       state.bounceback = true;
     }
 
-    // 1. MORNING (before noon, once per day) — persona follows the path
+    // 1. MORNING (before noon, once per day)
     if(hour < 12 && !state.morning){
-      if(path === 'evil' && deductionTotal === 0){
-        // Morning with nothing done yet leans Heinz playful
-        toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.notStarted), name, completed, total)});
-      } else if(path === 'evil'){
-        toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.deductions), name, completed, total)});
-      } else {
-        toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.morning), name, completed, total)});
-      }
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.morning), name, completed, total)});
       state.morning = true;
     }
 
-    // 2. EVENING (after 5pm, once per day) — persona follows the path
+    // 2. EVENING (after 5pm, once per day)
     if(hour >= 17 && !state.evening){
-      if(path === 'evil'){
-        toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.eveningEvil), name, completed, total)});
-      } else {
-        toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.evening), name, completed, total)});
-      }
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.evening), name, completed, total)});
       state.evening = true;
     }
 
@@ -3244,29 +3234,23 @@ function runHansEngine(){
       state.allDone = true;
     }
 
-    // 4. DEDUCTION ALERT (Heinz, once per day) — fire if a deduction appeared
+    // 4. DEDUCTION NOTED (once per day) — fire if a deduction appeared
     if(deductionTotal > 0 && !state.deductionNoted && toPost.length === 0){
-      toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.deductions), name, completed, total)});
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.deductions), name, completed, total)});
       state.deductionNoted = true;
     }
 
     // 5. ON-OPEN STATUS: only if completed count changed since last time
     if(state.lastCompleted !== completed && !(completed >= total && state.allDone) && toPost.length === 0){
-      if(path === 'good'){
-        const ctx = hansStatusContext(completed, total);
-        if(ctx && ctx !== 'allDone'){
-          toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES[ctx]), name, completed, total)});
-        }
-      } else {
-        // evil path on-open status
-        const pool = (completed === 0) ? HEINZ_LINES.notStarted : HEINZ_LINES.behind;
-        toPost.push({persona:'heinz', text: hansFill(hansPick(pool), name, completed, total)});
+      const ctx = hansStatusContext(completed, total);
+      if(ctx && ctx !== 'allDone'){
+        toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES[ctx]), name, completed, total)});
       }
     }
 
-    // 6. BEHIND nudge (afternoon, Heinz, once per day)
+    // 6. BEHIND nudge (afternoon, once per day)
     if(hour >= 14 && hour < 17 && completed < total/2 && total > 0 && !state.behind && toPost.length === 0){
-      toPost.push({persona:'heinz', text: hansFill(hansPick(HEINZ_LINES.behind), name, completed, total)});
+      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.behind), name, completed, total)});
       state.behind = true;
     }
 
@@ -3278,21 +3262,15 @@ function runHansEngine(){
     const el = document.getElementById('hans-orders-section');
     if(el && toPost.length){
       const item = toPost[0];
-      const isHeinz = item.persona === 'heinz';
-      const name2 = isHeinz ? 'Heinz' : 'Hans';
-      const bg = isHeinz ? 'rgba(120,40,140,.14)' : 'rgba(200,146,42,.12)';
-      const border = isHeinz ? 'rgba(160,60,180,.4)' : 'rgba(200,146,42,.3)';
-      const nameColor = isHeinz ? '#c77dff' : 'var(--gold)';
-      // Same character image for both — Heinz gets a purple duotone tint
-      // to read as his "evil twin" moment, since we don't have a separate
-      // original villain image yet.
-      const imgFilter = isHeinz ? 'filter:hue-rotate(220deg) saturate(2.2) brightness(0.9);' : '';
-      const icon = `<img src="assets/hans.png" alt="${name2}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;${imgFilter}">`;
+      const bg = 'rgba(200,146,42,.12)';
+      const border = 'rgba(200,146,42,.3)';
+      const nameColor = 'var(--gold)';
+      const icon = `<img src="assets/hans.png" alt="Hans" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
       el.innerHTML = `
         <div style="border-top:1px solid rgba(255,255,255,.12);margin:4px 0 16px;padding-top:16px;display:flex;gap:10px;align-items:flex-start;">
           <div style="width:38px;height:38px;border-radius:50%;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">${icon}</div>
           <div style="flex:1;background:${bg};border:1px solid ${border};border-radius:10px;border-top-left-radius:2px;padding:10px 13px;">
-            <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:${nameColor};margin-bottom:3px;">${name2}</div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:${nameColor};margin-bottom:3px;">Hans</div>
             <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.5;">${item.text}</div>
           </div>
         </div>`;
@@ -3529,30 +3507,43 @@ function renderShipsOrders(){
     _db.ref(`stewart/reading/${agentId}/${weekStart}/${today}`).once('value'),
     _db.ref(`stewart/groupChatSeen/${agentId}/${today}`).once('value'),
     weekKey ? _db.ref(`stewart/teachvote/${weekKey}/votes/${agentId}`).once('value') : Promise.resolve(null),
-    _db.ref(`stewart/selfassessment/${agentId}`).once('value')
-  ]).then(([missionSnap, readingSnap, chatSnap, voteSnap, selfSnap]) => {
+    _db.ref(`stewart/selfassessment/${agentId}`).once('value'),
+    _db.ref(`stewart/shipsOrdersManual/${agentId}/${today}/warroom`).once('value'),
+    _db.ref(`stewart/shipsOrdersManual/${agentId}/${today}/crowsnest`).once('value')
+  ]).then(([missionSnap, readingSnap, chatSnap, voteSnap, selfSnap, warRoomSnap, crowsNestSnap]) => {
     const checks = [];
 
     const done = missionSnap.val() || {};
     const missions = buildMissions(agentId);
     const gateMissions = missions.filter(m => m.category !== 'computer');
     const allDone = gateMissions.length > 0 && gateMissions.every(m => done[m.id]);
-    if(!allDone) checks.push('Complete today\'s missions');
+    if(!allDone) checks.push({text: 'Complete today\'s missions', auto:true});
 
-    if(!readingSnap.val()) checks.push('Log your reading for today');
+    if(!readingSnap.val()) checks.push({text: 'Log your reading for today', auto:true});
 
-    if(!chatSnap.val()) checks.push('Check the group chat');
+    if(!chatSnap.val()) checks.push({text: 'Check the group chat', auto:true});
 
-    if(dow >= 2 && dow <= 4 && voteSnap && !voteSnap.val()) checks.push('Place your Teach Me vote');
+    if(dow >= 2 && dow <= 4 && voteSnap && !voteSnap.val()) checks.push({text: 'Place your Teach Me vote', auto:true});
 
     const selfData = selfSnap.val();
     const weekStartMs = new Date(weekStart+'T00:00:00').getTime();
     const selfDoneThisWeek = selfData && selfData.updatedAt && selfData.updatedAt >= weekStartMs;
-    if(!selfDoneThisWeek) checks.push('Complete your weekly self-assessment');
+    if(!selfDoneThisWeek) checks.push({text: 'Complete your weekly self-assessment', auto:true});
+
+    if(!warRoomSnap.val()) checks.push({text: 'Visit the War Room — submit a prayer request and pray for yours and others', key:'warroom'});
+    if(!crowsNestSnap.val()) checks.push({text: 'Visit the Crow\'s Nest — add a praise or see what someone else is grateful for', key:'crowsnest'});
 
     renderShipsOrdersUI(checks, officerNames[officer] || officer);
   }).catch(()=>{
     renderShipsOrdersUI([], '—');
+  });
+}
+
+function toggleShipsOrderItem(key){
+  if(!currentAgent || !_db) return;
+  const today = localDateStr();
+  _db.ref(`stewart/shipsOrdersManual/${currentAgent.id}/${today}/${key}`).set(true).then(() => {
+    renderShipsOrders();
   });
 }
 
@@ -3561,9 +3552,16 @@ function renderShipsOrdersUI(checks, officerName){
   if(!el) return;
 
   const listHtml = checks.length
-    ? '<ul style="font-size:13px;color:rgba(255,255,255,.8);line-height:2;margin:0 0 18px 20px;padding:0;">' +
-        checks.map(c => '<li>'+c+'</li>').join('') +
-      '</ul>'
+    ? '<div style="display:grid;gap:6px;margin-bottom:18px;">' +
+        checks.map(c => {
+          if(c.auto){
+            return '<div style="font-size:13px;color:rgba(255,255,255,.8);padding:6px 0;">'+c.text+'</div>';
+          }
+          return '<div onclick="toggleShipsOrderItem(\''+c.key+'\')" style="display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.8);padding:6px 0;cursor:pointer;">'+
+            '<span style="width:18px;height:18px;border:1.5px solid var(--gold);border-radius:5px;flex-shrink:0;"></span>'+c.text+
+          '</div>';
+        }).join('') +
+      '</div>'
     : '<p style="font-size:13px;color:#4aaa6a;line-height:1.6;margin-bottom:18px;">&#10003; All caught up for today, Agent. Well done.</p>';
 
   el.innerHTML = `
