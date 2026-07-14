@@ -3920,7 +3920,7 @@ function renderStatusSummary(){
 
   const today = localDateStr();
   const weekStart = getWeekStart();
-  recalculateScore(currentAgent.id, today);
+  recalculateScore(currentAgent.id, today).then(() => {
 
   Promise.all([
     _db.ref(`stewart/scores/${currentAgent.id}/${today}`).once('value'),
@@ -3984,6 +3984,7 @@ function renderStatusSummary(){
           Weekly chores: ${weeklyComplete}/${weeklyTotal} &mdash; Family Night ${familyNightUnlocked?'ready!':'in progress'}
         </div>
       </div>`;
+  });
   });
 }
 
