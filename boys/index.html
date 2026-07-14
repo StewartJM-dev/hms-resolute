@@ -1108,7 +1108,6 @@ function selectAgent(id, codename, name, rank, theme, icon){
   renderPayScreen();
   loadPrivatePreview();
   setTimeout(() => updateGroupBadge(), 1600);
-  setTimeout(() => runHansEngine(), 2000);
   // Small delay then re-render missions once Firebase is settled
   setTimeout(() => renderMissions(), 1500);
   setTimeout(() => renderGameTime(), 1000);
@@ -2336,7 +2335,6 @@ function toggleMission(missionId, refPath){
   renderSuperFamilyNight();
   renderFamilyDevotionalDisplay();
   renderCourageDare();
-  setTimeout(() => runHansEngine(), 500);
     });
   });
 }
@@ -3275,8 +3273,27 @@ function runHansEngine(){
     state.lastCompleted = completed;
     try { localStorage.setItem('hans-'+agentId+'-'+today, JSON.stringify(state)); } catch(e){}
 
-    // Post sequentially in order
-    toPost.forEach((item, idx) => setTimeout(() => hansPost(item.text, item.persona), idx * 450));
+    // Show just the single highest-priority message in Ship's Orders
+    // (no longer posted into the chat thread — keeps chats clean)
+    const el = document.getElementById('hans-orders-section');
+    if(el && toPost.length){
+      const item = toPost[0];
+      const isHeinz = item.persona === 'heinz';
+      const name2 = isHeinz ? 'Heinz' : 'Hans';
+      const bg = isHeinz ? 'rgba(120,40,140,.14)' : 'rgba(200,146,42,.12)';
+      const border = isHeinz ? 'rgba(160,60,180,.4)' : 'rgba(200,146,42,.3)';
+      const nameColor = isHeinz ? '#c77dff' : 'var(--gold)';
+      // TODO: swap this emoji for John's actual Hans/Heinz character image once provided
+      const icon = isHeinz ? '&#129441;&#9889;' : '&#129441;';
+      el.innerHTML = `
+        <div style="border-top:1px solid rgba(255,255,255,.12);margin:4px 0 16px;padding-top:16px;display:flex;gap:10px;align-items:flex-start;">
+          <div style="width:38px;height:38px;border-radius:50%;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;">${icon}</div>
+          <div style="flex:1;background:${bg};border:1px solid ${border};border-radius:10px;border-top-left-radius:2px;padding:10px 13px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:${nameColor};margin-bottom:3px;">${name2}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.5;">${item.text}</div>
+          </div>
+        </div>`;
+    }
   });
 }
 
@@ -3559,8 +3576,12 @@ function renderShipsOrdersUI(checks, officerName){
     <div style="font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1px;color:var(--teal2);text-transform:uppercase;margin-bottom:8px;">Before You're Done Today</div>
     ${listHtml}
 
+    <div id="hans-orders-section"></div>
+
     <button onclick="closeTutorial()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD, CAPTAIN ⚓</button>
   `;
+
+  runHansEngine();
 }
 
 function startConfetti(){
