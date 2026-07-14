@@ -438,6 +438,13 @@ body{
 </head>
 <body>
 
+<!-- ═══ SHIP'S ORDERS (Dawn's daily checklist) ═══ -->
+<div id="dawn-orders-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:#fff;border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;" id="dawn-orders-content">
+    <!-- filled dynamically by renderDawnShipsOrders() -->
+  </div>
+</div>
+
 <!-- ═══ PIN SCREEN ═══ -->
 <div class="pin-screen" id="pin-screen">
   <div class="pin-logo">Stewart Family</div>
@@ -918,6 +925,7 @@ let pinEntry = '';
       document.getElementById('main-app').classList.add('active');
       initFirebase();
       setTimeout(() => renderOverview(), 800);
+      setTimeout(() => showDawnShipsOrders(), 1400);
     }
   }catch(e){}
 })();
@@ -933,6 +941,7 @@ function pinPress(d){
         document.getElementById('main-app').classList.add('active');
         initFirebase();
         setTimeout(() => renderOverview(), 800);
+      setTimeout(() => showDawnShipsOrders(), 1400);
       } else {
         document.getElementById('pin-error').textContent = 'Incorrect PIN. Try again.';
         pinEntry = '';
@@ -1098,6 +1107,96 @@ function getDayName_u(_d){
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   return days[(_d?new Date(_d):new Date()).getDay()];
 }
+function getOfficerOfWatch_u(_d){
+  const order = ['samuel','johnjr','stephen','daniel'];
+  const now = _d ? new Date(_d) : new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const dayNum = Math.floor((now - startOfYear) / (24*60*60*1000));
+  return order[dayNum % 4];
+}
+
+function getDawnOrdersWeekStart(){
+  const d = new Date();
+  const day = (d.getDay()+6)%7;
+  d.setDate(d.getDate()-day);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function showDawnShipsOrders(){
+  renderDawnShipsOrders();
+  document.getElementById('dawn-orders-overlay').style.display = 'flex';
+}
+function closeDawnShipsOrders(){
+  document.getElementById('dawn-orders-overlay').style.display = 'none';
+}
+
+function renderDawnShipsOrders(){
+  if(!_db) return;
+  const today = localDateStr();
+  const weekStart = getDawnOrdersWeekStart();
+  const devWeekKey = (typeof getDevotionalWeekKey === 'function') ? getDevotionalWeekKey() : weekStart;
+  const officer = getOfficerOfWatch_u();
+  const officerNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+
+  Promise.all([
+    _db.ref(`stewart/devotional/dawn/${devWeekKey}/${today}`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/vineyard`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/pots`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${weekStart}/mealplan`).once('value')
+  ]).then(([devSnap, vineSnap, potsSnap, mealSnap]) => {
+    const checks = [];
+    if(!devSnap.val()) checks.push({text:'Daily devotions', auto:true});
+    if(!vineSnap.val()) checks.push({text:'Tend to the Vineyard', key:'vineyard', scope:today});
+    if(!potsSnap.val()) checks.push({text:'Wash dinner pots and pans', key:'pots', scope:today});
+    if(!mealSnap.val()) checks.push({text:'Generate meal plan for the week', key:'mealplan', scope:weekStart});
+
+    renderDawnShipsOrdersUI(checks, officerNames[officer] || officer);
+  }).catch(()=>{
+    renderDawnShipsOrdersUI([], '—');
+  });
+}
+
+function toggleDawnOrderItem(key, scope){
+  if(!_db) return;
+  _db.ref(`stewart/dawnDailyOrders/${scope}/${key}`).set(true).then(() => {
+    renderDawnShipsOrders();
+  });
+}
+
+function renderDawnShipsOrdersUI(checks, officerName){
+  const el = document.getElementById('dawn-orders-content');
+  if(!el) return;
+
+  const listHtml = checks.length
+    ? '<div style="display:grid;gap:8px;margin-bottom:18px;">' +
+        checks.map(c => {
+          if(c.auto){
+            return '<div style="font-size:13px;color:var(--ink);padding:8px 0;border-bottom:1px solid var(--border);">'+c.text+'</div>';
+          }
+          return '<div onclick="toggleDawnOrderItem(\''+c.key+'\',\''+c.scope+'\')" style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">'+
+            '<span style="width:20px;height:20px;border:1.5px solid var(--brown);border-radius:5px;flex-shrink:0;"></span>'+c.text+
+          '</div>';
+        }).join('') +
+      '</div>'
+    : '<p style="font-size:13px;color:#2d6a47;line-height:1.6;margin-bottom:18px;">&#10003; All caught up for today.</p>';
+
+  el.innerHTML = `
+    <div style="text-align:center;font-size:40px;margin-bottom:6px;">⚓</div>
+    <div style="text-align:center;font-family:'Cinzel',serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:4px;">Ship's Orders</div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:18px;">Today's Standing Orders</div>
+
+    <div style="background:rgba(232,184,74,.12);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:18px;text-align:center;">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Officer of the Watch Today</div>
+      <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--brown);font-weight:700;">${officerName}</div>
+    </div>
+
+    <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:8px;">Before You're Done Today</div>
+    ${listHtml}
+
+    <button onclick="closeDawnShipsOrders()" style="width:100%;padding:13px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD ⚓</button>
+  `;
+}
+
 function getBathroomAgent_u(_d){
   const order = ['samuel','johnjr','stephen','daniel'];
   const now = _d ? new Date(_d) : new Date();
