@@ -891,7 +891,8 @@ const DAILY_ITEMS = [
   {key:'devotions', label:'Morning devotions', link:null},
   {key:'vineyard',  label:'Tend the Vineyard', link:'../vineyard/'},
   {key:'saga',      label:"Write today's bearing", link:null},
-  {key:'family',    label:'Check in with the family', link:null}
+  {key:'family',    label:'Check in with the family', link:null},
+  {key:'walkthrough', label:"Captain's Walkthrough — inspection round", link:null}
 ];
 function dayKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function loadDailyBanner(){
@@ -1026,7 +1027,7 @@ function loadInstruments(){
   ]))).then(results => {
     const crew = AGENTS.map((a,i)=>{
       const done = results[i][0].val() || {};
-      const completed = Object.values(done).filter(Boolean).length;
+      const completed = Object.keys(done).filter(id => done[id] && !id.startsWith('oow-')).length;
       const score = results[i][1].val();
       const pct = Math.min(100, Math.round((completed/MISSION_TARGET)*100));
       return {a, completed, score, pct};
@@ -1162,16 +1163,16 @@ function renderStatusBoard(crew){
 
     // White Glove — current window
     const wg = wgSnap.val();
-    const wgLamp = wg ? 'green' : 'amber';
+    const wgLamp = wg ? 'green' : 'red';
     const wgStatus = wg ? 'Logged \u2014 '+wgWin.label : 'Due \u2014 '+wgWin.label;
     rows.push({label:'\u2699\uFE0F White Glove', lamp:wgLamp, status:wgStatus});
 
     // Saga cadence lamp
-    let sagaLamp='off', sagaStatus='no rhythm';
+    let sagaLamp='red', sagaStatus='not started';
     if(typeof SAGA_CADENCE!=='undefined' && SAGA_CADENCE){
       const releases=(SAGA_CHAPTERS||[]).filter(x=>x.released&&x.released_at).map(x=>x.released_at);
       const last=releases.length?Math.max.apply(null,releases):0;
-      if(!last){ sagaLamp='amber'; sagaStatus='not started'; }
+      if(!last){ sagaLamp='red'; sagaStatus='not started'; }
       else{
         const due=last+SAGA_CADENCE*86400000;
         const daysLeft=Math.ceil((due-Date.now())/86400000);
@@ -1181,15 +1182,15 @@ function renderStatusBoard(crew){
       }
     }
     rows.push({label:'📖 The Saga', lamp:sagaLamp, status:sagaStatus});
-    // Daily banner: green if all done, amber if some
+    // Daily banner: green if all done, amber if some, red if none
     const daily=dailySnap.val()||{};
     const dailyDone=Object.values(daily).filter(Boolean).length;
     const dailyTotal=(typeof DAILY_ITEMS!=='undefined')?DAILY_ITEMS.length:4;
-    const dLamp=dailyDone>=dailyTotal?'green':(dailyDone>0?'amber':'off');
+    const dLamp=dailyDone>=dailyTotal?'green':(dailyDone>0?'amber':'red');
     rows.push({label:"⚓ Captain's daily watch", lamp:dLamp, status:dailyDone+'/'+dailyTotal});
     // Family night this week
     const fn=fnSnap.val();
-    let fnLamp='off', fnStatus='not set';
+    let fnLamp='red', fnStatus='not set';
     if(fn){ fnLamp='green'; fnStatus='held'; }
     rows.push({label:'🕯️ Family night', lamp:fnLamp, status:fnStatus});
 
