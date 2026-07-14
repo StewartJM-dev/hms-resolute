@@ -521,8 +521,6 @@ body{
     <!-- TAB: OVERVIEW -->
     <div class="tab active" id="tab-overview">
       <div id="overview-day-banner" style="margin-bottom:12px;"></div>
-      <div class="sec-hd">Your Daily Rhythm</div>
-      <div id="overview-dawn-checklist" style="margin-bottom:14px;"></div>
       <div id="overview-whiteglove-nudge" style="margin-bottom:14px;"></div>
       <div class="sec-hd">Agent Status Today</div>
       <div class="gauge-row" id="overview-agents"></div>
@@ -1191,8 +1189,9 @@ function renderDawnShipsOrders(){
     _db.ref(`stewart/dawnDailyOrders/${weekStart}/mealplan`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/warroom`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/crowsnest`).once('value'),
-    _db.ref(`stewart/dawnDailyOrders/${weekStart}/lunchoptions`).once('value')
-  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap]) => {
+    _db.ref(`stewart/dawnDailyOrders/${weekStart}/lunchoptions`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/gracedare`).once('value')
+  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap, gdManual]) => {
     const checks = [];
     if(!vineSnap.val()) checks.push({text:'Tend to the Vineyard', key:'vineyard', scope:today});
     if(!potsSnap.val()) checks.push({text:'Wash dinner pots and pans', key:'pots', scope:today});
@@ -1205,7 +1204,7 @@ function renderDawnShipsOrders(){
     _db.ref('stewart/gracedare/progress/currentDay').once('value', gdDaySnap => {
       const gdDay = gdDaySnap.val() || 1;
       _db.ref(`stewart/gracedare/progress/day${gdDay}/completed`).once('value', gdDoneSnap => {
-        if(!gdDoneSnap.val()) checks.push({text: 'Complete today\'s devotional (The Grace Dare)', auto:true});
+        if(!gdDoneSnap.val() && !gdManual.val()) checks.push({text: 'Complete today\'s devotional (The Grace Dare)', key:'gracedare', scope:today});
         renderDawnShipsOrdersUI(checks, officerNames[officer] || officer);
       });
     });
@@ -1228,9 +1227,6 @@ function renderDawnShipsOrdersUI(checks, officerName){
   const listHtml = checks.length
     ? '<div style="display:grid;gap:8px;margin-bottom:18px;">' +
         checks.map(c => {
-          if(c.auto){
-            return '<div style="font-size:13px;color:var(--ink);padding:8px 0;border-bottom:1px solid var(--border);">'+c.text+'</div>';
-          }
           return '<div onclick="toggleDawnOrderItem(\''+c.key+'\',\''+c.scope+'\')" style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">'+
             '<span style="width:20px;height:20px;border:1.5px solid var(--brown);border-radius:5px;flex-shrink:0;"></span>'+c.text+
           '</div>';
