@@ -580,47 +580,8 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
 
 <!-- SHIP'S MANUAL / TUTORIAL -->
 <div id="tutorial-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:9998;align-items:center;justify-content:center;padding:20px;">
-  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:linear-gradient(180deg,#0d1b2a,#050a10);border:1px solid rgba(232,184,74,.4);border-radius:14px;padding:26px 22px;text-align:left;">
-    <div style="text-align:center;font-size:44px;margin-bottom:6px;">🧭</div>
-    <div style="text-align:center;font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:4px;">Ship's Orders</div>
-    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1px;margin-bottom:18px;">What's New Aboard the Resolute</div>
-
-    <p style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.6;margin-bottom:16px;">Ahoy, Agent! The old command deck's had herself a proper refit. Here's your rundown of the ship, deck by deck:</p>
-
-    <div style="display:grid;gap:10px;margin-bottom:18px;">
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">⚓</span><div><strong style="color:var(--gold);font-size:12.5px;">Bridge</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">Dad's command post — keeps the whole ship on course.</span></div></div>
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">⚔️</span><div><strong style="color:var(--gold);font-size:12.5px;">War Room</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">Where the big-picture battle plan gets tracked.</span></div></div>
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">🏠</span><div><strong style="color:var(--gold);font-size:12.5px;">Officers' Country</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">Mom's quarters — runs the home front.</span></div></div>
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">🎯</span><div><strong style="color:var(--gold);font-size:12.5px;">Agent HQ</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">Your post — mission control for your daily orders.</span></div></div>
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">🔭</span><div><strong style="color:var(--gold);font-size:12.5px;">Crow's Nest</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">The lookout — first to spot what's coming.</span></div></div>
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">🍽️</span><div><strong style="color:var(--gold);font-size:12.5px;">Galley</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">The ship's kitchen — meals planned and made here.</span></div></div>
-      <div style="display:flex;gap:10px;align-items:flex-start;"><span style="font-size:18px;">📖</span><div><strong style="color:var(--gold);font-size:12.5px;">Wardroom</strong><br><span style="font-size:12px;color:rgba(255,255,255,.65);">Where the crew gathers for stories and downtime.</span></div></div>
-    </div>
-
-    <div style="border-top:1px solid rgba(232,184,74,.25);padding-top:16px;margin-bottom:6px;">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <span style="font-size:18px;">🎖️</span>
-        <strong style="font-family:'Orbitron',sans-serif;font-size:12.5px;letter-spacing:1px;color:var(--teal2);text-transform:uppercase;">New Duty: Officer of the Watch</strong>
-      </div>
-      <p style="font-size:12.5px;color:rgba(255,255,255,.75);line-height:1.6;margin-bottom:10px;">Every day, a new sailor takes the watch. Three times a day — morning, midday, and evening — the Officer makes their rounds:</p>
-      <ul style="font-size:12px;color:rgba(255,255,255,.65);line-height:1.7;margin:0 0 10px 18px;padding:0;">
-        <li>Bread sealed tight on the hutch</li>
-        <li>Fridge buttoned up, shelf by shelf</li>
-        <li>Every light doused before moving on</li>
-        <li>Sink and counter clear of dishes</li>
-      </ul>
-      <p style="font-size:12px;color:rgba(255,255,255,.5);line-height:1.6;font-style:italic;">No extra doubloons for this one, Agent — it's just what keeping a tight ship looks like.</p>
-    </div>
-
-    <div style="border-top:1px solid rgba(232,184,74,.25);padding-top:14px;margin-bottom:20px;">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
-        <span style="font-size:18px;">🍽️</span>
-        <strong style="font-family:'Orbitron',sans-serif;font-size:12.5px;letter-spacing:1px;color:var(--teal2);text-transform:uppercase;">Galley Duty Update</strong>
-      </div>
-      <p style="font-size:12.5px;color:rgba(255,255,255,.7);line-height:1.6;">The dishwasher now runs up to three rounds a day. Load it, run it, empty it — then do it again if the galley needs it.</p>
-    </div>
-
-    <button onclick="closeTutorial()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">ALL HANDS, UNDERSTOOD ⚓</button>
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:linear-gradient(180deg,#0d1b2a,#050a10);border:1px solid rgba(232,184,74,.4);border-radius:14px;padding:26px 22px;text-align:left;" id="ships-orders-content">
+    <!-- filled dynamically by renderShipsOrders() -->
   </div>
 </div>
 
@@ -1146,7 +1107,7 @@ function selectAgent(id, codename, name, rank, theme, icon){
   renderSuperFamilyNight();
   renderFamilyDevotionalDisplay();
   setTimeout(() => checkCelebrations(), 2000);
-  setTimeout(() => checkFirstTimeTutorial(), 1200);
+  setTimeout(() => showTutorial(), 1200);
 }
 
 function backToSelect(){
@@ -2902,6 +2863,7 @@ function openGroupThread(){
       const latest = items.reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
       try{ localStorage.setItem('sk-group-seen', String(latest)); }catch(e){}
       updateGroupBadge();
+      _db.ref('stewart/groupChatSeen/'+currentAgent.id+'/'+localDateStr()).set(true);
     });
   }
   setTimeout(() => document.getElementById('group-input').focus(), 300);
@@ -3501,27 +3463,90 @@ function closeCelebration(){
   stopConfetti();
 }
 
-// ── SHIP'S MANUAL / TUTORIAL (Version 2 + Officer of the Watch) ──
-const TUTORIAL_VERSION = 'v2-officer-of-the-watch-sink';
-
+// ── SHIP'S ORDERS — daily checklist, shown every login ──
 function showTutorial(){
+  renderShipsOrders();
   document.getElementById('tutorial-overlay').style.display = 'flex';
 }
 
 function closeTutorial(){
   document.getElementById('tutorial-overlay').style.display = 'none';
-  if(_db && currentAgent){
-    _db.ref(`stewart/tutorialSeen/${currentAgent.id}/${TUTORIAL_VERSION}`).set(true);
-  }
 }
 
-function checkFirstTimeTutorial(){
-  if(!_db || !currentAgent) return;
-  _db.ref(`stewart/tutorialSeen/${currentAgent.id}/${TUTORIAL_VERSION}`).once('value', snap => {
-    if(!snap.val()){
-      showTutorial();
-    }
+function getOrdersWeekStart(){
+  const d = new Date();
+  const day = (d.getDay()+6)%7;
+  d.setDate(d.getDate()-day);
+  return localDateStr(d);
+}
+
+function renderShipsOrders(){
+  if(!currentAgent || !_db) return;
+  const agentId = currentAgent.id;
+  const today = localDateStr();
+  const weekStart = getOrdersWeekStart();
+  const dow = new Date().getDay();
+  const weekKey = (typeof getVoteWeekKey === 'function') ? getVoteWeekKey() : null;
+  const officer = getOfficerOfWatch();
+  const officerNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+
+  Promise.all([
+    _db.ref(`stewart/missions/${agentId}/${today}`).once('value'),
+    _db.ref(`stewart/reading/${agentId}/${weekStart}/${today}`).once('value'),
+    _db.ref(`stewart/groupChatSeen/${agentId}/${today}`).once('value'),
+    weekKey ? _db.ref(`stewart/teachvote/${weekKey}/votes/${agentId}`).once('value') : Promise.resolve(null),
+    _db.ref(`stewart/selfassessment/${agentId}`).once('value')
+  ]).then(([missionSnap, readingSnap, chatSnap, voteSnap, selfSnap]) => {
+    const checks = [];
+
+    const done = missionSnap.val() || {};
+    const missions = buildMissions(agentId);
+    const gateMissions = missions.filter(m => m.category !== 'computer');
+    const allDone = gateMissions.length > 0 && gateMissions.every(m => done[m.id]);
+    if(!allDone) checks.push('Complete today\'s missions');
+
+    if(!readingSnap.val()) checks.push('Log your reading for today');
+
+    if(!chatSnap.val()) checks.push('Check the group chat');
+
+    if(dow >= 2 && dow <= 4 && voteSnap && !voteSnap.val()) checks.push('Place your Teach Me vote');
+
+    const selfData = selfSnap.val();
+    const weekStartMs = new Date(weekStart+'T00:00:00').getTime();
+    const selfDoneThisWeek = selfData && selfData.updatedAt && selfData.updatedAt >= weekStartMs;
+    if(!selfDoneThisWeek) checks.push('Complete your weekly self-assessment');
+
+    renderShipsOrdersUI(checks, officerNames[officer] || officer);
+  }).catch(()=>{
+    renderShipsOrdersUI([], '—');
   });
+}
+
+function renderShipsOrdersUI(checks, officerName){
+  const el = document.getElementById('ships-orders-content');
+  if(!el) return;
+
+  const listHtml = checks.length
+    ? '<ul style="font-size:13px;color:rgba(255,255,255,.8);line-height:2;margin:0 0 18px 20px;padding:0;">' +
+        checks.map(c => '<li>'+c+'</li>').join('') +
+      '</ul>'
+    : '<p style="font-size:13px;color:#4aaa6a;line-height:1.6;margin-bottom:18px;">&#10003; All caught up for today, Agent. Well done.</p>';
+
+  el.innerHTML = `
+    <div style="text-align:center;font-size:40px;margin-bottom:6px;">🧭</div>
+    <div style="text-align:center;font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:4px;">Ship's Orders</div>
+    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1px;margin-bottom:18px;">Today's Standing Orders</div>
+
+    <div style="background:rgba(232,184,74,.08);border:1px solid rgba(232,184,74,.3);border-radius:8px;padding:10px 14px;margin-bottom:18px;text-align:center;">
+      <div style="font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Officer of the Watch Today</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:14px;color:var(--gold);font-weight:700;">${officerName}</div>
+    </div>
+
+    <div style="font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1px;color:var(--teal2);text-transform:uppercase;margin-bottom:8px;">Before You're Done Today</div>
+    ${listHtml}
+
+    <button onclick="closeTutorial()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD, CAPTAIN ⚓</button>
+  `;
 }
 
 function startConfetti(){
