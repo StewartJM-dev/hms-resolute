@@ -865,30 +865,42 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
       <div class="hw-card">
         <div class="hw-card-head">
           <div class="hw-card-icon">&#127919;</div>
-          <div class="hw-card-title">Agent Self-Assessment</div>
+          <div class="hw-card-title">Today's Reflection</div>
         </div>
         <div class="hw-card-body">
-          <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.6;">Every agent has strengths and a mission to grow. This is just between you and HQ &mdash; your brothers won't see it. Update it whenever you want.</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.6;">A few minutes with today's Courage Dare. This is just between you and HQ &mdash; your brothers won't see it.</div>
 
           <div style="margin-bottom:10px;">
-            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">MY STRENGTH</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">Something I'm good at or proud of</div>
-            <textarea id="self-strength" placeholder="I'm good at..." maxlength="200" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">WHAT IT MEANS TO ME</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">What does today's devotional mean to me?</div>
+            <textarea id="self-strength" placeholder="Today's dare made me think about..." maxlength="300" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
           </div>
 
           <div style="margin-bottom:10px;">
-            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">MY MISSION</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">Something I want to get better at</div>
-            <textarea id="self-mission" placeholder="I want to get better at..." maxlength="200" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">WHERE I DID WELL</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">Where did I do well today?</div>
+            <textarea id="self-mission" placeholder="I did well when..." maxlength="300" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">WHERE I COULD DO BETTER</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">Where could I have done better today?</div>
+            <textarea id="self-step" placeholder="I could have done better when..." maxlength="300" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">WHAT I PUT INTO PRACTICE</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">What is one thing I put into practice from the devotional today?</div>
+            <textarea id="self-practice" placeholder="Today I actually tried..." maxlength="300" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
           </div>
 
           <div style="margin-bottom:12px;">
-            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">THIS WEEK'S STEP</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">One small thing I'm going to try</div>
-            <textarea id="self-step" placeholder="This week I'm going to try..." maxlength="200" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">TOMORROW</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:5px;">How can I do better tomorrow?</div>
+            <textarea id="self-tomorrow" placeholder="Tomorrow I'm going to..." maxlength="300" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:none;height:50px;"></textarea>
           </div>
 
-          <button onclick="saveSelfAssessment()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">SAVE TO MY FILE</button>
+          <button onclick="saveSelfAssessment()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">SAVE TODAY'S REFLECTION</button>
           <div id="self-assessment-saved" style="font-size:10px;color:#4aaa6a;text-align:center;margin-top:6px;display:none;">&#10003; Saved to your agent file</div>
         </div>
       </div>
@@ -3507,7 +3519,7 @@ function renderShipsOrders(){
     _db.ref(`stewart/reading/${agentId}/${weekStart}/${today}`).once('value'),
     _db.ref(`stewart/groupChatSeen/${agentId}/${today}`).once('value'),
     weekKey ? _db.ref(`stewart/teachvote/${weekKey}/votes/${agentId}`).once('value') : Promise.resolve(null),
-    _db.ref(`stewart/selfassessment/${agentId}`).once('value'),
+    _db.ref(`stewart/selfassessment/${agentId}/${today}`).once('value'),
     _db.ref(`stewart/shipsOrdersManual/${agentId}/${today}/warroom`).once('value'),
     _db.ref(`stewart/shipsOrdersManual/${agentId}/${today}/crowsnest`).once('value')
   ]).then(([missionSnap, readingSnap, chatSnap, voteSnap, selfSnap, warRoomSnap, crowsNestSnap]) => {
@@ -3525,10 +3537,7 @@ function renderShipsOrders(){
 
     if(dow >= 2 && dow <= 4 && voteSnap && !voteSnap.val()) checks.push({text: 'Place your Teach Me vote', auto:true});
 
-    const selfData = selfSnap.val();
-    const weekStartMs = new Date(weekStart+'T00:00:00').getTime();
-    const selfDoneThisWeek = selfData && selfData.updatedAt && selfData.updatedAt >= weekStartMs;
-    if(!selfDoneThisWeek) checks.push({text: 'Complete your weekly self-assessment', auto:true});
+    if(!selfSnap.val()) checks.push({text: 'Complete today\'s devotional reflection', auto:true});
 
     if(!warRoomSnap.val()) checks.push({text: 'Visit the War Room — submit a prayer request and pray for yours and others', key:'warroom'});
     if(!crowsNestSnap.val()) checks.push({text: 'Visit the Crow\'s Nest — add a praise or see what someone else is grateful for', key:'crowsnest'});
@@ -4056,14 +4065,19 @@ function renderStatusSummary(){
 
 function renderSelfAssessment(){
   if(!currentAgent || !_db) return;
-  _db.ref(`stewart/selfassessment/${currentAgent.id}`).once('value', snap => {
+  const today = localDateStr();
+  _db.ref(`stewart/selfassessment/${currentAgent.id}/${today}`).once('value', snap => {
     const data = snap.val() || {};
     const strengthEl = document.getElementById('self-strength');
     const missionEl = document.getElementById('self-mission');
     const stepEl = document.getElementById('self-step');
+    const practiceEl = document.getElementById('self-practice');
+    const tomorrowEl = document.getElementById('self-tomorrow');
     if(strengthEl) strengthEl.value = data.strength || '';
     if(missionEl) missionEl.value = data.mission || '';
     if(stepEl) stepEl.value = data.step || '';
+    if(practiceEl) practiceEl.value = data.practice || '';
+    if(tomorrowEl) tomorrowEl.value = data.tomorrow || '';
     const savedEl = document.getElementById('self-assessment-saved');
     if(savedEl) savedEl.style.display = 'none';
   });
@@ -4071,12 +4085,15 @@ function renderSelfAssessment(){
 
 function saveSelfAssessment(){
   if(!currentAgent || !_db) return;
+  const today = localDateStr();
   const strength = document.getElementById('self-strength').value.trim();
   const mission = document.getElementById('self-mission').value.trim();
   const step = document.getElementById('self-step').value.trim();
+  const practice = document.getElementById('self-practice').value.trim();
+  const tomorrow = document.getElementById('self-tomorrow').value.trim();
 
-  _db.ref(`stewart/selfassessment/${currentAgent.id}`).set({
-    strength, mission, step,
+  _db.ref(`stewart/selfassessment/${currentAgent.id}/${today}`).set({
+    strength, mission, step, practice, tomorrow,
     updatedAt: Date.now()
   }).then(() => {
     const savedEl = document.getElementById('self-assessment-saved');
