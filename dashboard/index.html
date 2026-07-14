@@ -691,6 +691,13 @@ body{
         </div>
       </div>
 
+      <div class="sec-hd">The Grace Dare</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd" id="grace-dare-display">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+
       <div class="sec-hd">Weekly Rhythm</div>
       <div class="card" style="margin-bottom:10px;">
         <div class="card-bd" style="font-size:12px;color:var(--muted);line-height:2;">
@@ -832,7 +839,7 @@ body{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Comms
     </button>
-    <button class="bnb" onclick="showTab('dawn',this);renderDawnTab();renderFamilyDevotionalInput();renderDawnDevotionalInput();renderHomestead();renderWhiteGlove();">
+    <button class="bnb" onclick="showTab('dawn',this);renderDawnTab();renderFamilyDevotionalInput();renderDawnDevotionalInput();renderHomestead();renderWhiteGlove();renderGraceDare();">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
       XO's Quarters
     </button>
@@ -4008,6 +4015,50 @@ function loadDevotionalWeek(weekKey){
 }
 
 // ─── DAWN'S DAILY DEVOTIONAL INPUT (Dashboard) ────────
+
+// ─── THE GRACE DARE (self-paced 40-day challenge for Dawn) ───
+
+function renderGraceDare(){
+  if(!_db) return;
+  const el = document.getElementById('grace-dare-display');
+  if(!el) return;
+
+  _db.ref('stewart/gracedare/progress/currentDay').once('value', daySnap => {
+    const day = daySnap.val() || 1;
+    _db.ref(`stewart/gracedare/content/day${day}`).once('value', contentSnap => {
+      const data = contentSnap.val();
+      if(!data){
+        el.innerHTML = `<div class="empty-state">Day ${day} hasn't been added yet.</div>`;
+        return;
+      }
+      el.innerHTML = `
+        <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;color:var(--brown);text-transform:uppercase;margin-bottom:4px;">Day ${day} of 40</div>
+        <div style="font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px;">${data.title}</div>
+        <div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px;white-space:pre-wrap;">${data.story}</div>
+        <div style="background:rgba(232,184,74,.12);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:12px;">
+          <div style="font-size:13px;color:var(--ink);line-height:1.7;font-style:italic;">&ldquo;${data.scriptureText}&rdquo;</div>
+          <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:var(--brown);margin-top:5px;">${data.scriptureRef}</div>
+        </div>
+        <div style="background:rgba(45,106,71,.08);border:1px solid rgba(45,106,71,.2);border-radius:8px;padding:11px 13px;margin-bottom:12px;">
+          <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2d6a47;margin-bottom:5px;">TODAY'S DARE</div>
+          <div style="font-size:13px;color:var(--ink);line-height:1.6;">${data.dare}</div>
+        </div>
+        <textarea id="grace-dare-journal" placeholder="What happened?" style="width:100%;min-height:70px;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:13px;margin-bottom:10px;box-sizing:border-box;"></textarea>
+        <button onclick="completeGraceDareDay(${day})" style="width:100%;padding:11px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Mark Day ${day} Complete</button>`;
+    });
+  });
+}
+
+function completeGraceDareDay(day){
+  if(!_db) return;
+  const journalEl = document.getElementById('grace-dare-journal');
+  const journal = journalEl ? journalEl.value.trim() : '';
+  _db.ref(`stewart/gracedare/progress/day${day}`).set({completed:true, journal, completedAt: Date.now()}).then(() => {
+    _db.ref('stewart/gracedare/progress/currentDay').set(day+1).then(() => {
+      renderGraceDare();
+    });
+  });
+}
 
 function renderDawnDevotionalInput(){
   if(!_db) return;
