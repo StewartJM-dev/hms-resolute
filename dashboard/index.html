@@ -672,8 +672,12 @@ body{
 
       <div id="whiteglove-section" style="margin-bottom:16px;"></div>
 
-      <div class="sec-hd">My Daily Rhythm</div>
-      <div id="dawn-daily-missions" style="margin-bottom:14px;"></div>
+      <div class="sec-hd">The Grace Dare</div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-bd" id="grace-dare-display">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
 
       <div id="dawn-special-section"></div>
 
@@ -687,13 +691,6 @@ body{
       <div class="sec-hd">Dawn's Personal Devotional</div>
       <div class="card" style="margin-bottom:12px;">
         <div class="card-bd" id="dawn-devotional-input">
-          <div class="empty-state">Loading...</div>
-        </div>
-      </div>
-
-      <div class="sec-hd">The Grace Dare</div>
-      <div class="card" style="margin-bottom:12px;">
-        <div class="card-bd" id="grace-dare-display">
           <div class="empty-state">Loading...</div>
         </div>
       </div>
@@ -1146,22 +1143,29 @@ function renderDawnShipsOrders(){
   const officerNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
 
   Promise.all([
-    _db.ref(`stewart/devotional/dawn/${devWeekKey}/${today}`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/vineyard`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/pots`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${weekStart}/mealplan`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/warroom`).once('value'),
-    _db.ref(`stewart/dawnDailyOrders/${today}/crowsnest`).once('value')
-  ]).then(([devSnap, vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap]) => {
+    _db.ref(`stewart/dawnDailyOrders/${today}/crowsnest`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${weekStart}/lunchoptions`).once('value')
+  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap]) => {
     const checks = [];
-    if(!devSnap.val()) checks.push({text:'Daily devotions', auto:true});
     if(!vineSnap.val()) checks.push({text:'Tend to the Vineyard', key:'vineyard', scope:today});
     if(!potsSnap.val()) checks.push({text:'Wash dinner pots and pans', key:'pots', scope:today});
     if(!mealSnap.val()) checks.push({text:'Generate meal plan for the week', key:'mealplan', scope:weekStart});
     if(!warRoomSnap.val()) checks.push({text:'Visit the War Room — submit a prayer request and pray for yours and others', key:'warroom', scope:today});
     if(!crowsNestSnap.val()) checks.push({text:'Visit the Crow\'s Nest — add a praise or see what someone else is grateful for', key:'crowsnest', scope:today});
+    if(!lunchSnap.val()) checks.push({text:'Load lunch options for the week', key:'lunchoptions', scope:weekStart});
 
-    renderDawnShipsOrdersUI(checks, officerNames[officer] || officer);
+    // Grace Dare completion needs the current day number first
+    _db.ref('stewart/gracedare/progress/currentDay').once('value', gdDaySnap => {
+      const gdDay = gdDaySnap.val() || 1;
+      _db.ref(`stewart/gracedare/progress/day${gdDay}/completed`).once('value', gdDoneSnap => {
+        if(!gdDoneSnap.val()) checks.push({text: 'Complete today\'s devotional (The Grace Dare)', auto:true});
+        renderDawnShipsOrdersUI(checks, officerNames[officer] || officer);
+      });
+    });
   }).catch(()=>{
     renderDawnShipsOrdersUI([], '—');
   });
@@ -2725,7 +2729,7 @@ function renderDawnTab(){
       <div style="font-family:'Cinzel',serif;font-size:13px;color:var(--brown);">Rest Today</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">No missions on the Sabbath. Be still.</div>
     </div></div>`;
-    missionsEl.innerHTML = restHtml;
+    missionsEl && (missionsEl.innerHTML = restHtml);
     if(overviewEl) overviewEl.innerHTML = restHtml;
   } else {
     _db.ref(`stewart/dawnmissions/${today}`).once('value', snap => {
@@ -2743,7 +2747,7 @@ function renderDawnTab(){
           </div>
         </div>`;
       }).join('');
-      missionsEl.innerHTML = missionsHtml;
+      missionsEl && (missionsEl.innerHTML = missionsHtml);
       if(overviewEl) overviewEl.innerHTML = missionsHtml;
     });
   }
