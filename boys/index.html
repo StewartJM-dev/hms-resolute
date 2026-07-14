@@ -596,6 +596,30 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
   </div>
 </div>
 
+<!-- ═══ SHIP'S DIRECTORY ═══ -->
+<div id="ships-directory-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:linear-gradient(180deg,#0d1b2a,#050a10);border:1px solid rgba(232,184,74,.4);border-radius:14px;padding:26px 22px;text-align:left;">
+    <div style="text-align:center;font-size:40px;margin-bottom:6px;">🗂️</div>
+    <div style="text-align:center;font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:4px;">Ship's Directory</div>
+    <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.45);letter-spacing:1px;margin-bottom:20px;">Where Everything Is Aboard the Resolute</div>
+
+    <div style="display:grid;gap:10px;margin-bottom:18px;">
+      <a href="../bridge/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚓</span><div><strong style="color:var(--gold);font-size:13px;">Bridge</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">Dad's command post &mdash; keeps the whole ship on course.</span></div></a>
+      <a href="../warroom/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚔️</span><div><strong style="color:var(--gold);font-size:13px;">War Room</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">Prayer requests &mdash; submit one, pray for the crew's.</span></div></a>
+      <a href="../dashboard/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">🏠</span><div><strong style="color:var(--gold);font-size:13px;">Officers' Country</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">Mom's quarters &mdash; runs the home front.</span></div></a>
+      <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(232,184,74,.08);border:1px solid rgba(232,184,74,.3);border-radius:10px;padding:12px;"><span style="font-size:22px;">🎯</span><div><strong style="color:var(--gold);font-size:13px;">Agent HQ</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">You're here right now &mdash; mission control for your day.</span></div></div>
+      <a href="../crowsnest/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">🔭</span><div><strong style="color:var(--gold);font-size:13px;">Crow's Nest</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">The lookout &mdash; log a praise, see what others are grateful for.</span></div></a>
+      <a href="../kitchen/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍽️</span><div><strong style="color:var(--gold);font-size:13px;">The Galley</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">The ship's kitchen &mdash; meals planned and made here.</span></div></a>
+      <a href="../saga/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">📖</span><div><strong style="color:var(--gold);font-size:13px;">Wardroom</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">Where the crew gathers for stories and downtime.</span></div></a>
+      <a href="map.html" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">🗺️</span><div><strong style="color:var(--gold);font-size:13px;">Crew Deck Map</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">A map of the whole ship, all decks at a glance.</span></div></a>
+      <a href="../registry.html" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">📜</span><div><strong style="color:var(--gold);font-size:13px;">Registry &amp; Muster</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">The full crew roster and ship's records.</span></div></a>
+      <a href="../vineyard/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍇</span><div><strong style="color:var(--gold);font-size:13px;">Captain's Quarters</strong><br><span style="font-size:11.5px;color:rgba(255,255,255,.6);">Mom and Dad's own space aboard the ship.</span></div></a>
+    </div>
+
+    <button onclick="closeShipsDirectory()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">CLOSE ⚓</button>
+  </div>
+</div>
+
 
 <!-- ═══ AGENT SELECT SCREEN ═══ -->
 <div class="screen active" id="screen-select">
@@ -682,6 +706,7 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
       <a href="../warroom/" title="War Room" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);color:inherit;text-decoration:none;font-size:16px;">⚔️</a>
       <a href="../saga/" title="Wardroom" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);color:inherit;text-decoration:none;font-size:16px;">📖</a>
       <button onclick="showTutorial()" title="Ship's Manual" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);background:none;color:inherit;cursor:pointer;font-size:16px;padding:0;">🧭</button>
+      <button onclick="showShipsDirectory()" title="Ship's Directory" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);background:none;color:inherit;cursor:pointer;font-size:16px;padding:0;">🗂️</button>
     </div>
   </div>
 
@@ -3502,6 +3527,15 @@ function closeTutorial(){
 
 function closeSignoutReminder(){
   const overlay = document.getElementById('signout-reminder-overlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
+function showShipsDirectory(){
+  const overlay = document.getElementById('ships-directory-overlay');
+  if(overlay) overlay.style.display = 'flex';
+}
+function closeShipsDirectory(){
+  const overlay = document.getElementById('ships-directory-overlay');
   if(overlay) overlay.style.display = 'none';
 }
 
