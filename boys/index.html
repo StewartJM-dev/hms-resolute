@@ -852,6 +852,18 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
 
       <div class="hw-card">
         <div class="hw-card-head">
+          <div class="hw-card-icon">&#9876;&#65039;</div>
+          <div class="hw-card-title">The Courage Dare</div>
+        </div>
+        <div class="hw-card-body" style="padding:0;">
+          <div id="courage-dare-display">
+            <div class="empty" style="color:rgba(255,255,255,.3);">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hw-card">
+        <div class="hw-card-head">
           <div class="hw-card-icon">&#127919;</div>
           <div class="hw-card-title">Agent Self-Assessment</div>
         </div>
@@ -1106,6 +1118,7 @@ function selectAgent(id, codename, name, rank, theme, icon){
   renderTonightActivity();
   renderSuperFamilyNight();
   renderFamilyDevotionalDisplay();
+  renderCourageDare();
   setTimeout(() => checkCelebrations(), 2000);
   setTimeout(() => showTutorial(), 1200);
 }
@@ -1136,7 +1149,7 @@ function showTab(name, btn){
   if(name === 'pay'){ renderPayScreen(); renderSuperFamilyNight(); }
   if(name === 'xbox'){ renderGameTime(); renderReadingLog(); }
   if(name === 'transmissions') renderTransmissions();
-  if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); }
+  if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
 }
 
 // ══════════════════════════════════════════════════════
@@ -2322,6 +2335,7 @@ function toggleMission(missionId, refPath){
   renderTonightActivity();
   renderSuperFamilyNight();
   renderFamilyDevotionalDisplay();
+  renderCourageDare();
   setTimeout(() => runHansEngine(), 500);
     });
   });
@@ -4610,6 +4624,52 @@ function saveDawnDevotional(dateStr){
     const el = document.getElementById('dawn-dev-saved');
     if(el){ el.style.display='block'; setTimeout(()=>el.style.display='none',2500); }
     renderDawnDevotionalInput(); // refresh day tabs to show checkmarks
+  });
+}
+
+// ─── THE COURAGE DARE (self-paced 40-day challenge) ───
+
+function renderCourageDare(){
+  if(!currentAgent || !_db) return;
+  const el = document.getElementById('courage-dare-display');
+  if(!el) return;
+
+  _db.ref(`stewart/couragedare/progress/${currentAgent.id}/currentDay`).once('value', daySnap => {
+    const day = daySnap.val() || 1;
+    _db.ref(`stewart/couragedare/content/day${day}`).once('value', contentSnap => {
+      const data = contentSnap.val();
+      if(!data){
+        el.innerHTML = `<div class="empty" style="color:rgba(255,255,255,.3);padding:14px;">Day ${day} hasn't been added yet, Agent. Check back soon.</div>`;
+        return;
+      }
+      el.innerHTML = `
+        <div style="background:linear-gradient(135deg,var(--dark2),#0a140a);border:1px solid rgba(232,184,74,.25);border-radius:10px;padding:16px;">
+          <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;">DAY ${day} OF 40</div>
+          <div style="font-family:'Exo 2',sans-serif;font-size:16px;font-weight:700;color:var(--white);margin-bottom:12px;line-height:1.3;">${data.title}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.8;margin-bottom:12px;white-space:pre-wrap;">${data.story}</div>
+          <div style="background:rgba(232,184,74,.1);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:12px;">
+            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.7;font-style:italic;">&ldquo;${data.scriptureText}&rdquo;</div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-top:5px;">${data.scriptureRef}</div>
+          </div>
+          <div style="background:rgba(12,200,200,.08);border:1px solid rgba(12,200,200,.2);border-radius:8px;padding:11px 13px;margin-bottom:12px;">
+            <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:5px;">&#9654; TODAY'S DARE</div>
+            <div style="font-size:13px;color:var(--white);line-height:1.6;">${data.dare}</div>
+          </div>
+          <textarea id="courage-dare-journal" placeholder="What happened?" style="width:100%;min-height:70px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:10px;color:#fff;font-size:13px;margin-bottom:10px;box-sizing:border-box;"></textarea>
+          <button onclick="completeCourageDareDay(${day})" style="width:100%;padding:12px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">MARK DAY ${day} COMPLETE</button>
+        </div>`;
+    });
+  });
+}
+
+function completeCourageDareDay(day){
+  if(!currentAgent || !_db) return;
+  const journalEl = document.getElementById('courage-dare-journal');
+  const journal = journalEl ? journalEl.value.trim() : '';
+  _db.ref(`stewart/couragedare/progress/${currentAgent.id}/day${day}`).set({completed:true, journal, completedAt: Date.now()}).then(() => {
+    _db.ref(`stewart/couragedare/progress/${currentAgent.id}/currentDay`).set(day+1).then(() => {
+      renderCourageDare();
+    });
   });
 }
 
