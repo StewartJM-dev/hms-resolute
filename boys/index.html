@@ -3565,6 +3565,7 @@ function renderShipsOrders(){
   const weekKey = (typeof getVoteWeekKey === 'function') ? getVoteWeekKey() : null;
   const officer = getOfficerOfWatch();
   const officerNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+  const manualBase = `stewart/shipsOrdersManual/${agentId}/${today}`;
 
   Promise.all([
     _db.ref(`stewart/missions/${agentId}/${today}`).once('value'),
@@ -3572,24 +3573,31 @@ function renderShipsOrders(){
     _db.ref(`stewart/groupChatSeen/${agentId}/${today}`).once('value'),
     weekKey ? _db.ref(`stewart/teachvote/${weekKey}/votes/${agentId}`).once('value') : Promise.resolve(null),
     _db.ref(`stewart/selfassessment/${agentId}/${today}`).once('value'),
-    _db.ref(`stewart/shipsOrdersManual/${agentId}/${today}/warroom`).once('value'),
-    _db.ref(`stewart/shipsOrdersManual/${agentId}/${today}/crowsnest`).once('value')
-  ]).then(([missionSnap, readingSnap, chatSnap, voteSnap, selfSnap, warRoomSnap, crowsNestSnap]) => {
+    _db.ref(`${manualBase}/warroom`).once('value'),
+    _db.ref(`${manualBase}/crowsnest`).once('value'),
+    _db.ref(`${manualBase}/missions`).once('value'),
+    _db.ref(`${manualBase}/reading`).once('value'),
+    _db.ref(`${manualBase}/chat`).once('value'),
+    _db.ref(`${manualBase}/teachvote`).once('value'),
+    _db.ref(`${manualBase}/selfassessment`).once('value'),
+    _db.ref(`${manualBase}/couragedare`).once('value')
+  ]).then(([missionSnap, readingSnap, chatSnap, voteSnap, selfSnap, warRoomSnap, crowsNestSnap,
+            mManual, rManual, cManual, tManual, sManual, cdManual]) => {
     const checks = [];
 
     const done = missionSnap.val() || {};
     const missions = buildMissions(agentId);
     const gateMissions = missions.filter(m => m.category !== 'computer');
     const allDone = gateMissions.length > 0 && gateMissions.every(m => done[m.id]);
-    if(!allDone) checks.push({text: 'Complete today\'s missions', auto:true});
+    if(!allDone && !mManual.val()) checks.push({text: 'Complete today\'s missions', key:'missions'});
 
-    if(!readingSnap.val()) checks.push({text: 'Log your reading for today', auto:true});
+    if(!readingSnap.val() && !rManual.val()) checks.push({text: 'Log your reading for today', key:'reading'});
 
-    if(!chatSnap.val()) checks.push({text: 'Check the group chat', auto:true});
+    if(!chatSnap.val() && !cManual.val()) checks.push({text: 'Check the group chat', key:'chat'});
 
-    if(dow >= 2 && dow <= 4 && voteSnap && !voteSnap.val()) checks.push({text: 'Place your Teach Me vote', auto:true});
+    if(dow >= 2 && dow <= 4 && voteSnap && !voteSnap.val() && !tManual.val()) checks.push({text: 'Place your Teach Me vote', key:'teachvote'});
 
-    if(!selfSnap.val()) checks.push({text: 'Complete today\'s devotional reflection', auto:true});
+    if(!selfSnap.val() && !sManual.val()) checks.push({text: 'Complete today\'s devotional reflection', key:'selfassessment'});
 
     if(!warRoomSnap.val()) checks.push({text: 'Visit the War Room — submit a prayer request and pray for yours and others', key:'warroom'});
     if(!crowsNestSnap.val()) checks.push({text: 'Visit the Crow\'s Nest — add a praise or see what someone else is grateful for', key:'crowsnest'});
@@ -3598,7 +3606,7 @@ function renderShipsOrders(){
     _db.ref(`stewart/couragedare/progress/${agentId}/currentDay`).once('value', cdDaySnap => {
       const cdDay = cdDaySnap.val() || 1;
       _db.ref(`stewart/couragedare/progress/${agentId}/day${cdDay}/completed`).once('value', cdDoneSnap => {
-        if(!cdDoneSnap.val()) checks.push({text: 'Complete today\'s devotional (The Courage Dare)', auto:true});
+        if(!cdDoneSnap.val() && !cdManual.val()) checks.push({text: 'Complete today\'s devotional (The Courage Dare)', key:'couragedare'});
         renderShipsOrdersUI(checks, officerNames[officer] || officer);
       });
     });
@@ -3622,9 +3630,6 @@ function renderShipsOrdersUI(checks, officerName){
   const listHtml = checks.length
     ? '<div style="display:grid;gap:6px;margin-bottom:18px;">' +
         checks.map(c => {
-          if(c.auto){
-            return '<div style="font-size:13px;color:rgba(255,255,255,.8);padding:6px 0;">'+c.text+'</div>';
-          }
           return '<div onclick="toggleShipsOrderItem(\''+c.key+'\')" style="display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.8);padding:6px 0;cursor:pointer;">'+
             '<span style="width:18px;height:18px;border:1.5px solid var(--gold);border-radius:5px;flex-shrink:0;"></span>'+c.text+
           '</div>';
