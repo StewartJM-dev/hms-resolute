@@ -4018,6 +4018,58 @@ function loadDevotionalWeek(weekKey){
 
 // ─── THE GRACE DARE (self-paced 40-day challenge for Dawn) ───
 
+const GRACE_DARE_SEED = {
+  "1": {
+    "title": "Notice Your Volume",
+    "story": "You can't change what you don't notice. Before you can control your yelling, you have to become aware of when and why it happens.\n\nSusanna Wesley, mother of 19 children (including John and Charles Wesley, who changed the world), was known for her calm, steady voice even in chaos. When asked how she managed, she said she made it a rule never to give a command twice in the same tone of voice.",
+    "scriptureRef": "Psalm 141:3",
+    "scriptureText": "Set a watch, O Lord, before my mouth; keep the door of my lips.",
+    "dare": "Today, simply notice. Pay attention to your volume throughout the day. Don't try to change it yet \u2014 just become aware. When do you raise your voice? What triggers it? How many times? How do the boys respond when you yell versus when you speak calmly? Write down what you notice."
+  },
+  "2": {
+    "title": "Whisper Instead of Yell",
+    "story": "When you feel the urge to yell, whisper instead. It's nearly impossible to stay angry while whispering, and it forces the kids to be quiet to hear you.\n\nThis isn't weakness \u2014 it's power under control. A whisper from a woman who means business is more powerful than a yell from a woman who's lost control.",
+    "scriptureRef": "Proverbs 31:26",
+    "scriptureText": "She openeth her mouth with wisdom; and in her tongue is the law of kindness.",
+    "dare": "At least three times today, when you feel the urge to raise your voice, drop it to a whisper instead. Notice what happens to the room."
+  },
+  "3": {
+    "title": "Count to Ten",
+    "story": "Anger itself isn't sin \u2014 it's what you do in the next ten seconds that matters. A pause is a small thing, but it's the difference between a word you regret and a word that helps.\n\nMoses struck the rock in anger instead of speaking to it as God commanded \u2014 one impulsive moment cost him entry into the Promised Land. Ten seconds of restraint could have changed everything.",
+    "scriptureRef": "James 1:19",
+    "scriptureText": "Let every man be swift to hear, slow to speak, slow to wrath.",
+    "dare": "Every time you feel anger rising today, count to ten silently before you respond. Not before you address it \u2014 just before you speak. Let the pause do its work."
+  },
+  "4": {
+    "title": "Apologize When You Fail",
+    "story": "You will yell today. Probably more than once. That's not the failure. The failure is pretending you didn't, or acting like it was justified because you were tired or they deserved it.\n\nA mother who apologizes teaches her sons something no amount of perfect discipline could: that grace covers even the person giving it.",
+    "scriptureRef": "James 5:16",
+    "scriptureText": "Confess your faults one to another... that ye may be healed.",
+    "dare": "The next time you lose your temper today, stop, kneel to their eye level if you can, and say plainly: \"I'm sorry I yelled. That wasn't right of me.\" No excuses attached."
+  },
+  "5": {
+    "title": "Speak Names Gently",
+    "story": "There's a difference between calling a child's name like a warning shot and calling it like an invitation. Boys can tell within a syllable which one is coming \u2014 and they brace for the first, but they lean toward the second.\n\nHow you say their name shapes how they hear everything that follows it.",
+    "scriptureRef": "Isaiah 43:1",
+    "scriptureText": "Fear not: for I have redeemed thee, I have called thee by thy name; thou art mine.",
+    "dare": "Every time you say one of the boys' names today, say it the way you'd want to be called if you were the one who'd made a mistake \u2014 gently, like an invitation, not a verdict."
+  },
+  "6": {
+    "title": "Lower Your Baseline",
+    "story": "It's not just the yelling that wears a house down \u2014 it's the general volume everything gets said at. A home can be loud without anyone ever technically raising their voice.\n\nLowering your everyday baseline volume, even for ordinary instructions, changes the whole temperature of a room before anger ever enters it.",
+    "scriptureRef": "1 Kings 19:12",
+    "scriptureText": "And after the fire a still small voice.",
+    "dare": "Today, speak every instruction \u2014 even the easy, ordinary ones \u2014 quieter than you normally would. Notice if the house itself feels calmer by evening."
+  },
+  "7": {
+    "title": "Weekly Review",
+    "story": "One week in. This isn't about a perfect scorecard \u2014 it's about noticing the shape of your own growth.\n\nWhich day was hardest? When did you succeed? When did you fail, and did you apologize afterward? What is God showing you about your own heart in the middle of the noise?",
+    "scriptureRef": "Psalm 139:23",
+    "scriptureText": "Search me, O God, and know my heart: try me, and know my thoughts.",
+    "dare": "Take some quiet time today \u2014 after the boys are down, or before they're up \u2014 and answer the review questions above honestly in your journal. No new dare today, just reflection."
+  }
+};
+
 function renderGraceDare(){
   if(!_db) return;
   const el = document.getElementById('grace-dare-display');
@@ -4026,7 +4078,11 @@ function renderGraceDare(){
   _db.ref('stewart/gracedare/progress/currentDay').once('value', daySnap => {
     const day = daySnap.val() || 1;
     _db.ref(`stewart/gracedare/content/day${day}`).once('value', contentSnap => {
-      const data = contentSnap.val();
+      let data = contentSnap.val();
+      if(!data && GRACE_DARE_SEED[day]){
+        data = GRACE_DARE_SEED[day];
+        _db.ref(`stewart/gracedare/content/day${day}`).set(data);
+      }
       if(!data){
         el.innerHTML = `<div class="empty-state">Day ${day} hasn't been added yet.</div>`;
         return;
