@@ -445,6 +445,29 @@ body{
   </div>
 </div>
 
+<!-- ═══ SHIP'S DIRECTORY ═══ -->
+<div id="ships-directory-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:#fff;border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;">
+    <div style="text-align:center;font-size:40px;margin-bottom:6px;">🗂️</div>
+    <div style="text-align:center;font-family:'Cinzel',serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:4px;">Ship's Directory</div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:20px;">Where Everything Is Aboard the Resolute</div>
+
+    <div style="display:grid;gap:10px;margin-bottom:18px;">
+      <a href="../bridge/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚓</span><div><strong style="color:var(--brown);font-size:13px;">Bridge</strong><br><span style="font-size:11.5px;color:var(--muted);">Dad's command post &mdash; keeps the whole ship on course.</span></div></a>
+      <a href="../warroom/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚔️</span><div><strong style="color:var(--brown);font-size:13px;">War Room</strong><br><span style="font-size:11.5px;color:var(--muted);">Prayer requests &mdash; submit one, pray for the crew's.</span></div></a>
+      <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(232,184,74,.15);border:1px solid var(--gold);border-radius:10px;padding:12px;"><span style="font-size:22px;">🏠</span><div><strong style="color:var(--brown);font-size:13px;">Officers' Country</strong><br><span style="font-size:11.5px;color:var(--muted);">You're here right now &mdash; runs the home front.</span></div></div>
+      <a href="../boys/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🎯</span><div><strong style="color:var(--brown);font-size:13px;">Agent HQ</strong><br><span style="font-size:11.5px;color:var(--muted);">Mission control for the boys' daily orders.</span></div></a>
+      <a href="../crowsnest/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🔭</span><div><strong style="color:var(--brown);font-size:13px;">Crow's Nest</strong><br><span style="font-size:11.5px;color:var(--muted);">The lookout &mdash; log a praise, see what others are grateful for.</span></div></a>
+      <a href="../kitchen/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍽️</span><div><strong style="color:var(--brown);font-size:13px;">The Galley</strong><br><span style="font-size:11.5px;color:var(--muted);">The ship's kitchen &mdash; meals planned and made here.</span></div></a>
+      <a href="../saga/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">📖</span><div><strong style="color:var(--brown);font-size:13px;">Wardroom</strong><br><span style="font-size:11.5px;color:var(--muted);">Where the crew gathers for stories and downtime.</span></div></a>
+      <a href="../registry.html" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">📜</span><div><strong style="color:var(--brown);font-size:13px;">Registry &amp; Muster</strong><br><span style="font-size:11.5px;color:var(--muted);">The full crew roster and ship's records.</span></div></a>
+      <a href="../vineyard/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍇</span><div><strong style="color:var(--brown);font-size:13px;">Captain's Quarters</strong><br><span style="font-size:11.5px;color:var(--muted);">Yours and John's own space aboard the ship.</span></div></a>
+    </div>
+
+    <button onclick="closeShipsDirectory()" style="width:100%;padding:13px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
+  </div>
+</div>
+
 <!-- ═══ PIN SCREEN ═══ -->
 <div class="pin-screen" id="pin-screen">
   <div class="pin-logo">Stewart Family</div>
@@ -490,6 +513,7 @@ body{
     <a href="../" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">⚓ Gangway</a>
     <a href="../registry.html" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">📜 Registry &amp; Muster</a>
     <a href="../vineyard/" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">🍇 Captain's Quarters</a>
+    <button onclick="showShipsDirectory()" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;background:none;cursor:pointer;">🗂️ Ship's Directory</button>
   </div>
 
   <div class="content">
@@ -1132,6 +1156,15 @@ function showDawnShipsOrders(){
 }
 function closeDawnShipsOrders(){
   document.getElementById('dawn-orders-overlay').style.display = 'none';
+}
+
+function showShipsDirectory(){
+  const overlay = document.getElementById('ships-directory-overlay');
+  if(overlay) overlay.style.display = 'flex';
+}
+function closeShipsDirectory(){
+  const overlay = document.getElementById('ships-directory-overlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 function renderDawnShipsOrders(){
