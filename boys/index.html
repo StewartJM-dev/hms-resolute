@@ -4629,6 +4629,58 @@ function saveDawnDevotional(dateStr){
 
 // ─── THE COURAGE DARE (self-paced 40-day challenge) ───
 
+const COURAGE_DARE_SEED = {
+  "1": {
+    "title": "Obey the First Time",
+    "story": "Alvin York grew up in the Tennessee mountains as a wild young man \u2014 drinking, fighting, and causing trouble. But when he surrendered his life to God, he learned to obey \u2014 first God, then his authorities. That obedience eventually made him one of the most decorated soldiers of World War I.\n\nYork said, \"It's the fear of the Lord that's the beginning of wisdom.\" When you learn to obey God and your parents, you're learning the foundation of all wisdom.",
+    "scriptureRef": "Ephesians 6:1",
+    "scriptureText": "Children, obey your parents in the Lord: for this is right.",
+    "dare": "Today, every time your mother or father tells you to do something, obey immediately \u2014 without complaining, without arguing, without asking why. The FIRST time. Even if you're in the middle of something fun."
+  },
+  "2": {
+    "title": "Speak Respectfully",
+    "story": "Audie Murphy was the most decorated American soldier of World War II. But before he was a hero, he was a poor farm boy from Texas who learned to respect his elders even when life was hard. He never forgot where he came from or the people who raised him.\n\nMurphy understood that how you speak reveals who you are. A man who speaks with disrespect will never command respect.",
+    "scriptureRef": "Ephesians 4:29",
+    "scriptureText": "Let no corrupt communication proceed out of your mouth, but that which is good to the use of edifying.",
+    "dare": "Today, watch every word you say to your parents and your brothers. No back talk, no eye-rolling, no smart remarks \u2014 even the ones that seem small. Speak the way a soldier speaks to someone he respects."
+  },
+  "3": {
+    "title": "Go Beyond What Was Asked",
+    "story": "When George Washington was a young surveyor, he was known for doing more than the job required \u2014 checking his work twice, going the extra mile others wouldn't. That habit, built in small unnoticed jobs, became the same discipline that carried an army through a revolution.\n\nAnybody can do the minimum. Courage shows up in the extra effort nobody asked for.",
+    "scriptureRef": "Colossians 3:23",
+    "scriptureText": "And whatsoever ye do, do it heartily, as to the Lord, and not unto men.",
+    "dare": "Today, find one chore or task and do more than what was asked \u2014 without being told to, and without announcing that you did it. Let it just be noticed on its own."
+  },
+  "4": {
+    "title": "Do It Without Being Asked Twice",
+    "story": "A soldier who needs an order repeated twice is a soldier who can't be trusted in a real fight. Alvin York's unit trusted him because when a command came, it came once \u2014 and it was done.\n\nThe same is true at home. A young man who makes his parents repeat themselves is quietly telling them he can't be counted on.",
+    "scriptureRef": "Proverbs 13:1",
+    "scriptureText": "A wise son heareth his father's instruction.",
+    "dare": "Today, listen the first time everything is said to you \u2014 chores, table manners, bedtime, all of it. If you catch yourself needing it repeated, stop and own it out loud: \"I heard you, I'm sorry, I'm doing it now.\""
+  },
+  "5": {
+    "title": "Honor Your Mother",
+    "story": "Robert E. Lee, whatever else history says about him, was known for his deep respect for his mother. Even as a grown man and famous general, he spoke of her with honor and credited her with teaching him character.\n\nThe way you treat your mother now will determine how you treat your wife later. A man who dishonors his mother will dishonor every woman in his life.",
+    "scriptureRef": "Exodus 20:12",
+    "scriptureText": "Honour thy father and thy mother: that thy days may be long upon the land.",
+    "dare": "Every time your mother speaks to you today, stop what you're doing, look her in the eyes, and say \"Yes ma'am\" or \"No ma'am.\" Show her with your full attention that you honor her."
+  },
+  "6": {
+    "title": "Obey When It's Hard",
+    "story": "When Alvin York was drafted for World War I, his religious beliefs made him opposed to killing. But after prayer and counsel, he realized that sometimes obeying authority means doing hard things to protect others. He obeyed \u2014 and saved countless lives by his courage in battle.\n\nThe real test of obedience isn't when it's easy. It's when it costs you something.",
+    "scriptureRef": "Colossians 3:22",
+    "scriptureText": "Servants, obey in all things your masters according to the flesh; not with eyeservice, as menpleasers; but in singleness of heart, fearing God.",
+    "dare": "When you're asked to do something you really don't want to do today, do it cheerfully and completely \u2014 without complaining even in your heart. Choose joy in obedience."
+  },
+  "7": {
+    "title": "Weekly Review",
+    "story": "You've finished your first week, Agent. Before you move forward, look back.\n\nWhich day was hardest this week? Why?\nWhen did you succeed at the dare?\nWhen did you fail?\nWhat did you learn about yourself?\nWhat did you learn about courage?\n\nWrite it down honestly. Growth only happens where there's honesty first.",
+    "scriptureRef": "Lamentations 3:40",
+    "scriptureText": "Let us search and try our ways, and turn again to the Lord.",
+    "dare": "Take ten quiet minutes today and answer the review questions above in your journal. No new dare today \u2014 just honest reflection."
+  }
+};
+
 function renderCourageDare(){
   if(!currentAgent || !_db) return;
   const el = document.getElementById('courage-dare-display');
@@ -4637,7 +4689,12 @@ function renderCourageDare(){
   _db.ref(`stewart/couragedare/progress/${currentAgent.id}/currentDay`).once('value', daySnap => {
     const day = daySnap.val() || 1;
     _db.ref(`stewart/couragedare/content/day${day}`).once('value', contentSnap => {
-      const data = contentSnap.val();
+      let data = contentSnap.val();
+      if(!data && COURAGE_DARE_SEED[day]){
+        data = COURAGE_DARE_SEED[day];
+        // Seed Firebase so this content is now the durable source of truth
+        _db.ref(`stewart/couragedare/content/day${day}`).set(data);
+      }
       if(!data){
         el.innerHTML = `<div class="empty" style="color:rgba(255,255,255,.3);padding:14px;">Day ${day} hasn't been added yet, Agent. Check back soon.</div>`;
         return;
