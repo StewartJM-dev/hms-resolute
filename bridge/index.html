@@ -488,6 +488,34 @@ body{
     </div>
     <div class="ce-stat" id="ce-stat"></div>
   </div>
+
+  <!-- THE BOYS' LOG (their own stories) -->
+  <div class="shead" style="margin-top:22px;">The Boys' Log</div>
+  <div id="bl-selector" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+    <button class="filter-btn active" onclick="openBoyLog('samuel','Samuel',this)">🦅 Samuel</button>
+    <button class="filter-btn" onclick="openBoyLog('johnjr','John Jr.',this)">🦁 John Jr.</button>
+    <button class="filter-btn" onclick="openBoyLog('stephen','Stephen',this)">🦖 Stephen</button>
+    <button class="filter-btn" onclick="openBoyLog('daniel','Daniel',this)">🐘 Daniel</button>
+  </div>
+  <div class="saga-chapters" id="bl-entries"></div>
+  <button class="saga-add-btn" onclick="openEntryEditor()">＋ Add a Story</button>
+
+  <!-- entry editor (hidden until opened) -->
+  <div id="entry-editor" style="display:none;">
+    <div class="ce-field">
+      <label>Title</label>
+      <input type="text" id="be-title" placeholder="Story title…">
+    </div>
+    <div class="ce-field">
+      <label>Story text (paste what they sent you)</label>
+      <textarea id="be-text" rows="8" placeholder="Paste the story here…"></textarea>
+    </div>
+    <div class="ce-btns">
+      <button class="ce-save" onclick="saveEntry()">Save</button>
+      <button class="ce-cancel" onclick="closeEntryEditor()">Cancel</button>
+    </div>
+    <div class="ce-stat" id="be-stat"></div>
+  </div>
   </div>
 
   <!-- ===== WORD TAB (devotional ministry) ===== -->
@@ -568,7 +596,7 @@ function initFirebase(){
     _db.ref('.info/connected').on('value', snap => {
       const live = !!snap.val();
       if(dot){ dot.textContent = live ? '● live' : '○ offline'; dot.style.color = live ? '#7ad19a' : '#c89'; }
-      if(live){ loadCrewStatus(); loadSaga(); loadCadence(); loadDailyBanner(); }
+      if(live){ loadCrewStatus(); loadSaga(); loadCadence(); loadDailyBanner(); loadBoyLog(); }
     });
   }catch(e){
     const dot = document.getElementById('sync-dot');
@@ -771,6 +799,73 @@ function unreleaseChapter(k){
   }
 }
 function ceStat(m){ const e=document.getElementById('ce-stat'); if(e) e.textContent=m; }
+
+// ----- The Boys' Log -----
+let BL_BOY='samuel', BL_NAME='Samuel';
+let BL_ENTRIES=[];
+let editingEntryKey=null;
+function openBoyLog(key,name,btn){
+  BL_BOY=key; BL_NAME=name;
+  document.querySelectorAll('#bl-selector .filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  closeEntryEditor();
+  loadBoyLog();
+}
+function loadBoyLog(){
+  if(!_db) return;
+  _db.ref('stories/'+BL_BOY+'/entries').on('value', s=>{
+    const v=s.val()||{};
+    BL_ENTRIES=Object.entries(v).map(([k,e])=>({k,...e})).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+    renderBoyLog();
+  });
+}
+function renderBoyLog(){
+  const el=document.getElementById('bl-entries');
+  if(!el) return;
+  if(!BL_ENTRIES.length){ el.innerHTML='<div class="empty">No stories from '+esc(BL_NAME)+' yet.</div>'; return; }
+  el.innerHTML=BL_ENTRIES.map((e,i)=>
+    '<div class="sch"><div class="sc-main"><div class="sc-num">Story '+(i+1)+'</div>'+
+    '<div class="sc-title">'+esc(e.title||'Untitled')+'</div></div>'+
+    '<div class="sc-actions"><button onclick="editEntry(\''+e.k+'\')">Edit</button>'+
+    '<button onclick="deleteEntry(\''+e.k+'\')">Delete</button></div></div>'
+  ).join('');
+}
+function openEntryEditor(){
+  editingEntryKey=null;
+  document.getElementById('be-title').value='';
+  document.getElementById('be-text').value='';
+  document.getElementById('entry-editor').style.display='block';
+  document.getElementById('be-stat').textContent='';
+  document.getElementById('entry-editor').scrollIntoView({behavior:'smooth'});
+}
+function editEntry(k){
+  const e=BL_ENTRIES.find(x=>x.k===k); if(!e) return;
+  editingEntryKey=k;
+  document.getElementById('be-title').value=e.title||'';
+  document.getElementById('be-text').value=e.text||'';
+  document.getElementById('entry-editor').style.display='block';
+  document.getElementById('be-stat').textContent='';
+  document.getElementById('entry-editor').scrollIntoView({behavior:'smooth'});
+}
+function closeEntryEditor(){ const el=document.getElementById('entry-editor'); if(el) el.style.display='none'; }
+function saveEntry(){
+  if(!_db){ beStat('Not connected.'); return; }
+  const title=document.getElementById('be-title').value.trim();
+  const text=document.getElementById('be-text').value;
+  if(!title){ beStat('Give it a title.'); return; }
+  if(editingEntryKey){
+    _db.ref('stories/'+BL_BOY+'/entries/'+editingEntryKey).update({title,text}).then(()=>{ beStat('Saved'); setTimeout(closeEntryEditor,700); });
+  }else{
+    _db.ref('stories/'+BL_BOY+'/entries').push({title,text,timestamp:Date.now()}).then(()=>{ beStat('Added'); setTimeout(closeEntryEditor,700); });
+  }
+}
+function deleteEntry(k){
+  if(!_db) return;
+  if(confirm('Delete this story? This cannot be undone.')){
+    _db.ref('stories/'+BL_BOY+'/entries/'+k).remove();
+  }
+}
+function beStat(m){ const e=document.getElementById('be-stat'); if(e) e.textContent=m; }
 
 // ----- Release cadence (item 3) -----
 let SAGA_CADENCE = 0; // days between releases; 0 = no cadence set
