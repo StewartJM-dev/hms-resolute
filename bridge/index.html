@@ -15,6 +15,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
+<script src="../push-notifications.js"></script>
 <style>
 :root{
   --green:#1a4a2e;--green2:#2d6a47;--green3:#3d8a5e;
@@ -597,6 +600,7 @@ function initFirebase(){
   try{
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
+    if(typeof initPush === 'function') initPush();
     const dot = document.getElementById('sync-dot');
     _db.ref('.info/connected').on('value', snap => {
       const live = !!snap.val();
