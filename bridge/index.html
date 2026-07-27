@@ -251,6 +251,11 @@ body{
   font-family:'Lato',sans-serif;font-size:9px;letter-spacing:.5px;text-transform:uppercase;flex:1;padding:4px 0;transition:.15s;}
 .bnav .bni{font-size:20px;}
 .bnav.active{color:var(--gold2,#e8b84a);}
+.bnav{position:relative;}
+.bnav .bni{position:relative;}
+.bnav-badge{position:absolute;top:-4px;right:-9px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;
+  background:#c0392b;color:#fff;font-family:'Lato',sans-serif;font-size:10px;font-weight:700;line-height:16px;text-align:center;
+  box-shadow:0 0 0 2px rgba(10,16,26,.99);}
 
 /* ===== Daily banner ===== */
 .daily-banner{background:linear-gradient(135deg,rgba(46,63,122,.45),rgba(26,40,80,.35));border:1px solid rgba(200,160,70,.3);
@@ -596,7 +601,7 @@ function initFirebase(){
     _db.ref('.info/connected').on('value', snap => {
       const live = !!snap.val();
       if(dot){ dot.textContent = live ? '● live' : '○ offline'; dot.style.color = live ? '#7ad19a' : '#c89'; }
-      if(live){ loadCrewStatus(); loadSaga(); loadCadence(); loadDailyBanner(); loadBoyLog(); }
+      if(live){ loadCrewStatus(); loadSaga(); loadCadence(); loadDailyBanner(); loadBoyLog(); startCommsWatch(); }
     });
   }catch(e){
     const dot = document.getElementById('sync-dot');
@@ -912,7 +917,7 @@ function showBTab(name, btn){
   document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='comms'){ loadBridgeChat(); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); }
+  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); }
   if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
   window.scrollTo(0,0);
@@ -926,6 +931,7 @@ let bridgePrivateThreadAgent = null;
 function openBridgeThread(agentId, name, btnEl){
   if(!_db) return;
   bridgePrivateThreadAgent = agentId;
+  markSourceRead(agentId);
   document.querySelectorAll('#bpt-selector .filter-btn').forEach(b=>b.classList.remove('active'));
   if(btnEl) btnEl.classList.add('active');
   const el = document.getElementById('bpt-thread');
@@ -977,6 +983,52 @@ function sendBridgeChat(){
   const inp=document.getElementById('bchat-input');
   const text=inp.value.trim(); if(!text) return;
   _db.ref('stewart/groupchat').push({ text, from:'Dad', agentId:'parent', timestamp:Date.now() }).then(()=>{ inp.value=''; });
+}
+
+// ----- Comms unread notification badge -----
+const COMMS_BOYS = ['samuel','johnjr','stephen','daniel'];
+let commsLastSeen = {};
+let commsUnread = {}; // source -> count
+try{ commsLastSeen = JSON.parse(localStorage.getItem('bridge-comms-lastseen')||'{}'); }catch(e){ commsLastSeen = {}; }
+
+function isFromParent(m){
+  return m.agentId==='parent' || m.from==='Dad' || m.from==='Mom' || m.from==='HQ';
+}
+function startCommsWatch(){
+  if(!_db) return;
+  // group chat
+  _db.ref('stewart/groupchat').on('value', s=>{
+    const v=s.val()||{};
+    const since = commsLastSeen['groupchat']||0;
+    commsUnread['groupchat'] = Object.values(v).filter(m=>!isFromParent(m) && (m.timestamp||0)>since).length;
+    renderCommsBadge();
+  });
+  // private threads
+  COMMS_BOYS.forEach(key=>{
+    _db.ref('stewart/messages/'+key).on('value', s=>{
+      const v=s.val()||{};
+      const since = commsLastSeen[key]||0;
+      commsUnread[key] = Object.values(v).filter(m=>!isFromParent(m) && (m.timestamp||0)>since).length;
+      renderCommsBadge();
+    });
+  });
+}
+function renderCommsBadge(){
+  const total = Object.values(commsUnread).reduce((a,b)=>a+b,0);
+  const badge = document.getElementById('comms-badge');
+  if(!badge) return;
+  if(total>0){ badge.textContent = total>9?'9+':total; badge.style.display='inline-block'; }
+  else{ badge.style.display='none'; }
+}
+function markSourceRead(source){
+  commsLastSeen[source] = Date.now();
+  localStorage.setItem('bridge-comms-lastseen', JSON.stringify(commsLastSeen));
+  commsUnread[source] = 0;
+  renderCommsBadge();
+}
+function markCommsRead(){
+  markSourceRead('groupchat');
+  COMMS_BOYS.forEach(k=>markSourceRead(k));
 }
 
 // ════════════════════════════════════════════
@@ -1302,7 +1354,7 @@ initFirebase();
 <!-- BRIDGE BOTTOM NAV -->
 <div class="bbotnav">
   <button class="bnav active" data-btab="helm" onclick="showBTab('helm',this)"><span class="bni">⚓</span>Helm</button>
-  <button class="bnav" data-btab="comms" onclick="showBTab('comms',this)"><span class="bni">📡</span>Comms</button>
+  <button class="bnav" data-btab="comms" onclick="showBTab('comms',this)"><span class="bni">📡<span class="bnav-badge" id="comms-badge" style="display:none;"></span></span>Comms</button>
   <button class="bnav" data-btab="instruments" onclick="showBTab('instruments',this)"><span class="bni">🎛️</span>Instruments</button>
   <button class="bnav" data-btab="saga" onclick="showBTab('saga',this)"><span class="bni">📖</span>Saga</button>
   <button class="bnav" data-btab="word" onclick="showBTab('word',this)"><span class="bni">✝️</span>Word</button>
