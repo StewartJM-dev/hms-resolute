@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Systems Seven · Boys' Log</title>
+<link rel="apple-touch-icon" href="../assets/app-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boys' Log">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --ink:#16120c;--ink2:#241c12;--parch:#f4ecd8;--parch2:#ece0c8;
+  --gold:#b8893a;--gold2:#d9b36a;--deep:#0e0a06;
+  --cream:#f6efe0;--muted:#9a8a6f;--rule:#3a2e1d;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'EB Garamond',Georgia,serif;
+  background:
+    radial-gradient(ellipse at top,rgba(184,137,58,.12),transparent 55%),
+    linear-gradient(170deg,#16120c,#0e0a06);
+  background-attachment:fixed;color:var(--cream);min-height:100vh;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:680px;margin:0 auto;padding:0 18px 70px;}
+.mast{text-align:center;padding:22px 0 6px;}
+.mast .orn{color:var(--gold2);letter-spacing:6px;font-size:12px;opacity:.55;margin-bottom:10px;}
+.mast h1{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(26px,7vw,38px);
+  background:linear-gradient(180deg,#f0dcae,var(--gold) 72%,#7a531c);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px;}
+.mast .sub{font-style:italic;color:var(--gold2);opacity:.75;margin-top:10px;font-size:15px;}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:18px 0;opacity:.4;}
+.gw-link{
+  position:fixed; top:max(14px, env(safe-area-inset-top) + 8px); left:14px; z-index:9999;
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 13px; border-radius:20px;
+  background:rgba(6,15,29,.8); border:1px solid rgba(212,175,90,.5);
+  color:#d4af5a; text-decoration:none;
+  font-family:'Lato',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.gw-link:active{ background:rgba(176,141,62,.32); }
+
+/* boy banner */
+.boy-banner{display:block;width:100%;text-align:left;cursor:pointer;
+  background:linear-gradient(145deg,rgba(184,137,58,.1),rgba(36,28,18,.4));
+  border:1px solid rgba(184,137,58,.22);border-radius:11px;padding:16px 17px;margin-bottom:12px;color:inherit;font-family:inherit;}
+.boy-banner:active{transform:scale(.99);}
+.boy-banner .bname{font-family:'Cinzel',serif;font-size:18px;color:var(--cream);}
+.boy-banner .bcode{font-size:14px;opacity:.7;font-style:italic;margin-top:3px;}
+.boy-banner .bcount{font-family:'Lato',sans-serif;font-size:11px;letter-spacing:1px;color:var(--gold2);opacity:.85;margin-top:7px;}
+
+/* toc list (per-boy) */
+#boy-toc{display:none;}
+.toc-intro{text-align:center;font-style:italic;opacity:.65;font-size:15px;margin-bottom:20px;line-height:1.5;}
+.chap{display:block;width:100%;text-align:left;cursor:pointer;
+  background:linear-gradient(145deg,rgba(184,137,58,.1),rgba(36,28,18,.4));
+  border:1px solid rgba(184,137,58,.22);border-radius:11px;padding:15px 17px;margin-bottom:11px;transition:.15s;color:inherit;font-family:inherit;}
+.chap:active{transform:scale(.99);}
+.chap .cnum{font-family:'Lato',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold2);opacity:.8;}
+.chap .ctitle{font-family:'Cinzel',serif;font-size:18px;color:var(--cream);margin-top:4px;}
+.chap .cmeta{font-size:13px;opacity:.6;margin-top:5px;font-style:italic;}
+.empty{text-align:center;opacity:.55;font-style:italic;padding:40px 20px;line-height:1.6;}
+.back-row{margin-bottom:6px;}
+.back-btn{background:none;border:1px solid var(--gold);color:var(--gold2);border-radius:8px;
+  padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Lato',sans-serif;}
+
+/* reader */
+#reader{display:none;}
+.reader-bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;padding:12px 0;
+  background:linear-gradient(180deg,#16120c 70%,transparent);margin-bottom:10px;}
+.reader-bar button{background:none;border:1px solid var(--gold);color:var(--gold2);border-radius:8px;
+  width:34px;height:34px;font-size:16px;cursor:pointer;flex-shrink:0;}
+.reader-bar .rtitle{font-family:'Cinzel',serif;font-size:15px;color:var(--cream);flex:1;line-height:1.2;}
+.chapter-body{font-size:19px;line-height:1.75;letter-spacing:.2px;}
+.chapter-body .chnum{text-align:center;font-family:'Lato',sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold2);opacity:.75;margin-bottom:6px;}
+.chapter-body .chttl{text-align:center;font-family:'Cinzel',serif;font-size:26px;color:var(--gold2);margin-bottom:26px;font-weight:700;}
+.chapter-body p{margin-bottom:1.1em;text-indent:1.6em;}
+.chapter-body p:first-of-type{text-indent:0;}
+.chapter-body p:first-of-type::first-letter{font-family:'Cinzel',serif;font-size:3.1em;float:left;line-height:.82;margin:.02em .08em 0 0;color:var(--gold);}
+.chapter-end{text-align:center;color:var(--gold2);opacity:.5;letter-spacing:6px;margin:34px 0;}
+
+.sync{text-align:center;font-size:10px;letter-spacing:1px;color:var(--muted);opacity:.5;margin-top:24px;font-family:'Lato',sans-serif;}
+</style>
+</head>
+<body>
+
+<a class="gw-link" href="../">← Gangway</a>
+
+<!-- BOY LOBBY -->
+<div class="wrap" id="boy-lobby">
+  <div class="mast">
+    <div class="orn">✦ ✦ ✦</div>
+    <h1>The Boys' Log</h1>
+    <div class="sub">Stories written by the crew, off the clock.</div>
+  </div>
+  <div class="rule"></div>
+  <div id="boy-list"></div>
+  <div class="sync" id="lobby-sync">connecting…</div>
+</div>
+
+<!-- PER-BOY TOC -->
+<div class="wrap" id="boy-toc">
+  <div class="back-row"><button class="back-btn" onclick="closeBoyToc()">‹ All Boys</button></div>
+  <div class="mast">
+    <div class="orn">✦ ✦ ✦</div>
+    <h1 id="toc-bname"></h1>
+    <div class="sub" id="toc-bcode"></div>
+  </div>
+  <div class="rule"></div>
+  <div class="toc-intro">Stories, in the order they were written.</div>
+  <div id="story-list"></div>
+</div>
+
+<!-- READER -->
+<div class="wrap" id="reader">
+  <div class="reader-bar">
+    <button onclick="closeStory()">&#8592;</button>
+    <div class="rtitle" id="reader-title"></div>
+  </div>
+  <div class="chapter-body" id="story-body"></div>
+  <div class="chapter-end">✦ ✦ ✦</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// THE BOYS' LOG — reads stories from Firebase.
+// Data model: stories/{boyKey}/entries/{pushKey} = {title, text, timestamp}
+// Entries are added/edited from the Bridge (Boys' Log station).
+// ════════════════════════════════════════════════════
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+
+const BOYS = [
+  {key:'samuel', name:'Samuel', code:'aka Agent Alpha', icon:'🦅'},
+  {key:'johnjr', name:'John Jr.', code:'aka Agent Bravo', icon:'🦁'},
+  {key:'stephen', name:'Stephen', code:'aka Agent Dino', icon:'🦖'},
+  {key:'daniel', name:'Daniel', code:'aka Agent Wildcard', icon:'🐘'}
+];
+
+let _db=null;
+let ENTRIES={};      // boyKey -> [entries]
+let currentBoy=null;
+let currentEntries=[];
+
+firebase.initializeApp(FB_CONFIG);
+_db = firebase.database();
+
+function esc(s){return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+_db.ref('.info/connected').on('value', s=>{
+  document.getElementById('lobby-sync').textContent = s.val() ? '' : '○ offline';
+});
+
+_db.ref('stories').on('value', snap=>{
+  const v = snap.val() || {};
+  BOYS.forEach(b=>{
+    const raw = (v[b.key] && v[b.key].entries) || {};
+    ENTRIES[b.key] = Object.entries(raw).map(([k,e])=>({k,...e}))
+      .sort((a,b2)=>(a.timestamp||0)-(b2.timestamp||0));
+  });
+  renderLobby();
+  if(currentBoy) renderStoryList(currentBoy);
+});
+
+function renderLobby(){
+  const el = document.getElementById('boy-list');
+  el.innerHTML = BOYS.map(b=>{
+    const n = (ENTRIES[b.key]||[]).length;
+    const countTxt = n===0 ? 'No stories yet' : (n===1 ? '1 story' : n+' stories');
+    return `<button class="boy-banner" onclick="openBoy('${b.key}')">
+      <div class="bname">${b.icon} ${esc(b.name)}</div>
+      <div class="bcode">${esc(b.code)}</div>
+      <div class="bcount">${countTxt}</div>
+    </button>`;
+  }).join('');
+}
+
+function openBoy(key){
+  currentBoy = key;
+  const b = BOYS.find(x=>x.key===key);
+  document.getElementById('toc-bname').textContent = b.icon+' '+b.name;
+  document.getElementById('toc-bcode').textContent = b.code;
+  document.getElementById('boy-lobby').style.display='none';
+  document.getElementById('boy-toc').style.display='block';
+  renderStoryList(key);
+  window.scrollTo(0,0);
+}
+function closeBoyToc(){
+  currentBoy=null;
+  document.getElementById('boy-toc').style.display='none';
+  document.getElementById('boy-lobby').style.display='block';
+  window.scrollTo(0,0);
+}
+
+function renderStoryList(key){
+  currentEntries = ENTRIES[key] || [];
+  const el = document.getElementById('story-list');
+  if(!currentEntries.length){
+    el.innerHTML = '<div class="empty">No stories yet.<br>The first is on its way.</div>';
+    return;
+  }
+  el.innerHTML = currentEntries.map((e,i)=>`
+    <button class="chap" onclick="openStory(${i})">
+      <div class="cnum">Story ${i+1}</div>
+      <div class="ctitle">${esc(e.title||'Untitled')}</div>
+      ${e.timestamp?`<div class="cmeta">${new Date(e.timestamp).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>`:''}
+    </button>`).join('');
+}
+
+function openStory(i){
+  const e = currentEntries[i];
+  document.getElementById('boy-toc').style.display='none';
+  document.getElementById('reader').style.display='block';
+  document.getElementById('reader-title').textContent = e.title||'Untitled';
+  const paras = (e.text||'').split(/\n\s*\n/).filter(p=>p.trim());
+  document.getElementById('story-body').innerHTML =
+    `<div class="chnum">${esc((BOYS.find(b=>b.key===currentBoy)||{}).name||'')}</div><div class="chttl">${esc(e.title||'')}</div>`+
+    paras.map(p=>`<p>${esc(p.trim())}</p>`).join('');
+  window.scrollTo(0,0);
+}
+function closeStory(){
+  document.getElementById('reader').style.display='none';
+  document.getElementById('boy-toc').style.display='block';
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
