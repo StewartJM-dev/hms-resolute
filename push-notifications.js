@@ -12,7 +12,7 @@
 // One-level-deep pages (bridge/, dashboard/, boys/, saga/):
 //   const PUSH_SW_PATH = '../firebase-messaging-sw.js';
 // ════════════════════════════════════════════════════
-const PUSH_VAPID_KEY = "PASTE_YOUR_VAPID_PUBLIC_KEY_HERE";
+const PUSH_VAPID_KEY = "BAZvZcHTWYtqiIivjknmnqM4YmktBf4TJjiScLL_sh8mM_oS3i1EsLIlVfb0E7n3-Pvl_U627mKS5T_Y6MkPx_o";
 
 function getResoluteSession(){
   try{ return JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){ return null; }
