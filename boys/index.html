@@ -14,6 +14,9 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
+<script src="../push-notifications.js"></script>
 <style>
 :root{
   --teal:#0a7a7a;--teal2:#0d9e9e;--teal3:#12c4c4;
@@ -1097,6 +1100,7 @@ function initFirebase(){
     }
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
+    if(typeof initPush === 'function') initPush();
     setSyncStatus('live');
 
     // Connection monitor
