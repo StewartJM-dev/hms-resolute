@@ -237,6 +237,14 @@ body::before{
 }
 .bnb.active{color:var(--teal3);}
 .bnb svg{width:18px;height:18px;flex-shrink:0;}
+.bnb{position:relative;}
+.bnb-badge{
+  position:absolute;top:1px;right:calc(50% - 20px);
+  min-width:14px;height:14px;padding:0 4px;border-radius:8px;
+  background:#c0392b;color:#fff;
+  font-family:'Exo 2',sans-serif;font-size:9px;font-weight:700;line-height:14px;text-align:center;
+  box-shadow:0 0 0 2px var(--black,#0a0f14);display:none;
+}
 
 /* TABS */
 .tab{display:none;padding:14px 13px 20px;}
@@ -793,12 +801,12 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
     <div class="tab" id="tab-transmissions">
       <!-- BOARD MESSAGES VIEW -->
       <div id="msg-board-view">
-        <div class="sec-head">
+        <div class="sec-head" style="display:none;">
           <div class="sec-head-diamond"></div>
           <div class="sec-head-text">Transmissions from HQ</div>
           <div class="sec-head-line"></div>
         </div>
-        <div id="transmissions-list">
+        <div id="transmissions-list" style="display:none;">
           <div class="empty">No transmissions at this time.</div>
         </div>
 
@@ -1004,6 +1012,7 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
     <button class="bnb" onclick="showTab('transmissions',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       HQ
+      <span class="bnb-badge" id="hq-nav-badge"></span>
     </button>
     <button class="bnb" onclick="showTab('training',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -2832,6 +2841,9 @@ function openPrivateThread(){
   threadView.style.display = 'flex';
   threadView.style.flexDirection = 'column';
   document.getElementById('thread-agent-name').textContent = currentAgent.codename + ' — Private Thread';
+  const msgBadge = document.getElementById('msg-unread-badge');
+  if(msgBadge) msgBadge.style.display = 'none';
+  refreshHqNavBadge();
 
   // Listen for messages
   if(_db){
@@ -3041,7 +3053,17 @@ function updateGroupBadge(){
         badge.style.display = 'none';
       }
     }
+    refreshHqNavBadge();
   });
+}
+
+function refreshHqNavBadge(){
+  const navBadge = document.getElementById('hq-nav-badge');
+  if(!navBadge) return;
+  const groupOn = document.getElementById('group-unread-badge');
+  const msgOn = document.getElementById('msg-unread-badge');
+  const anyUnread = (groupOn && groupOn.style.display !== 'none') || (msgOn && msgOn.style.display !== 'none');
+  navBadge.style.display = anyUnread ? 'block' : 'none';
 }
 
 // ══════════════════════════════════════════════════════
@@ -3358,6 +3380,7 @@ function loadPrivatePreview(){
       if(previewEl) previewEl.textContent = `${last.from}: ${(last.text||'').slice(0,50)}`;
       if(badgeEl && isParent) badgeEl.style.display = 'block';
     }
+    refreshHqNavBadge();
   });
 }
 
