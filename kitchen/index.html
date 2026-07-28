@@ -304,8 +304,8 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
   </div>
   <div class="screen" id="screen-shopping">
     <div class="sc-title">Shopping List</div>
-    <div class="sc-sub">Low-stock items and meal-plan needs. Stays here until you pick them up.</div>
-    <button class="shop-gen" onclick="sendToShopping()">&#8635; Add Missing Items from This Week's Plan</button>
+    <div class="sc-sub">Only fills up from the cart button on Pantry items. Stays here until you pick them up.</div>
+    <button class="shop-clr" onclick="clearAllShopping()" style="margin-bottom:8px;">&#128465; Clear All Items</button>
     <button class="shop-clr" onclick="clearChecked()">Clear Picked-Up Items</button>
     <div id="shopping-list"></div>
   </div>
@@ -967,22 +967,19 @@ function renderInv(){
   document.getElementById('inventory-list').innerHTML=secs.map(sec=>`<div class="inv-sec"><div class="inv-sec-t" style="display:flex;align-items:center;justify-content:space-between;"><span>${sec.label}</span><button class="inv-gen-btn" onclick="generateStarterList('${sec.key}')">+ Generate List</button></div>${inv[sec.key].map(item=>`<div class="inv-item ${invStatusClass(item)}"><div><div class="inv-nm">${item.name}</div><div class="inv-un">${item.unit}</div></div><div class="inv-ct"><button class="qb" onclick="adjQty('${sec.key}','${item.id}',-1)">-</button><span class="qs ${item.qty<=item.low?'q-lo':'q-ok'}" id="q-${item.id}">${item.qty}</span><button class="qb" onclick="adjQty('${sec.key}','${item.id}',1)">+</button><button class="inv-shop-btn" title="Add to Shopping List" onclick="addSingleToShopping('${item.name.replace(/'/g,"\\'")}', this)">&#128722;</button></div></div>`).join('')}<div class="add-row"><input class="add-inp" type="text" placeholder="Add to ${sec.label.toLowerCase()}..." id="ai-${sec.key}"><button class="add-btn" onclick="addItem('${sec.key}')">Add</button></div></div>`).join('');
 }
 
-// Starter templates — seeds common items for a section so there's something
-// to work from instead of typing every item in from scratch. Only adds
-// items not already present (matched by name, case-insensitive), so tapping
-// this again later is safe and won't create duplicates.
-const INV_STARTER_LISTS = {
-  freezer: ['Ground Beef','Chicken Breast','Mixed Vegetables','Frozen Pizza','Ice Cream','Frozen Waffles','Sausage','Bacon','Frozen Fries'],
-  pantry: ['Flour','Sugar','Rice','Pasta','Canned Tomatoes','Peanut Butter','Cereal','Canned Beans','Olive Oil','Salt','Pepper','Ketchup','Mustard','Bread'],
-  fridge: ['Milk','Eggs','Butter','Cheese','Yogurt','Lunch Meat','Salad Greens','Carrots','Apples']
-};
+// Generates the full inventory sheet for one section from Dawn's real
+// baseline (DEFAULT_INV) — the same comprehensive data "Load Dawn's
+// Inventory Sheet" uses, just scoped to a single section instead of
+// resetting everything at once. Only adds items not already present
+// (matched by name, case-insensitive) — items you've already added or
+// adjusted are left untouched, so this is safe to tap again later.
 function generateStarterList(sec){
   const inv=getInv();
   const existing = new Set(inv[sec].map(i=>i.name.toLowerCase()));
-  const toAdd = (INV_STARTER_LISTS[sec]||[]).filter(name => !existing.has(name.toLowerCase()));
-  if(!toAdd.length){ alert('Everything on the starter list for this section is already here.'); return; }
-  toAdd.forEach(name => {
-    inv[sec].push({id:sec[0]+Date.now()+Math.random().toString(36).slice(2,6), name, qty:0, unit:'item', low:1});
+  const toAdd = (DEFAULT_INV[sec]||[]).filter(item => !existing.has(item.name.toLowerCase()));
+  if(!toAdd.length){ alert('Every item from the inventory sheet for this section is already here.'); return; }
+  toAdd.forEach(item => {
+    inv[sec].push({id:sec[0]+Date.now()+Math.random().toString(36).slice(2,6), name:item.name, qty:0, unit:item.unit, low:item.low});
   });
   saveInv(inv);
   renderInv();
@@ -1016,6 +1013,12 @@ function renderShopList(){
 }
 function toggleShop(i){const l=getShop();l[i].checked=!l[i].checked;saveShop(l);renderShopList();updateShopBadge();}
 function clearChecked(){saveShop(getShop().filter(i=>!i.checked));renderShopList();updateShopBadge();}
+function clearAllShopping(){
+  if(!confirm('Clear the entire shopping list? This removes everything, checked or not.')) return;
+  saveShop([]);
+  renderShopList();
+  updateShopBadge();
+}
 
 function renderHealth(){
   document.getElementById('health-content').innerHTML=`
