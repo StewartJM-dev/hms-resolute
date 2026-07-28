@@ -1029,6 +1029,7 @@ function markSourceRead(source){
   localStorage.setItem('bridge-comms-lastseen', JSON.stringify(commsLastSeen));
   commsUnread[source] = 0;
   renderCommsBadge();
+  if(typeof clearHomeScreenBadge === 'function') clearHomeScreenBadge();
 }
 function markCommsRead(){
   markSourceRead('groupchat');
