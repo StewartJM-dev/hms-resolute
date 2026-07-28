@@ -110,10 +110,10 @@ body{
 }
 .gw-link:active{ background:rgba(176,141,62,.32); }
 .gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:12px;}
-.gauge-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
-.gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.gauge-card{background:#0a0f16;border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
+.gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:#8fb4d9;margin-bottom:2px;}
 .gauge-card .gc-icon{font-size:22px;margin-bottom:2px;}
-.gauge-card .gc-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+.gauge-card .gc-sub{font-size:11px;color:#8fb4d9;margin-top:6px;}
 .gauge-svg{width:100%;max-width:110px;height:auto;display:block;margin:0 auto;}
 .gauge-track{fill:none;stroke:var(--border);stroke-width:9;stroke-linecap:round;}
 .gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
@@ -1058,6 +1058,11 @@ const AGENTS = [
   {id:'stephen', name:'Stephen', codename:'Agent Dino', color:'#1e5c2a', icon:'🦖'},
   {id:'daniel', name:'Daniel', codename:'Agent Wildcard', color:'#7a5c1e', icon:'🐘'},
 ];
+// Brighter versions of each agent's color, just for the gauge cards (which
+// now sit on a black background) — same bright tones the Bridge uses for
+// its own Instruments tab. The darker `color` above stays as-is everywhere
+// else (badges, borders, buttons on light cards).
+const GAUGE_COLORS = {samuel:'#4d9fff', johnjr:'#34d399', stephen:'#f5a623', daniel:'#ec4899'};
 
 
 
@@ -1316,10 +1321,10 @@ function renderOverview(){
       return `<div class="gauge-card">
         <div class="gc-name">${a.name}</div>
         <div class="gc-icon">${a.icon}</div>
-        ${gaugeSVG(pct, a.color)}
-        <div class="gauge-pctline" style="color:${a.color};">${pct}%</div>
+        ${gaugeSVG(pct, GAUGE_COLORS[a.id])}
+        <div class="gauge-pctline" style="color:${GAUGE_COLORS[a.id]};">${pct}%</div>
         <div class="gc-sub">${completed}/${total} missions</div>
-        <div class="gc-sub" style="color:${earned?'#2d6a47':isWeekend?'var(--muted)':'#b5451b'};font-weight:700;">${isWeekend?'Family day':earned?'$1.00':'$0.00'}</div>
+        <div class="gc-sub" style="color:${earned?'#4ade80':isWeekend?'#8fb4d9':'#f87171'};font-weight:700;">${isWeekend?'Family day':earned?'$1.00':'$0.00'}</div>
       </div>`;
     }).join('');
   });
