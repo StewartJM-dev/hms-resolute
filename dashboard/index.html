@@ -1148,9 +1148,18 @@ let dashWtStep = 0;
 
 function showTutorialOrWalkthroughDash(person){
   if(!_db || !person){ showDawnShipsOrders(); return; }
-  _db.ref('stewart/helpSeen/'+person).once('value', snap => {
-    if(snap.val()) showDawnShipsOrders();
-    else startDashWalkthrough();
+  const TWO_WEEKS_MS = 14*24*60*60*1000;
+  const firstSeenRef = _db.ref('stewart/helpFirstSeen/'+person);
+  firstSeenRef.once('value', snap => {
+    const firstSeen = snap.val();
+    if(!firstSeen){
+      firstSeenRef.set(Date.now());
+      startDashWalkthrough();
+    } else if(Date.now() - firstSeen < TWO_WEEKS_MS){
+      startDashWalkthrough();
+    } else {
+      showDawnShipsOrders();
+    }
   });
 }
 function startDashWalkthrough(){
@@ -1178,13 +1187,10 @@ function dashWalkthroughNext(){
   }
 }
 function skipDashWalkthrough(){ finishDashWalkthrough(); }
-function finishDashWalkthrough(person){
+function finishDashWalkthrough(){
   const overlay = document.getElementById('dash-walkthrough-overlay');
   if(overlay) overlay.style.display = 'none';
-  try{
-    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
-    if(_db && s && s.person) _db.ref('stewart/helpSeen/'+s.person).set(true);
-  }catch(e){}
+  // No "seen forever" flag anymore — helpFirstSeen's two-week window governs it.
   showDawnShipsOrders();
 }
 
