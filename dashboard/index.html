@@ -503,6 +503,18 @@ body{
   </div>
 </div>
 
+<!-- ═══ FIRST-LOGIN WALKTHROUGH (parents) ═══ -->
+<div id="dash-walkthrough-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:420px;width:100%;background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:center;">
+    <a href="#" onclick="skipDashWalkthrough();return false;" style="display:block;text-align:right;font-size:11px;color:var(--muted);margin-bottom:10px;">Skip tour</a>
+    <div id="dwt-icon" style="font-size:44px;margin-bottom:14px;"></div>
+    <div id="dwt-title" style="font-family:'Cinzel',serif;font-size:16px;color:var(--brown);letter-spacing:.5px;margin-bottom:10px;"></div>
+    <div id="dwt-body" style="font-size:13px;color:var(--ink);line-height:1.6;margin-bottom:20px;"></div>
+    <div id="dwt-dots" style="display:flex;justify-content:center;gap:6px;margin-bottom:18px;"></div>
+    <button id="dwt-next-btn" onclick="dashWalkthroughNext()" style="width:100%;padding:13px;border-radius:8px;background:url('assets/textures/dark-brass.jpg');background-size:cover;background-position:center;border:1.5px solid #e8c368;color:#fff6de;text-shadow:0 1px 2px rgba(0,0,0,.9);font-family:'Cinzel',serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">NEXT</button>
+  </div>
+</div>
+
 <!-- ═══ SHIP'S DIRECTORY ═══ -->
 <div id="ships-directory-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:20px;">
   <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;">
@@ -564,6 +576,7 @@ body{
     </div>
     <div class="topbar-right">
       <span class="topbar-sync" id="sync-status" style="color:rgba(255,255,255,.5);">&#9675; Connecting</span>
+      <a href="help.html" style="color:var(--gold2);text-decoration:none;font-size:16px;" title="Help">&#10067;</a>
       <button class="topbar-lock" onclick="lockApp()">Lock</button>
     </div>
   </div>
@@ -1025,7 +1038,7 @@ let pinEntry = '';
       document.getElementById('main-app').classList.add('active');
       initFirebase();
       setTimeout(() => renderOverview(), 800);
-      setTimeout(() => showDawnShipsOrders(), 1400);
+      setTimeout(() => showTutorialOrWalkthroughDash(s.person), 1400);
     }
   }catch(e){}
 })();
@@ -1120,6 +1133,61 @@ function getDawnOrdersWeekStart(){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+// ── FIRST-LOGIN WALKTHROUGH (parents) ──
+// Same idea as the boys' one: shown once per person (John or Dawn,
+// tracked in Firebase so it persists across devices), then Standing
+// Orders takes over as normal. Revisitable anytime via the Help (?) icon.
+const DASH_WALKTHROUGH_STEPS = [
+  { icon:'&#9875;', title:'Welcome Aboard', body:"A quick tour of Officers' Country before you dive in — five short stops, skip anytime with the link up top." },
+  { icon:'&#129517;', title:"Ship's Orders", body:"Every time you log in, Standing Orders shows what still needs doing today — White Glove, devotionals, lunch options, and more. Tap an item and it takes you right there." },
+  { icon:'&#128737;', title:'White Glove & Approvals', body:"Pending Screen Time cash-outs and Ship Account transfers show up under Comms, waiting for you to approve and mark handled." },
+  { icon:'&#127974;', title:'Ship Accounts & Store', body:"Each boy's savings and Chromebook Fund progress are visible right on Ship's Watch — no digging required." },
+  { icon:'&#10067;', title:'Need a Reminder?', body:"Tap the ? icon at the top anytime for the full reference — every section of Officers' Country, explained." },
+];
+let dashWtStep = 0;
+
+function showTutorialOrWalkthroughDash(person){
+  if(!_db || !person){ showDawnShipsOrders(); return; }
+  _db.ref('stewart/helpSeen/'+person).once('value', snap => {
+    if(snap.val()) showDawnShipsOrders();
+    else startDashWalkthrough();
+  });
+}
+function startDashWalkthrough(){
+  dashWtStep = 0;
+  renderDashWalkthroughStep();
+  const overlay = document.getElementById('dash-walkthrough-overlay');
+  if(overlay) overlay.style.display = 'flex';
+}
+function renderDashWalkthroughStep(){
+  const s = DASH_WALKTHROUGH_STEPS[dashWtStep];
+  document.getElementById('dwt-icon').innerHTML = s.icon;
+  document.getElementById('dwt-title').textContent = s.title;
+  document.getElementById('dwt-body').innerHTML = s.body;
+  document.getElementById('dwt-dots').innerHTML = DASH_WALKTHROUGH_STEPS.map((_,i) =>
+    `<span style="width:6px;height:6px;border-radius:50%;background:${i===dashWtStep?'var(--gold)':'rgba(0,0,0,.15)'};"></span>`
+  ).join('');
+  document.getElementById('dwt-next-btn').textContent = (dashWtStep === DASH_WALKTHROUGH_STEPS.length-1) ? "LET'S GO ⚓" : 'NEXT';
+}
+function dashWalkthroughNext(){
+  if(dashWtStep < DASH_WALKTHROUGH_STEPS.length - 1){
+    dashWtStep++;
+    renderDashWalkthroughStep();
+  } else {
+    finishDashWalkthrough();
+  }
+}
+function skipDashWalkthrough(){ finishDashWalkthrough(); }
+function finishDashWalkthrough(person){
+  const overlay = document.getElementById('dash-walkthrough-overlay');
+  if(overlay) overlay.style.display = 'none';
+  try{
+    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+    if(_db && s && s.person) _db.ref('stewart/helpSeen/'+s.person).set(true);
+  }catch(e){}
+  showDawnShipsOrders();
+}
+
 function showDawnShipsOrders(){
   renderDawnShipsOrders();
   document.getElementById('dawn-orders-overlay').style.display = 'flex';
@@ -1177,8 +1245,30 @@ function renderDawnShipsOrders(){
 
 function toggleDawnOrderItem(key, scope){
   if(!_db) return;
-  _db.ref(`stewart/dawnDailyOrders/${scope}/${key}`).set(true).then(() => {
+  return _db.ref(`stewart/dawnDailyOrders/${scope}/${key}`).set(true).then(() => {
     renderDawnShipsOrders();
+  });
+}
+
+// Items with a real destination in the app: tapping marks the item handled
+// AND takes Dawn straight there, instead of just being a bare checkbox.
+// Items without a real destination (physical tasks like washing pots, or
+// meal planning done outside the app) stay as plain mark-done checkboxes.
+const DAWN_ORDER_DESTINATIONS = {
+  vineyard:   {type:'link', href:'../vineyard/'},
+  warroom:    {type:'link', href:'../warroom/'},
+  crowsnest:  {type:'link', href:'../crowsnest/'},
+  lunchoptions: {type:'tab', tab:'lunch'},
+  gracedare:  {type:'tab', tab:'dawn'}
+};
+function goToDawnOrderItem(key, scope){
+  toggleDawnOrderItem(key, scope).then(() => {
+    const dest = DAWN_ORDER_DESTINATIONS[key];
+    closeDawnShipsOrders();
+    if(!dest) return;
+    if(dest.type === 'link'){ window.location.href = dest.href; return; }
+    const btn = document.querySelector('.bnb[onclick*="\''+dest.tab+'\'"]');
+    if(btn) btn.click();
   });
 }
 
@@ -1189,12 +1279,27 @@ function renderDawnShipsOrdersUI(checks, officerName){
   const listHtml = checks.length
     ? '<div style="display:grid;gap:8px;margin-bottom:18px;">' +
         checks.map(c => {
+          const hasDest = !!DAWN_ORDER_DESTINATIONS[c.key];
+          if(hasDest){
+            return '<div onclick="goToDawnOrderItem(\''+c.key+'\',\''+c.scope+'\')" style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);padding:9px 11px;border-radius:8px;background:rgba(255,255,255,.4);border:1px solid var(--border);cursor:pointer;">'+
+              '<span style="flex:1;">'+c.text+'</span>'+
+              '<span style="color:var(--brown);font-size:15px;flex-shrink:0;">&#8250;</span>'+
+            '</div>';
+          }
           return '<div onclick="toggleDawnOrderItem(\''+c.key+'\',\''+c.scope+'\')" style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">'+
             '<span style="width:20px;height:20px;border:1.5px solid var(--brown);border-radius:5px;flex-shrink:0;"></span>'+c.text+
           '</div>';
         }).join('') +
       '</div>'
     : '<p style="font-size:13px;color:#2d6a47;line-height:1.6;margin-bottom:18px;">&#10003; All caught up for today.</p>';
+
+  const quickLinksHtml = `
+    <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:8px;">Quick Links</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+      <a href="../vineyard/" style="flex:1;min-width:120px;text-align:center;text-decoration:none;font-family:'Cinzel',serif;font-size:11px;color:var(--ink);background:rgba(255,255,255,.4);border:1px solid var(--border);border-radius:8px;padding:9px 8px;">&#127815; Vineyard</a>
+      <a href="#" onclick="closeDawnShipsOrders();document.querySelector('.bnb[onclick*=\\'lunch\\']').click();return false;" style="flex:1;min-width:120px;text-align:center;text-decoration:none;font-family:'Cinzel',serif;font-size:11px;color:var(--ink);background:rgba(255,255,255,.4);border:1px solid var(--border);border-radius:8px;padding:9px 8px;">&#127857; Meal Planner</a>
+      <a href="../kitchen/" style="flex:1;min-width:120px;text-align:center;text-decoration:none;font-family:'Cinzel',serif;font-size:11px;color:var(--ink);background:rgba(255,255,255,.4);border:1px solid var(--border);border-radius:8px;padding:9px 8px;">&#127860; The Galley</a>
+    </div>`;
 
   el.innerHTML = `
     <div style="text-align:center;font-size:40px;margin-bottom:6px;">⚓</div>
@@ -1208,8 +1313,9 @@ function renderDawnShipsOrdersUI(checks, officerName){
 
     <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:8px;">Before You're Done Today</div>
     ${listHtml}
+    ${quickLinksHtml}
 
-    <button onclick="closeDawnShipsOrders()" style="width:100%;padding:13px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD ⚓</button>
+    <button onclick="closeDawnShipsOrders()" style="width:100%;padding:13px;border-radius:8px;background:url('assets/textures/dark-brass.jpg');background-size:cover;background-position:center;border:1.5px solid #e8c368;color:#fff6de;text-shadow:0 1px 2px rgba(0,0,0,.9);font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD ⚓</button>
   `;
 }
 
