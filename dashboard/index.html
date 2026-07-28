@@ -1038,26 +1038,7 @@ const AGENTS = [
   {id:'daniel', name:'Daniel', codename:'Agent Wildcard', color:'#7a5c1e', icon:'🐘'},
 ];
 
-const DAILY_BASE = {
-  samuel: ['bed','bedroom','rabbit-own','floor-laundry'],
-  johnjr: ['bed','bedroom','rabbit-own','floor-living'],
-  stephen:['bed','bedroom','rabbit-own','kitchen-counter','floor-kitchen'],
-  daniel: ['bed','bedroom','rabbit-own','floor-hallway','floor-rabbit','table-set'],
-};
 
-const MISSION_NAMES = {
-  'bed':'Make bed','bedroom':'Tidy bedroom','rabbit-own':'Care for rabbit',
-  'floor-laundry':'Sweep laundry room','floor-living':'Sweep living room',
-  'floor-kitchen':'Sweep kitchen','floor-hallway':'Sweep hallway',
-  'floor-rabbit':'Sweep rabbit area','kitchen-counter':'Clean kitchen counters',
-  'dishwasher-load':'Load dishwasher','dishwasher-unload':'Unload dishwasher',
-  'table-set':'Set table','table-clear':'Clear table','table-wipe':'Wipe table',
-  'drinks':'Pour drinks','stovetop':'Wipe stovetop','microwave':'Wipe microwave',
-  'trash':'Take out trash','bathroom-trash':'Empty bathroom trash',
-  'laundry-sam':'Laundry Day (with John Jr.)','laundry-john':'Laundry Day (with Samuel)',
-  'laundry-stephen':'Laundry Day (with Daniel)','laundry-daniel':'Laundry Day (with Stephen)',
-  'dinner-side-starch':'Make the starch side', 'dinner-side-veggie':'Make the vegetable',
-};
 
 
 
@@ -1192,37 +1173,6 @@ function renderDawnShipsOrdersUI(checks, officerName){
 // to get continuous alternation regardless of week
 
 
-function getExpectedMissions(agentId){
-  const dt = getDishTeam();
-  const onDishes = (agentId==='samuel'||agentId==='johnjr') ? dt==='sj' : dt==='sd';
-  const base = [...(DAILY_BASE[agentId]||[])];
-  const onLaundryDay = isLaundryDay(agentId);
-  if(onDishes){
-    if(agentId==='stephen') base.push('dishwasher-unload','table-clear','table-wipe');
-    else if(agentId==='daniel') base.push('dishwasher-load','table-clear','table-wipe');
-    else base.push('dishwasher-load','dishwasher-unload','table-clear','table-wipe');
-  } else {
-    if(agentId!=='daniel' && !onLaundryDay) base.push('stovetop','microwave');
-    if(agentId==='samuel'||agentId==='johnjr') base.push('drinks');
-    if(!base.includes('table-set')) base.push('table-set');
-  }
-  if(new Date().getDay()===3){
-    if(agentId==='samuel'||agentId==='johnjr') base.push('trash');
-    if(agentId==='daniel') base.push('bathroom-trash');
-  }
-  if(onLaundryDay){
-    if(agentId==='samuel') base.push('laundry-sam');
-    if(agentId==='johnjr') base.push('laundry-john');
-    if(agentId==='stephen') base.push('laundry-stephen');
-    if(agentId==='daniel') base.push('laundry-daniel');
-  }
-  if(isDinnerSideDay()){
-    const side = getMyDinnerSide(agentId);
-    if(side === 'starch') base.push('dinner-side-starch');
-    else if(side === 'veggie') base.push('dinner-side-veggie');
-  }
-  return [...new Set(base)];
-}
 
 function gaugeSVG(pct, color){
   const size = 110, r = 46, cx = size/2, cy = size/2;
@@ -1283,11 +1233,15 @@ function printDailyChores(){
 // Single source of truth for "how is this agent doing today" — used by both
 // Overview's quick-glance card and the Missions tab's detailed checklist,
 // so the two views can never quietly drift out of sync with each other.
+// Uses the same shared buildMissions()/calculateDayScore() as the boys'
+// page and Bridge, so the percentage here always matches the real stored
+// score in stewart/scores instead of a separately-maintained mission list.
 function computeMissionStats(agentId, doneObj){
-  const expected = getExpectedMissions(agentId);
-  const completed = expected.filter(m => doneObj[m]).length;
+  const expected = buildMissions(agentId, new Date());
+  const completed = expected.filter(m => doneObj[m.id]).length;
   const total = expected.length;
-  const pct = total > 0 ? Math.round((completed/total)*100) : 0;
+  const score = calculateDayScore(agentId, expected, doneObj);
+  const pct = Math.round(score.pct * 100);
   return { expected, completed, total, pct };
 }
 
@@ -1363,8 +1317,8 @@ function renderOverview(){
             const done=allData[ai][di].val()||{};
             const dow=new Date(d).getDay();
             if(dow===0||dow===6) return;
-            const exp=getExpectedMissions(a.id);
-            if(exp.every(m=>done[m])&&exp.length>0) earned++;
+            const exp=buildMissions(a.id, new Date(d));
+            if(exp.length>0 && exp.every(m=>done[m.id])) earned++;
           });
           return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;gap:8px;">
@@ -1800,12 +1754,12 @@ function loadMissionsDetail(){
       const dollars = score!==null&&score!==undefined ? (score/100).toFixed(2) : '0.00';
 
       const missionRows = expected.map(m => {
-        const isDone = !!done[m];
-        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleMissionParent('${a.id}','${m}','${today}')">
+        const isDone = !!done[m.id];
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="toggleMissionParent('${a.id}','${m.id}','${today}')">
           <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${isDone?'#2d6a47':'var(--border)'};background:${isDone?'#2d6a47':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             ${isDone?'<span style="color:white;font-size:10px;">&#10003;</span>':''}
           </div>
-          <span style="font-size:12px;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">${MISSION_NAMES[m]||m}</span>
+          <span style="font-size:12px;color:${isDone?'var(--muted)':'var(--ink)'};${isDone?'text-decoration:line-through;':''}">${m.text||m.id}</span>
         </div>`;
       }).join('');
 
@@ -1877,7 +1831,9 @@ function toggleMissionParent(agentId, missionId, date){
   if(!_db) return;
   const ref = _db.ref(`stewart/missions/${agentId}/${date}/${missionId}`);
   ref.once('value', snap => {
-    ref.set(snap.val()?null:true).then(()=>loadMissionsDetail());
+    ref.set(snap.val()?null:true).then(()=>{
+      recalculateScore(agentId, date).then(()=>loadMissionsDetail());
+    });
   });
 }
 
