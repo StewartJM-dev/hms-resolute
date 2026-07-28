@@ -1390,7 +1390,11 @@ function loadInstruments(){
     renderStatusBoard(crew);
     renderBridgeWeekGrid();
     renderShipAccountsOverview();
-  }).catch(()=>{});
+  }).catch(err => {
+    console.error('loadInstruments failed:', err);
+    const gr = document.getElementById('gauge-row');
+    if(gr) gr.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:rgba(255,255,255,.5);font-size:12px;">Could not load crew instruments — try reloading the page.</div>';
+  });
 }
 
 const SHIP_ACCOUNT_START_DATE = '2026-07-27';
