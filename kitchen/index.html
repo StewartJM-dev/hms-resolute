@@ -129,7 +129,12 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
 .chain-sd{font-size:11px;color:var(--muted);font-style:italic;line-height:1.4;}
 .inv-sec{margin-bottom:16px;}
 .inv-sec-t{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--border);}
-.inv-item{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--card);border:1px solid var(--border);border-radius:7px;margin-bottom:4px;}
+.inv-item{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;border:1px solid var(--border);border-radius:7px;margin-bottom:4px;gap:8px;}
+.inv-item.inv-ok{background:rgba(74,170,106,.16);border-color:rgba(74,170,106,.4);}
+.inv-item.inv-low{background:rgba(230,150,50,.18);border-color:rgba(230,150,50,.45);}
+.inv-item.inv-out{background:rgba(204,85,51,.2);border-color:rgba(204,85,51,.5);}
+.inv-shop-btn{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--card);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.inv-gen-btn{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;}
 .inv-nm{font-size:13px;font-weight:700;}.inv-un{font-size:10px;color:var(--muted);}
 .inv-ct{display:flex;gap:5px;align-items:center;}
 .qb{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--cream);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:700;}
@@ -280,7 +285,7 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
       <div class="sc-sub" style="margin-bottom:8px;">Based on what's in your inventory right now</div>
       <div id="meal-suggestions"></div>
     </div>
-    <button class="plan-btn sec" onclick="sendToShopping()">&rarr; Build Shopping List</button>
+    <button class="plan-btn sec" onclick="sendToShopping()">&rarr; View Shopping List</button>
     <button class="plan-btn cal" id="cal-btn" style="display:none" onclick="sendToCalendar()">&#128197; Send to Home Calendar</button>
     <div class="cal-confirm" id="cal-confirm"></div>
     <div id="nut-summary"></div>
@@ -951,35 +956,61 @@ fridge:[{id:'r1',name:'Eggs',qty:36,unit:'eggs',low:12},{id:'r2',name:'Whole Mil
 
 // Storage functions overridden by Firebase block below
 
+function invStatusClass(item){
+  if(item.qty<=0) return 'inv-out';
+  if(item.qty<=item.low) return 'inv-low';
+  return 'inv-ok';
+}
 function renderInv(){
   const inv=getInv();
   const secs=[{key:'freezer',label:'Freezer'},{key:'pantry',label:'Pantry & Dry Goods'},{key:'fridge',label:'Refrigerator & Fresh'}];
-  document.getElementById('inventory-list').innerHTML=secs.map(sec=>`<div class="inv-sec"><div class="inv-sec-t">${sec.label}</div>${inv[sec.key].map(item=>`<div class="inv-item"><div><div class="inv-nm">${item.name}</div><div class="inv-un">${item.unit}</div></div><div class="inv-ct"><button class="qb" onclick="adjQty('${sec.key}','${item.id}',-1)">-</button><span class="qs ${item.qty<=item.low?'q-lo':'q-ok'}" id="q-${item.id}">${item.qty}</span><button class="qb" onclick="adjQty('${sec.key}','${item.id}',1)">+</button></div></div>`).join('')}<div class="add-row"><input class="add-inp" type="text" placeholder="Add to ${sec.label.toLowerCase()}..." id="ai-${sec.key}"><button class="add-btn" onclick="addItem('${sec.key}')">Add</button></div></div>`).join('');
+  document.getElementById('inventory-list').innerHTML=secs.map(sec=>`<div class="inv-sec"><div class="inv-sec-t" style="display:flex;align-items:center;justify-content:space-between;"><span>${sec.label}</span><button class="inv-gen-btn" onclick="generateStarterList('${sec.key}')">+ Generate List</button></div>${inv[sec.key].map(item=>`<div class="inv-item ${invStatusClass(item)}"><div><div class="inv-nm">${item.name}</div><div class="inv-un">${item.unit}</div></div><div class="inv-ct"><button class="qb" onclick="adjQty('${sec.key}','${item.id}',-1)">-</button><span class="qs ${item.qty<=item.low?'q-lo':'q-ok'}" id="q-${item.id}">${item.qty}</span><button class="qb" onclick="adjQty('${sec.key}','${item.id}',1)">+</button><button class="inv-shop-btn" title="Add to Shopping List" onclick="addSingleToShopping('${item.name.replace(/'/g,"\\'")}', this)">&#128722;</button></div></div>`).join('')}<div class="add-row"><input class="add-inp" type="text" placeholder="Add to ${sec.label.toLowerCase()}..." id="ai-${sec.key}"><button class="add-btn" onclick="addItem('${sec.key}')">Add</button></div></div>`).join('');
 }
-function adjQty(sec,id,d){const inv=getInv();const item=inv[sec].find(i=>i.id===id);if(!item)return;item.qty=Math.max(0,item.qty+d);saveInv(inv);const el=document.getElementById('q-'+id);if(el){el.textContent=item.qty;el.className='qs '+(item.qty<=item.low?'q-lo':'q-ok');}if(item.qty<=item.low){addToShopping([item.name],'low stock');}updateShopBadge();}
+
+// Starter templates — seeds common items for a section so there's something
+// to work from instead of typing every item in from scratch. Only adds
+// items not already present (matched by name, case-insensitive), so tapping
+// this again later is safe and won't create duplicates.
+const INV_STARTER_LISTS = {
+  freezer: ['Ground Beef','Chicken Breast','Mixed Vegetables','Frozen Pizza','Ice Cream','Frozen Waffles','Sausage','Bacon','Frozen Fries'],
+  pantry: ['Flour','Sugar','Rice','Pasta','Canned Tomatoes','Peanut Butter','Cereal','Canned Beans','Olive Oil','Salt','Pepper','Ketchup','Mustard','Bread'],
+  fridge: ['Milk','Eggs','Butter','Cheese','Yogurt','Lunch Meat','Salad Greens','Carrots','Apples']
+};
+function generateStarterList(sec){
+  const inv=getInv();
+  const existing = new Set(inv[sec].map(i=>i.name.toLowerCase()));
+  const toAdd = (INV_STARTER_LISTS[sec]||[]).filter(name => !existing.has(name.toLowerCase()));
+  if(!toAdd.length){ alert('Everything on the starter list for this section is already here.'); return; }
+  toAdd.forEach(name => {
+    inv[sec].push({id:sec[0]+Date.now()+Math.random().toString(36).slice(2,6), name, qty:0, unit:'item', low:1});
+  });
+  saveInv(inv);
+  renderInv();
+}
+
+// Manual, deliberate add from the Pantry screen — the ONLY way items land
+// on the shopping list now. Low stock no longer auto-adds anything.
+function addSingleToShopping(name, btn){
+  addToShopping([name], 'added from pantry');
+  updateShopBadge();
+  if(btn){ btn.style.background='var(--green)'; setTimeout(()=>{btn.style.background='';},600); }
+}
+
+function adjQty(sec,id,d){const inv=getInv();const item=inv[sec].find(i=>i.id===id);if(!item)return;item.qty=Math.max(0,item.qty+d);saveInv(inv);renderInv();}
 function addItem(sec){const inp=document.getElementById('ai-'+sec);const name=inp.value.trim();if(!name)return;const inv=getInv();inv[sec].push({id:sec[0]+Date.now(),name,qty:1,unit:'item',low:1});saveInv(inv);inp.value='';renderInv();}
 
+// This used to auto-add missing meal ingredients + low-stock items. Per
+// request, the shopping list now ONLY reflects what's explicitly added via
+// the Add to Shopping List button on each pantry item — so this just
+// takes you to the list as it already stands.
 function sendToShopping(){
-  if(!currentPlan)generatePlan();
-  const invNames=inStockNames();
-  // Gather missing ingredients from every planned meal
-  const missing=[];
-  currentPlan.forEach(s=>{
-    if(!s.mealObj||!s.mealObj.ingredients)return;
-    s.mealObj.ingredients.forEach(ing=>{
-      if(!haveIngredient(ing,invNames)) missing.push(ing);
-    });
-  });
-  // Add missing meal ingredients + any low-stock items, persistently
-  addToShopping(missing,'meal plan');
-  syncLowStockToShopping();
   renderShopList();
   updateShopBadge();
   showScreen('shopping',document.querySelectorAll('.nb')[4]);
 }
 function renderShopList(){
   const list=getShop();const el=document.getElementById('shopping-list');
-  if(!list.length){el.innerHTML='<div class="empty">Generate a plan and tap Build Shopping List to populate</div>';return;}
+  if(!list.length){el.innerHTML='<div class="empty">Tap the cart icon on any Pantry item to add it here</div>';return;}
   const rem=list.filter(i=>!i.checked).length;
   el.innerHTML=`<div class="sec-lbl">${rem} item${rem!==1?'s':''} remaining</div>`+list.map((item,i)=>`<div class="shop-item ${item.checked?'chk':''}" onclick="toggleShop(${i})"><div class="shop-chk"></div><span class="shop-nm">${item.name}</span></div>`).join('');
 }
@@ -1003,7 +1034,7 @@ function renderHelp(){
 <div class="help-step"><div class="help-num">1</div><div class="help-txt"><strong>Meals Tab</strong> &mdash; Browse all 98 Stewart family meals. Filter by category or search by name. Tap any meal to expand it. Meals with a <span style="background:#fff3e0;color:#e65100;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:700">&#128214; Recipe</span> badge have the full cookbook recipe embedded -- tap the brown bar to expand exact ingredients and step-by-step directions.</div></div>
 <div class="help-step"><div class="help-num">2</div><div class="help-txt"><strong>Planner Tab</strong> &mdash; Tap Generate This Week's Plan for a full Sunday to Saturday week. The app automatically avoids similar proteins back to back, no pasta sauce dishes back to back, Chinese only once per week, and varies categories throughout the week. Tuesday is always boys cook night. Friday is always John's date night.</div></div>
 <div class="help-step"><div class="help-num">3</div><div class="help-txt"><strong>Send to Calendar</strong> &mdash; After generating, tap Send to Home Calendar. Every dinner gets added to your shared Home calendar with a cooking start alert timed for 6pm dinner. Crockpot meals alert at 9am. Meals needing defrosted meat get an 8pm alert the night before.</div></div>
-<div class="help-step"><div class="help-num">4</div><div class="help-txt"><strong>Shopping List</strong> &mdash; After generating your plan, tap Build Shopping List. It compares the week's meals against your pantry inventory and shows only what you need to buy. Tap items to check them off as you shop.</div></div>
+<div class="help-step"><div class="help-num">4</div><div class="help-txt"><strong>Shopping List</strong> &mdash; Only fills up from the Pantry tab: tap the cart icon on any item to add it. Tap items on this list to check them off as you shop.</div></div>
 <div class="help-step"><div class="help-num">5</div><div class="help-txt"><strong>Pantry Tab</strong> &mdash; After every surplus run or weekly shop, update your inventory. Tap + and - to adjust quantities. Red numbers mean running low. Tap Add to add anything not on the list.</div></div>
 <div class="help-step"><div class="help-num">6</div><div class="help-txt"><strong>Chains Tab</strong> &mdash; Every leftover chain step by step. Ham unlocks 8+ meals. Baked chicken unlocks 5. Christmas turkey unlocks 6. Taco night unlocks nachos. Spaghetti night unlocks John's cast iron fried spaghetti.</div></div>
 </div>
@@ -1720,7 +1751,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHealth();
   renderHelp();
   initFirebase();
-  setTimeout(()=>{ syncLowStockToShopping(); updateShopBadge(); }, 1500);
+  setTimeout(()=>{ updateShopBadge(); }, 1500);
 });
 
 </script>
