@@ -110,7 +110,7 @@ body{
 }
 .gw-link:active{ background:rgba(176,141,62,.32); }
 .gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:12px;}
-.gauge-card{background:#0a0f16;border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
+.gauge-card{background:url('../assets/textures/gunmetal.jpg');background-size:cover;background-position:center;border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
 .gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:#8fb4d9;margin-bottom:2px;}
 .gauge-card .gc-icon{font-size:22px;margin-bottom:2px;}
 .gauge-card .gc-sub{font-size:11px;color:#8fb4d9;margin-top:6px;}
@@ -119,7 +119,7 @@ body{
 .gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
 .gauge-pctline{font-family:'Cinzel',serif;font-weight:700;font-size:20px;margin-top:2px;}
 .topbar{
-  background:var(--indigo);
+  background:url('../assets/textures/blue-velvet.jpg');background-size:cover;background-position:center;
   border-bottom:3px solid var(--gold);
   padding:10px 14px;
   display:flex;align-items:center;justify-content:space-between;
@@ -180,7 +180,8 @@ body{
 
 /* CARDS */
 .card{
-  background:var(--card);border:1px solid var(--border);
+  background:url('../assets/textures/silver-metal.jpg');background-size:cover;background-position:center;
+  border:1px solid var(--border);
   border-radius:10px;overflow:hidden;margin-bottom:10px;
 }
 .card-hd{
@@ -198,7 +199,8 @@ body{
 
 .green-hd .card-hd{background:var(--green);}
 .indigo-hd .card-hd{background:var(--indigo);}
-.brown-hd .card-hd{background:var(--brown);}
+.brown-hd .card-hd{background:url('../assets/textures/gold-metal.jpg');background-size:cover;background-position:center;}
+.brown-hd .card-hd-title,.brown-hd .card-hd-icon{text-shadow:0 1px 3px rgba(0,0,0,.6);}
 .rust-hd .card-hd{background:var(--rust);}
 
 /* AGENT CARDS */
@@ -1301,8 +1303,8 @@ function renderOverview(){
   const setupLabel = dt==='sj'?'Stephen & Daniel':'Samuel & John Jr.';
 
   document.getElementById('overview-day-banner').innerHTML =
-    `<div style="background:var(--green);border-radius:10px;padding:11px 14px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;">
-      <div style="font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--white);flex:1;">${dayName}</div>
+    `<div style="background:url('../assets/textures/green-felt.jpg');background-size:cover;background-position:center;border-radius:10px;padding:11px 14px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;">
+      <div style="font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--white);flex:1;text-shadow:0 1px 3px rgba(0,0,0,.6);">${dayName}</div>
       ${isWeekend
         ? '<span class="badge badge-green">Family Service Day</span>'
         : `<span class="badge badge-green" style="background:rgba(255,255,255,.15);color:var(--gold2);">Dishes: ${dishLabel}</span>
