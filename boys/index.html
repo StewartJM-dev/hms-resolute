@@ -597,6 +597,18 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
   </div>
 </div>
 
+<!-- CHROMEBOOK CONTEST REMINDER — shown every time after Ship's Orders closes -->
+<div id="chromebook-reminder-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:640px;width:100%;background:#050a10;border:1px solid rgba(232,184,74,.4);border-radius:14px;overflow:hidden;text-align:center;">
+    <img src="assets/chromebook-contest.png" alt="Own Your Own Chromebook" style="width:100%;display:block;">
+    <div style="padding:16px 20px 20px;">
+      <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:14px;">Save $45 in your Ship Account to claim one. Check your progress on the Pay tab.</div>
+      <button onclick="closeChromebookReminder()" style="width:100%;padding:12px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">LET'S GO ⚓</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- ═══ SIGN-OUT REMINDER (triggered when mouse nears bottom-right corner) ═══ -->
 <div id="signout-reminder-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9998;align-items:center;justify-content:center;padding:20px;">
   <div style="max-width:380px;width:100%;background:linear-gradient(180deg,#0d1b2a,#050a10);border:1px solid rgba(232,184,74,.4);border-radius:14px;padding:26px 22px;text-align:center;">
@@ -3008,6 +3020,19 @@ function closeTutorial(){
   document.getElementById('tutorial-overlay').style.display = 'none';
 }
 
+// Shows every time a boy finishes Ship's Orders — a reminder about the
+// Chromebook contest. Deliberately shows every time, not just once; this
+// is meant to be a recurring nudge, not a one-time announcement.
+function closeTutorialAndRemind(){
+  closeTutorial();
+  const overlay = document.getElementById('chromebook-reminder-overlay');
+  if(overlay) overlay.style.display = 'flex';
+}
+function closeChromebookReminder(){
+  const overlay = document.getElementById('chromebook-reminder-overlay');
+  if(overlay) overlay.style.display = 'none';
+}
+
 function closeSignoutReminder(){
   const overlay = document.getElementById('signout-reminder-overlay');
   if(overlay) overlay.style.display = 'none';
@@ -3148,7 +3173,7 @@ function renderShipsOrdersUI(checks, officerName){
 
     <div id="hans-orders-section"></div>
 
-    <button onclick="closeTutorial()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD, CAPTAIN ⚓</button>
+    <button onclick="closeTutorialAndRemind()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD, CAPTAIN ⚓</button>
   `;
 
   runHansEngine();
