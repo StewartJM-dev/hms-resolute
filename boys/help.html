@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Systems Seven · Help</title>
+<link rel="apple-touch-icon" href="../assets/app-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Help">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#0a7a7a;--teal2:#0d9e9e;--teal3:#12c4c4;
+  --black:#0a0a0a;--dark:#111a1a;--dark2:#1a2626;
+  --white:#f0fafa;--gold:#e8b84a;--gold2:#f5d070;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Exo 2',sans-serif;
+  background:radial-gradient(ellipse at top,rgba(232,184,74,.08),transparent 55%),
+    linear-gradient(170deg,var(--dark),var(--black));
+  background-attachment:fixed;color:var(--white);min-height:100vh;
+  padding:env(safe-area-inset-top) 0 40px;
+}
+.wrap{max-width:640px;margin:0 auto;padding:0 18px;}
+.back-link{display:inline-flex;align-items:center;gap:5px;margin:16px 0 6px;color:var(--gold2);text-decoration:none;font-size:13px;}
+.mast{text-align:center;padding:10px 0 16px;}
+.mast h1{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(22px,6vw,28px);color:var(--gold2);letter-spacing:1px;}
+.mast .sub{font-size:13px;color:rgba(255,255,255,.5);margin-top:6px;}
+.section{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.section-hd{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;}
+.section-hd .icon{font-size:20px;flex-shrink:0;}
+.section-hd .title{flex:1;font-family:'Orbitron',sans-serif;font-size:13px;color:var(--white);}
+.section-hd .chev{color:var(--gold2);font-size:14px;transition:transform .2s;flex-shrink:0;}
+.section.open .chev{transform:rotate(90deg);}
+.section-body{display:none;padding:0 16px 16px 46px;font-size:13px;color:rgba(255,255,255,.75);line-height:1.7;}
+.section.open .section-body{display:block;}
+.section-body b{color:var(--gold2);}
+.section-body ul{margin:6px 0 6px 18px;}
+.section-body li{margin-bottom:4px;}
+.jump-note{font-size:11px;color:rgba(255,255,255,.35);font-style:italic;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Agent HQ</a>
+  <div class="mast">
+    <h1>&#10067; HELP</h1>
+    <div class="sub">Everything in Systems Seven, explained. Tap a topic.</div>
+  </div>
+  <div id="sections"></div>
+</div>
+
+<script>
+const SECTIONS = [
+  {
+    icon: '&#127919;',
+    title: 'The Big Picture',
+    body: `Every day you have a list of <b>Missions</b> &mdash; chores and tasks worth points. Finish them and you earn <b>money</b> (goes into your <b>Ship Account</b>) and <b>screen time</b> (goes into your <b>Screen Time Bank</b>). Both of those are things YOU choose what to do with &mdash; cash out, save up, or spend in the <b>Ship's Store</b>. Everything else in the app &mdash; Comms, Training, Xbox, Lunch &mdash; supports that daily rhythm.`
+  },
+  {
+    icon: '&#129517;',
+    title: "Ship's Orders (the compass icon)",
+    body: `Tap the compass icon at the top any time to see your <b>Standing Orders</b> &mdash; a checklist of things you still need to do today (finish missions, log your reading, check the group chat, visit the War Room or Crow's Nest, etc). Tap any item and it takes you straight there &mdash; you don't have to hunt for it. It also shows who's <b>Officer of the Watch</b> today.`
+  },
+  {
+    icon: '&#9989;',
+    title: 'Missions Tab',
+    body: `Your daily chore list, sorted by category (Bedroom, Kitchen, Animals, Laundry, etc). Tap a mission to check it off &mdash; each one is worth points, and points become dollars and minutes at the end of the day.<br><br>
+      <b>Dish Team vs. Setup Team:</b> every day, one pair (Samuel &amp; John Jr., or Stephen &amp; Daniel) is on dishes and the other is on setup. It flips every single day, no repeats.<br><br>
+      <b>Laundry Day:</b> Samuel &amp; John Jr. do laundry Mondays; Stephen &amp; Daniel do it Thursdays.<br><br>
+      <b>Officer of the Watch:</b> a rotating daily role &mdash; no points, just keeping an eye on the small stuff (bread left open, lights on, etc).`
+  },
+  {
+    icon: '&#128187;',
+    title: 'Computer Missions',
+    body: `These unlock only after you finish <b>everything else</b> for the day &mdash; typing practice, a Scratch lesson, Khan Academy, and a research report. They don't count toward your pay, but finishing all of them earns you an extra <b>15 minutes</b> in your Screen Time Bank, on top of the 15 you already earned for your regular missions. That's up to 30 minutes a day.`
+  },
+  {
+    icon: '&#127918;',
+    title: 'Screen Time Bank',
+    body: `Separate from Xbox Game Time (see below) &mdash; this is <b>bonus Chromebook time</b>, on top of your normal daily allowance. You earn up to 30 min/day (15 for regular missions, 15 more for Computer Missions). When you want to use it, tap <b>Cash Out 15</b> or <b>Cash Out 30</b> &mdash; that sends Mom or Dad a notification to add it in Family Link. Max 30 minutes cashed out per day.`
+  },
+  {
+    icon: '&#9875;',
+    title: 'Ship Account',
+    body: `Your real bank, on the <b>Pay</b> tab. Every dollar you earn from missions goes in automatically &mdash; nothing to choose, it just accrues. From there, you decide:<br>
+      <ul>
+        <li><b>Cash Out to Greenlight</b> &mdash; enter an amount, it leaves your account right away and Mom or Dad gets notified to move the real money.</li>
+        <li><b>Save it</b> &mdash; just leave it in your account for later, including for the Ship's Store.</li>
+      </ul>
+      Your recent activity (cash-outs, purchases) shows right on the Ship Account card, along with whether Mom/Dad have finished the real-world transfer yet.`
+  },
+  {
+    icon: '&#127974;',
+    title: "Ship's Store",
+    body: `Spend what you've saved on real prizes. Right now: <b>Your Own Chromebook</b> for $45, four available, <b>deadline September 25</b>. Redeeming spends the money from your Ship Account immediately and notifies Mom or Dad to arrange getting it to you. Get there from the Ship Account card on the Pay tab.`
+  },
+  {
+    icon: '&#128176;',
+    title: 'Pay Tab',
+    body: `Shows your week at a glance &mdash; a checkmark/dot/X for each weekday and how much you earned. Total possible is $5.00/week (Mon&ndash;Fri only; weekends don't count toward pay). Below that is your <b>Ship Account</b> card, and further down, <b>Family Night</b> progress &mdash; if all four agents finish their weekly missions, the family unlocks Family Night together.`
+  },
+  {
+    icon: '&#128225;',
+    title: 'HQ Tab (Comms)',
+    body: `Two ways to talk:<br>
+      <ul>
+        <li><b>Agent Group Chat</b> &mdash; all four of you, and Mom &amp; Dad can see it too.</li>
+        <li><b>Message Dad &amp; Mom</b> &mdash; private, just between you and them.</li>
+      </ul>
+      A red badge on the HQ tab means you've got something new to read. If your chat gets paused for nonsense, you'll see a notice when you try to send a message.`
+  },
+  {
+    icon: '&#127942;',
+    title: 'Training Tab',
+    body: `<b>The Courage Dare</b> &mdash; a short devotional, just between you and HQ, your brothers don't see it.<br><br>
+      <b>Teach Me Vote</b> &mdash; open Tuesday through Thursday, vote on what the family learns about together.<br><br>
+      This is also where your daily reflection lives.`
+  },
+  {
+    icon: '&#127918;',
+    title: 'Xbox Tab (Game Time)',
+    body: `This is <b>Xbox Game Time</b> &mdash; different from the Screen Time Bank. It's calculated from your weekly mission percentage: up to 30 minutes/week from missions, plus up to 15 more from reading, for a max of <b>45 minutes/week</b>. Scroll down on this tab for your <b>Field Library</b> &mdash; log what you're reading here.`
+  },
+  {
+    icon: '&#127869;',
+    title: 'Lunch Tab',
+    body: `Pick your lunch for the day from what's available. First come, first served on shared items.`
+  },
+  {
+    icon: '&#128506;',
+    title: 'The Other Decks',
+    body: `From the icons at the top: <b>Crow's Nest</b> (log a praise, see what others are grateful for), <b>War Room</b> (submit or pray over prayer requests), <b>Wardroom</b> (the Adamah Saga and Boys' Log &mdash; stories written by you and your brothers), and <b>Crew Deck Map</b> (a map of the whole ship).`
+  },
+  {
+    icon: '&#128172;',
+    title: 'Stuck or Confused?',
+    body: `Tap the compass icon (Ship's Orders) &mdash; it'll point you to whatever's left to do today. If something still doesn't make sense, message Dad or Mom privately from the HQ tab and ask.`
+  }
+];
+
+const el = document.getElementById('sections');
+el.innerHTML = SECTIONS.map((s,i) => `
+  <div class="section" id="sec-${i}">
+    <div class="section-hd" onclick="toggleSection(${i})">
+      <div class="icon">${s.icon}</div>
+      <div class="title">${s.title}</div>
+      <div class="chev">&#8250;</div>
+    </div>
+    <div class="section-body">${s.body}</div>
+  </div>
+`).join('');
+
+function toggleSection(i){
+  document.getElementById('sec-'+i).classList.toggle('open');
+}
+
+// If arriving with #topic in the URL (used by the first-login walkthrough
+// to deep-link), open that section automatically.
+(function openFromHash(){
+  const hash = window.location.hash.replace('#','');
+  if(!hash) return;
+  const idx = parseInt(hash, 10);
+  if(!isNaN(idx) && SECTIONS[idx]){
+    document.getElementById('sec-'+idx).classList.add('open');
+    setTimeout(() => document.getElementById('sec-'+idx).scrollIntoView({behavior:'smooth', block:'start'}), 300);
+  }
+})();
+</script>
+</body>
+</html>
