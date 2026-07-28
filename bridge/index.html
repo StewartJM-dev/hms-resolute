@@ -410,42 +410,6 @@ body{
 
   <!-- ===== COMMS TAB ===== -->
   <div class="btab" id="btab-comms">
-    <!-- CAPTAIN'S TRANSMISSION -->
-  <div class="shead">Captain's Transmission</div>
-  <div class="transmit">
-    <div class="tx-row">
-      <select id="tx-target">
-        <option value="group">📢 Whole crew (group chat)</option>
-        <option value="samuel">🦅 Samuel</option>
-        <option value="johnjr">🦁 John Jr.</option>
-        <option value="stephen">🦖 Stephen</option>
-        <option value="daniel">🐘 Daniel</option>
-      </select>
-      <select id="tx-from">
-        <option value="Dad">From: Dad</option>
-        <option value="HQ">From: HQ</option>
-      </select>
-    </div>
-    <textarea id="tx-msg" placeholder="Send a message to the crew from the Bridge…" maxlength="280"></textarea>
-    <button id="tx-send" onclick="sendTransmission()">Transmit ▸</button>
-    <div id="tx-status" class="tx-stat"></div>
-  </div>
-
-    <!-- SHIP ACCOUNT: PENDING TRANSFERS -->
-    <div class="shead" style="margin-top:22px;">Ship Account — Pending Transfers</div>
-    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">A boy cashed out or bought a store item — this already left their account. Mark it done once you've actually moved the money or handled the item.</div>
-    <div id="ship-pending" style="margin-bottom:8px;"></div>
-
-    <!-- SCREEN TIME APPROVALS -->
-    <div class="shead" style="margin-top:22px;">Screen Time Approvals</div>
-    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Bonus screen time cashed out from missions — approving deducts it from the bank; denying leaves it untouched.</div>
-    <div id="screentime-approvals" style="margin-bottom:8px;"></div>
-
-    <!-- CHAT MODERATION -->
-    <div class="shead" style="margin-top:22px;">Chat Moderation</div>
-    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
-    <div id="mod-list" style="margin-bottom:8px;"></div>
-
     <!-- PRIVATE THREADS -->
     <div class="shead">Private Threads</div>
     <div id="bpt-selector" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
@@ -461,12 +425,27 @@ body{
     </div>
 
     <!-- FAMILY CHAT -->
-    <div class="shead">Family Channel</div>
+    <div class="shead" style="margin-top:22px;">Family Channel</div>
     <div class="bchat-thread" id="bchat-thread"></div>
     <div class="bchat-input-row">
       <input type="text" id="bchat-input" placeholder="Message the family…" maxlength="280" autocomplete="off" name="msg-chat-nofill">
       <button onclick="sendBridgeChat()">Send</button>
     </div>
+
+    <!-- CHAT MODERATION -->
+    <div class="shead" style="margin-top:22px;">Chat Moderation</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
+    <div id="mod-list" style="margin-bottom:8px;"></div>
+
+    <!-- SHIP ACCOUNT: PENDING TRANSFERS -->
+    <div class="shead" style="margin-top:22px;">Ship Account — Pending Transfers</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">A boy cashed out or bought a store item — this already left their account. Mark it done once you've actually moved the money or handled the item.</div>
+    <div id="ship-pending" style="margin-bottom:8px;"></div>
+
+    <!-- SCREEN TIME APPROVALS -->
+    <div class="shead" style="margin-top:22px;">Screen Time Approvals</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Bonus screen time cashed out from missions — approving deducts it from the bank; denying leaves it untouched.</div>
+    <div id="screentime-approvals" style="margin-bottom:8px;"></div>
   </div>
 
   <!-- ===== INSTRUMENTS TAB ===== -->
