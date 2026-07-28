@@ -16,6 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
+<script src="../mission-engine.js"></script>
 <style>
 :root{
   --green:#1a4a2e;--green2:#2d6a47;--green3:#3d8a5e;
@@ -895,23 +896,11 @@ body{
 // localDateStr() returns LOCAL YYYY-MM-DD (fixes UTC evening-rollover
 // bug that made mission checkmarks read under the wrong date key).
 // ══════════════════════════════════════════════════════
-function localDateStr(date){
-  const d = date ? new Date(date) : new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-}
 
 // IMPORTANT: new Date("YYYY-MM-DD") parses as UTC midnight, which silently
 // shifts to the PREVIOUS calendar day in any US timezone (behind UTC) —
 // causing missions, pay, and schedules to land on the wrong day. Always use
 // this instead of new Date(dateStr) when dateStr is a "YYYY-MM-DD" string.
-function parseLocalDate(dateStr){
-  if(dateStr instanceof Date) return dateStr;
-  const parts = String(dateStr).split('-').map(Number);
-  return new Date(parts[0], parts[1]-1, parts[2]);
-}
 function escapeHtml(s){
   return String(s||'')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -1070,104 +1059,16 @@ const MISSION_NAMES = {
   'dinner-side-starch':'Make the starch side', 'dinner-side-veggie':'Make the vegetable',
 };
 
-function getDishTeam(){
-  const now = new Date();
-  const dow = now.getDay();
-  const soy = new Date(now.getFullYear(),0,1);
-  const wk = Math.floor((now-soy)/(7*24*60*60*1000));
-  const A = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
-  const B = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
-  return (wk%2===0)?A[dow]:B[dow];
-}
 
-function calculateDayScore(agentId, missions, doneMap){
-  const possible = missions.reduce((sum,m) => sum + (m.points||0), 0);
-  const earned = missions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
-  const pct = possible > 0 ? (earned / possible) : 0;
-  return {
-    earned,
-    possible,
-    pct,
-    points100: Math.round(pct * 100),
-    dollars: Math.round(pct * 100) / 100, // $1.00 max
-    minutes: pct * 6 // 6 min max
-  };
-}
 
 // Apply transfer adjustments to a base score
 // transferAdjust is in points-out-of-100 (e.g. +50 or -50)
 
-function recalculateScore(agentId, dateStr){
-  if(!_db) return;
-
-  Promise.all([
-    _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value'),
-    _db.ref(`stewart/transferAdjust/${agentId}/${dateStr}`).once('value'),
-    _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value')
-  ]).then(([mSnap, tSnap, dSnap]) => {
-    const done = mSnap.val() || {};
-    const transferAdjust = tSnap.val() || 0; // e.g. +50 or -50
-    const deductions = dSnap.val() || {}; // {reasonKey: points, ...}
-
-    // Build expected missions for that date (use date-aware logic)
-    const dayDate = parseLocalDate(dateStr);
-    const dayOfWeek = dayDate.getDay();
-    if(dayOfWeek===0||dayOfWeek===6){
-      // Weekend — no score
-      _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null);
-      return;
-    }
-
-    const missions = buildMissionsForDate(agentId, dayDate);
-    const base = calculateDayScore(agentId, missions, done);
-
-    let score = base.points100;
-    score += transferAdjust;
-    const totalDeductions = Object.values(deductions).reduce((a,b)=>a+b,0);
-    score -= totalDeductions;
-    score = Math.max(0, Math.min(100, score));
-
-    _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(score);
-  });
-}
 
 // Build the expected mission list for ANY date (not just today)
 // Mirrors buildMissions but accepts an explicit date
 
 // ===== UNIFIED MISSION ENGINE (mirrors Agent HQ exactly — single source of truth) =====
-function getDishTeam_u(_d){
-  const now = _d ? new Date(_d) : new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun,1=Mon...6=Sat
-  // Week number (0 or 1) based on ISO week
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const weekNum = Math.floor((now - startOfYear) / (7 * 24 * 60 * 60 * 1000));
-  const weekParity = weekNum % 2; // 0 or 1
-
-  // Week A pattern: Sun=SJ, Mon=SJ, Tue=SD, Wed=SJ, Thu=SD, Fri=SJ, Sat=SD
-  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
-  // Week B: flipped
-  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
-
-  return weekParity === 0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
-}
-function isWeekend_u(_d){
-  const d = (_d?new Date(_d):new Date()).getDay();
-  return d === 0 || d === 6;
-}
-function isWednesday_u(_d){
-  return (_d?new Date(_d):new Date()).getDay() === 3;
-}
-function getDayName_u(_d){
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  return days[(_d?new Date(_d):new Date()).getDay()];
-}
-function getOfficerOfWatch_u(_d){
-  const order = ['samuel','johnjr','stephen','daniel'];
-  const now = _d ? new Date(_d) : new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const dayNum = Math.floor((now - startOfYear) / (24*60*60*1000));
-  return order[dayNum % 4];
-}
 
 function getDawnOrdersWeekStart(){
   const d = new Date();
@@ -1269,545 +1170,27 @@ function renderDawnShipsOrdersUI(checks, officerName){
   `;
 }
 
-function getBathroomAgent_u(_d){
-  const order = ['samuel','johnjr','stephen','daniel'];
-  const now = _d ? new Date(_d) : new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
-  return order[weekNum % 4];
-}
-function isLaundryDay_u(agentId, _d){
-  return isLaundryDayFor_u(agentId, (_d?new Date(_d):new Date()).getDay());
-}
-function isLaundryDayFor_u(agentId, dayOfWeek){
-  // dayOfWeek: 1=Mon, 4=Thu
-  if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
-  if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
-  return false;
-}
-function isDinnerSideDay_u(_d){
-  return DINNER_SIDE_DAYS.includes((_d?new Date(_d):new Date()).getDay());
-}
-function getMyDinnerSide_u(agentId, _d){
-  const pair = PAIRS[agentId];
-  if(!pair) return null;
-  const assignment = getDinnerSideAssignment_u(_d);
-  if(!assignment) return null;
-  return assignment[pair.pairId];
-}
-function getDinnerSideAssignment_u(dateOverride){
-  const date = dateOverride ? new Date(dateOverride) : new Date();
-  const dow = date.getDay();
-  if(!DINNER_SIDE_DAYS.includes(dow)) return null;
 
-  const epoch = new Date(2024, 0, 1); // Jan 1, 2024 (Monday)
-  const daysSinceEpoch = Math.floor((date - epoch) / (24*60*60*1000));
-  const fullWeeks = Math.floor(daysSinceEpoch / 7);
-  const remainderDays = daysSinceEpoch % 7;
-  // Each full week contributes 3 cooking days (Mon, Wed, Thu)
-  // Count cooking days in the remainder (days 0..remainderDays-1 of this week, Sun-based)
-  let cookingDayIndex = fullWeeks * 3;
-  for(let i=0;i<remainderDays;i++){
-    if(DINNER_SIDE_DAYS.includes(i)) cookingDayIndex++;
-  }
-
-  // Even index = Virtus does starch, Vulnere does veggie. Odd = swap.
-  const virtusGetsStarch = (cookingDayIndex % 2 === 0);
-  return {
-    virtus: virtusGetsStarch ? 'starch' : 'veggie',
-    vulnere: virtusGetsStarch ? 'veggie' : 'starch'
-  };
-}
-
-function buildMissionsUnified(agentId, _d){
-  const dishTeam = getDishTeam_u(_d);
-  const weekend = isWeekend_u(_d);
-  const wed = isWednesday_u(_d);
-  const day = getDayName_u(_d);
-  const isBathroomWeek = (agentId === getBathroomAgent_u(_d));
-
-  // Is this agent on dishes today?
-  const onDishes = (agentId === 'samuel' || agentId === 'johnjr')
-    ? dishTeam === 'sj'
-    : dishTeam === 'sd';
-
-  const onSetup = !onDishes; // opposite team does setup
-
-  const missions = [];
-
-  // ── SHARED DAILY (all 7 days) ──────────────────────
-  missions.push({
-    id: 'bed',
-    text: 'Make your bed',
-    detail: 'Every morning before anything else.',
-    points: 5,
-    category: 'bedroom',
-    always: true
-  });
-  missions.push({
-    id: 'bedroom',
-    text: 'Tidy your bedroom space',
-    detail: 'Your area clean and clothes put away.',
-    points: 5,
-    category: 'bedroom',
-    always: true
-  });
-  missions.push({
-    id: 'rabbit-own',
-    text: 'Care for your rabbit',
-    detail: 'Feed and water your own rabbit before bed.',
-    points: 5,
-    category: 'animals',
-    always: true
-  });
-
-  // ── DISHES TEAM DAILY ──────────────────────────────
-  if(onDishes){
-    // Dish team is either Sam+John or Stephen+Daniel
-    // Sam+John: both alternate load and unload between themselves
-    // Stephen+Daniel: Stephen UNLOADS, Daniel LOADS — always, no exceptions
-
-    if(agentId === 'samuel' || agentId === 'johnjr'){
-      const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
-      missions.push({
-        id: 'dishwasher-load',
-        text: `Load the dishwasher — with ${partner}`,
-        detail: `You and ${partner} handle dishes today. Load all dirty dishes after meals.`,
-        points: 10,
-        category: 'kitchen',
-        always: true
-      });
-      missions.push({
-        id: 'dishwasher-unload',
-        text: `Unload dishwasher & put away — with ${partner}`,
-        detail: `Empty the clean dishes and put everything in its place. Work with ${partner}.`,
-        points: 10,
-        category: 'kitchen',
-        always: true
-      });
-    }
-
-    if(agentId === 'stephen'){
-      // Stephen ONLY unloads — Daniel loads
-      missions.push({
-        id: 'dishwasher-unload',
-        text: 'Unload dishwasher & put away — with Daniel',
-        detail: 'Empty the clean dishes and put everything in its place. Daniel will load.',
-        points: 10,
-        category: 'kitchen',
-        always: true
-      });
-    }
-
-    if(agentId === 'daniel'){
-      // Daniel ONLY loads — Stephen unloads
-      missions.push({
-        id: 'dishwasher-load',
-        text: 'Load the dishwasher — with Stephen',
-        detail: 'Load all the dirty dishes after meals. Stephen will unload and put away.',
-        points: 10,
-        category: 'kitchen',
-        always: true
-      });
-    }
-
-    missions.push({
-      id: 'table-clear',
-      text: 'Clear the table after dinner',
-      detail: 'Bring all dishes, glasses, and food to the kitchen.',
-      points: 5,
-      category: 'kitchen',
-      always: true
-    });
-    missions.push({
-      id: 'table-wipe',
-      text: 'Wipe down the table after meals',
-      detail: 'Wipe the whole table after every meal — breakfast, lunch, and dinner.',
-      points: 5,
-      category: 'kitchen',
-      always: true
-    });
-  }
-
-// ── SETUP TEAM DAILY ──────────────────────────────
-  if(onSetup){
-    missions.push({
-      id: 'table-set',
-      text: 'Set the table before dinner',
-      detail: 'Plates, silverware, and napkins — set 10 minutes before we sit down.',
-      points: 5,
-      category: 'kitchen',
-      always: true
-    });
-    // Drinks — only older boys
-    if(agentId === 'samuel' || agentId === 'johnjr'){
-      const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
-      missions.push({
-        id: 'drinks',
-        text: `Pour drinks before dinner — with ${partner}`,
-        detail: `Pour everyone's drinks 10 minutes before dinner. You and ${partner} handle setup today.`,
-        points: 5,
-        category: 'kitchen',
-        always: true
-      });
-    }
-    // Appliance wipes — Sam, John, Stephen only, dropped on their laundry day
-    if(agentId !== 'daniel' && !isLaundryDay_u(agentId, _d)){
-      missions.push({
-        id: 'stovetop',
-        text: 'Wipe down the stovetop',
-        detail: 'Wipe down all burners and the stovetop surface after cooking.',
-        points: 5,
-        category: 'kitchen',
-        always: true
-      });
-      missions.push({
-        id: 'microwave',
-        text: 'Wipe down the microwave',
-        detail: 'Inside and outside. Check for splatter.',
-        points: 5,
-        category: 'kitchen',
-        always: true
-      });
-    }
-  }
-
-  // ── AGENT-SPECIFIC DAILY ─────────────────────────
-  if(agentId === 'samuel'){
-    missions.push({
-      id: 'floor-laundry',
-      text: 'Sweep the laundry room floor',
-      detail: 'Sweep and tidy the laundry room.',
-      points: 5,
-      category: 'floors',
-      weekday: true
-    });
-  }
-
-  if(agentId === 'johnjr'){
-    missions.push({
-      id: 'floor-living',
-      text: 'Sweep the living room floor',
-      detail: 'Sweep the full living room floor.',
-      points: 5,
-      category: 'floors',
-      weekday: true
-    });
-  }
-
-  if(agentId === 'stephen'){
-    missions.push({
-      id: 'kitchen-counter',
-      text: 'Clean & wipe kitchen counters',
-      detail: 'Wipe down all counter surfaces. Clear anything that doesn\'t belong.',
-      points: 10,
-      category: 'kitchen',
-      weekday: true
-    });
-    missions.push({
-      id: 'floor-kitchen',
-      text: 'Sweep the kitchen floor',
-      detail: 'Sweep the full kitchen floor including under the table.',
-      points: 5,
-      category: 'floors',
-      weekday: true
-    });
-  }
-
-  if(agentId === 'daniel'){
-    missions.push({
-      id: 'floor-hallway',
-      text: 'Sweep the hallway',
-      detail: 'Sweep the hallway floor.',
-      points: 5,
-      category: 'floors',
-      weekday: true
-    });
-    missions.push({
-      id: 'floor-rabbit',
-      text: 'Sweep the rabbit cage area',
-      detail: 'Sweep around and under the rabbit cages.',
-      points: 5,
-      category: 'animals',
-      weekday: true
-    });
-  }
-
-  // ── WEEKLY MISSIONS ────────────────────────────────
-  // Only show on weekdays, one per week — app marks when done
-
-  if(agentId === 'samuel'){
-    if(isLaundryDay_u('samuel', _d)){
-      missions.push({
-        id: 'laundry-sam',
-        text: 'Laundry Day — with John Jr.',
-        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
-        points: 15,
-        category: 'laundry',
-        always: true
-      });
-    }
-    missions.push({
-      id: 'fridge',
-      text: 'Wipe down the fridge',
-      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
-      points: 10,
-      category: 'kitchen',
-      weekly: true,
-      rotate: 'sj-stephen'
-    });
-    if(isBathroomWeek){
-      missions.push({
-        id: 'bathroom-clean',
-        text: 'Clean the bathroom',
-        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
-        points: 15,
-        category: 'bathroom',
-        weekly: true
-      });
-    }
-  }
-
-  if(agentId === 'johnjr'){
-    if(isLaundryDay_u('johnjr', _d)){
-      missions.push({
-        id: 'laundry-john',
-        text: 'Laundry Day — with Samuel',
-        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
-        points: 15,
-        category: 'laundry',
-        always: true
-      });
-    }
-    missions.push({
-      id: 'fridge',
-      text: 'Wipe down the fridge',
-      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
-      points: 10,
-      category: 'kitchen',
-      weekly: true,
-      rotate: 'sj-stephen'
-    });
-    if(isBathroomWeek){
-      missions.push({
-        id: 'bathroom-clean',
-        text: 'Clean the bathroom',
-        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
-        points: 15,
-        category: 'bathroom',
-        weekly: true
-      });
-    }
-  }
-
-  if(agentId === 'stephen'){
-    if(isLaundryDay_u('stephen', _d)){
-      missions.push({
-        id: 'laundry-stephen',
-        text: 'Laundry Day — with Daniel',
-        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
-        points: 15,
-        category: 'laundry',
-        always: true
-      });
-    }
-    missions.push({
-      id: 'hutch',
-      text: 'Organize the hutch',
-      detail: 'Keep the food hutch organized — boxes neat, nothing expired, everything in its place.',
-      points: 10,
-      category: 'kitchen',
-      weekly: true
-    });
-    missions.push({
-      id: 'fridge',
-      text: 'Wipe down the fridge',
-      detail: 'Inside and outside. Sam, John, and Stephen rotate this weekly.',
-      points: 10,
-      category: 'kitchen',
-      weekly: true,
-      rotate: 'sj-stephen'
-    });
-    if(isBathroomWeek){
-      missions.push({
-        id: 'bathroom-clean',
-        text: 'Clean the bathroom',
-        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
-        points: 15,
-        category: 'bathroom',
-        weekly: true
-      });
-    }
-  }
-
-  if(agentId === 'daniel'){
-    if(isLaundryDay_u('daniel', _d)){
-      missions.push({
-        id: 'laundry-daniel',
-        text: 'Laundry Day — with Stephen',
-        detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
-        points: 10,
-        category: 'laundry',
-        always: true
-      });
-    }
-    missions.push({
-      id: 'bathroom-trash',
-      text: 'Empty bathroom trash',
-      detail: 'Wednesday morning — empty the bathroom trash can and bring it to the road with Sam and John.',
-      points: 10,
-      category: 'bathroom',
-      weekly: true,
-      wednesday: true
-    });
-    if(isBathroomWeek){
-      missions.push({
-        id: 'bathroom-clean',
-        text: 'Clean the bathroom',
-        detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
-        points: 15,
-        category: 'bathroom',
-        weekly: true
-      });
-    }
-  }
-
-  // ── WEDNESDAY TRASH ────────────────────────────────
-  if(wed && (agentId === 'samuel' || agentId === 'johnjr')){
-    const partner = agentId === 'samuel' ? 'John Jr.' : 'Samuel';
-    missions.push({
-      id: 'trash',
-      text: `Take trash to the road — with ${partner}`,
-      detail: `Wednesday mission — you and ${partner} go together. Long driveway, out before 9am. Daniel brings the bathroom trash to you.`,
-      points: 10,
-      category: 'trash',
-      always: true,
-      urgent: true
-    });
-  }
-
-  // ── WEEKLY RABBIT CAGE CLEAN ─────────────────────
-  missions.push({
-    id: 'rabbit-cage',
-    text: 'Clean rabbit cages',
-    detail: 'All four boys clean the cages together once this week.',
-    points: 15,
-    category: 'animals',
-    weekly: true
-  });
-
-  // ── DINNER SIDE DISH (Mon/Wed/Thu) ────────────────
-  if(isDinnerSideDay_u(_d)){
-    const side = getMyDinnerSide_u(agentId, _d);
-    const pair = PAIRS[agentId];
-    if(side && pair){
-      const partner = pair.partner === 'johnjr' ? 'John Jr.' : pair.partner.charAt(0).toUpperCase() + pair.partner.slice(1);
-      if(side === 'starch'){
-        missions.push({
-          id: 'dinner-side-starch',
-          text: `Make the starch side — with ${partner}`,
-          detail: `Potatoes, rice, pasta, or similar. Work with ${partner} to get it ready for dinner.`,
-          points: 10,
-          category: 'kitchen',
-          always: true
-        });
-      } else {
-        missions.push({
-          id: 'dinner-side-veggie',
-          text: `Make the vegetable — with ${partner}`,
-          detail: `Heat the vegetable on the stove or microwave with ${partner} for dinner tonight.`,
-          points: 5,
-          category: 'kitchen',
-          always: true
-        });
-      }
-    }
-  }
-
-  // Filter by day type
-  return missions.filter(m => {
-    if(m.always) return true;
-    if(m.weekday && !weekend) return true;
-    if(m.weekly && !weekend) return true;
-    if(m.wednesday && wed) return true;
-    return false;
-  });
-}
 
 // Dashboard entrypoint: delegate to the unified engine for any date
-function buildMissionsForDate(agentId, dayDate){
-  return buildMissionsUnified(agentId, dayDate);
-}
 
 
 // ══════════════════════════════════════════════════════
 // RENDER MISSIONS
 // ══════════════════════════════════════════════════════
 
-function isLaundryDayFor(agentId, dayOfWeek){
-  // dayOfWeek: 1=Mon, 4=Thu
-  if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
-  if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
-  return false;
-}
 
 // Monday = laundry day for Sam & John (pairId 'virtus')
 // Thursday = laundry day for Stephen & Daniel (pairId 'vulnere')
 
 // Monday = laundry day for Sam & John, Thursday = laundry day for Stephen & Daniel
-function isLaundryDay(agentId){
-  const dow = new Date().getDay();
-  if((agentId==='samuel'||agentId==='johnjr') && dow===1) return true;
-  if((agentId==='stephen'||agentId==='daniel') && dow===4) return true;
-  return false;
-}
 
-const PAIRS = {
-  'samuel':  { partner: 'johnjr',  pairId: 'virtus',   label: 'Team Virtus',   names: 'Samuel & John Jr.' },
-  'johnjr':  { partner: 'samuel',  pairId: 'virtus',   label: 'Team Virtus',   names: 'Samuel & John Jr.' },
-  'stephen': { partner: 'daniel',  pairId: 'vulnere',  label: 'Team Vulnere',  names: 'Stephen & Daniel' },
-  'daniel':  { partner: 'stephen', pairId: 'vulnere',  label: 'Team Vulnere',  names: 'Stephen & Daniel' },
-};
 
-const DINNER_SIDE_DAYS = [1, 3, 4]; // Mon, Wed, Thu
 
-function isDinnerSideDay(){
-  return DINNER_SIDE_DAYS.includes(new Date().getDay());
-}
 
 // Count which "cooking day" this is since a fixed epoch (Mon Jan 1 2024)
 // to get continuous alternation regardless of week
-function getDinnerSideAssignment(dateOverride){
-  const date = dateOverride ? new Date(dateOverride) : new Date();
-  const dow = date.getDay();
-  if(!DINNER_SIDE_DAYS.includes(dow)) return null;
 
-  const epoch = new Date(2024, 0, 1); // Jan 1, 2024 (Monday)
-  const daysSinceEpoch = Math.floor((date - epoch) / (24*60*60*1000));
-  const fullWeeks = Math.floor(daysSinceEpoch / 7);
-  const remainderDays = daysSinceEpoch % 7;
-  // Each full week contributes 3 cooking days (Mon, Wed, Thu)
-  // Count cooking days in the remainder (days 0..remainderDays-1 of this week, Sun-based)
-  let cookingDayIndex = fullWeeks * 3;
-  for(let i=0;i<remainderDays;i++){
-    if(DINNER_SIDE_DAYS.includes(i)) cookingDayIndex++;
-  }
-
-  // Even index = Virtus does starch, Vulnere does veggie. Odd = swap.
-  const virtusGetsStarch = (cookingDayIndex % 2 === 0);
-  return {
-    virtus: virtusGetsStarch ? 'starch' : 'veggie',
-    vulnere: virtusGetsStarch ? 'veggie' : 'starch'
-  };
-}
-
-function getMyDinnerSide(agentId){
-  const pair = PAIRS[agentId];
-  if(!pair) return null;
-  const assignment = getDinnerSideAssignment();
-  if(!assignment) return null;
-  return assignment[pair.pairId];
-}
 
 function getExpectedMissions(agentId){
   const dt = getDishTeam();
@@ -1860,7 +1243,7 @@ function printDailyChores(){
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
   const sections = AGENTS.map(a => {
-    const missions = buildMissionsUnified(a.id, today);
+    const missions = buildMissions(a.id, today);
     if(!missions.length){
       return `<div style="margin-bottom:24px;page-break-inside:avoid;">
         <div style="font-family:Georgia,serif;font-size:18px;font-weight:700;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px;">${a.icon} ${a.name} — ${a.codename}</div>
@@ -2320,7 +1703,7 @@ function renderWeekGrid(){
       let daysHtml = '';
       days.forEach((d, di) => {
         const dObj = new Date(d+'T12:00:00');
-        const assigned = buildMissionsUnified(a.id, dObj);
+        const assigned = buildMissions(a.id, dObj);
         const done = all[ai][di].val() || {};
         const isFuture = d > today;
         const isToday = d === today;
@@ -2379,7 +1762,7 @@ function toggleBwcDay(dayId){
 function showCellDetail(agentId, dateStr, agentName){
   if(!_db) return;
   const dObj = new Date(dateStr+'T12:00:00');
-  const assigned = buildMissionsUnified(agentId, dObj);
+  const assigned = buildMissions(agentId, dObj);
   _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value', s=>{
     const done = s.val()||{};
     const lines = assigned.map(m=>{
