@@ -17,8 +17,37 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Same IndexedDB-backed counter as push-notifications.js (service workers
+// can't share localStorage with the page, so this has to be duplicated here).
+function openBadgeDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('resolute-badge', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('meta');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function bumpBadgeCount(){
+  try{
+    const db = await openBadgeDB();
+    const current = await new Promise((resolve) => {
+      const tx = db.transaction('meta','readonly').objectStore('meta').get('count');
+      tx.onsuccess = () => resolve(tx.result || 0);
+      tx.onerror = () => resolve(0);
+    });
+    const next = current + 1;
+    await new Promise((resolve) => {
+      const tx = db.transaction('meta','readwrite').objectStore('meta').put(next, 'count');
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+    if('setAppBadge' in navigator) navigator.setAppBadge(next);
+  }catch(e){}
+}
+
 // Background message handler — fires when the app is closed or in another tab.
 messaging.onBackgroundMessage((payload) => {
+  bumpBadgeCount();
   const title = (payload.notification && payload.notification.title) || 'HMS Resolute';
   const body = (payload.notification && payload.notification.body) || 'New message aboard.';
   const relUrl = (payload.data && payload.data.url) || '';
