@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>OWCA Agent HQ</title>
 <link rel="apple-touch-icon" href="../assets/app-icon.png">
+<link rel="manifest" href="../manifest.json">
 <link rel="icon" href="icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1128,6 +1129,7 @@ function initFirebase(){
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
     if(typeof initPush === 'function') initPush();
+    if(typeof syncHomeScreenBadgeOnOpen === 'function') syncHomeScreenBadgeOnOpen();
     setSyncStatus('live');
 
     // Connection monitor
