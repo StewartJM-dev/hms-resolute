@@ -307,17 +307,17 @@ body{
 
 /* ===== Instrument gauges ===== */
 .gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:8px;}
-.gauge-card{background:url('../assets/textures/gunmetal.jpg');background-size:cover;background-position:center;border:1px solid rgba(90,130,190,.28);border-radius:10px;
+.gauge-card{background:url('../assets/textures/black-satin.jpg');background-size:cover;background-position:center;border:1px solid rgba(90,130,190,.28);border-radius:10px;
   padding:14px 8px 12px;text-align:center;}
 .gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;
-  color:#7fa8d9;margin-bottom:2px;}
+  color:#a8cbee;margin-bottom:2px;text-shadow:0 1px 2px rgba(0,0,0,.6);}
 .gauge-card .gc-icon{font-size:22px;margin-bottom:2px;}
 .gauge-card .gc-readout{font-family:'Lato',sans-serif;font-size:11px;color:var(--gold2,#e8b84a);margin-top:6px;letter-spacing:.4px;}
-.gauge-card .gc-sub{font-size:10.5px;opacity:.6;margin-top:2px;}
+.gauge-card .gc-sub{font-size:10.5px;opacity:.75;margin-top:2px;}
 .gauge-svg{width:100%;max-width:120px;height:auto;display:block;margin:0 auto;}
-.gauge-track{fill:none;stroke:rgba(255,255,255,.08);stroke-width:9;stroke-linecap:round;}
+.gauge-track{fill:none;stroke:rgba(255,255,255,.14);stroke-width:9;stroke-linecap:round;}
 .gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
-.gauge-pctline{font-family:'Cinzel',serif;font-weight:700;font-size:22px;margin-top:2px;}
+.gauge-pctline{font-family:'Cinzel',serif;font-weight:700;font-size:22px;margin-top:2px;text-shadow:0 1px 2px rgba(0,0,0,.6);}
 
 /* ===== Submarine status board (Christmas tree) ===== */
 .xmas-tree{background:linear-gradient(180deg,#0a0e16,#12182400);border:1px solid rgba(200,160,70,.25);border-radius:14px;padding:8px 6px;margin-bottom:10px;}
