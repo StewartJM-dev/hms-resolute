@@ -50,7 +50,8 @@ function getDishTeam(_d){
   const now = _d ? new Date(_d) : new Date();
   const epoch = new Date(2024, 0, 1); // fixed reference point, arbitrary but stable
   const daysSinceEpoch = Math.floor((now - epoch) / (24*60*60*1000));
-  return (daysSinceEpoch % 2 === 0) ? 'sj' : 'sd';
+  // Flipped 2026-07-28 per Dawn/John's request — Samuel & John Jr. on dishes today.
+  return (daysSinceEpoch % 2 === 0) ? 'sd' : 'sj';
 }
 function isWeekend(_d){
   const d = (_d?new Date(_d):new Date()).getDay();
