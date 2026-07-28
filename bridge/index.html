@@ -1197,7 +1197,9 @@ function loadInstruments(){
       const done = results[i][0].val() || {};
       const completed = Object.keys(done).filter(id => done[id] && !id.startsWith('oow-')).length;
       const score = results[i][1].val();
-      const pct = Math.min(100, Math.round((completed/MISSION_TARGET)*100));
+      // score is already 0-100 (the boy's real percentage for the day) —
+      // use it directly instead of guessing a fixed mission count.
+      const pct = (score===null||score===undefined) ? 0 : Math.max(0, Math.min(100, score));
       return {a, completed, score, pct};
     });
     renderGauges(crew);
@@ -1225,7 +1227,7 @@ function renderGauges(crew){
       '<div class="gc-icon">'+c.a.icon+'</div>'+
       gaugeSVG(c.pct,color)+
       '<div class="gauge-pctline" style="color:'+color+';">'+c.pct+'%</div>'+
-      '<div class="gc-readout">'+c.completed+' of '+MISSION_TARGET+' missions</div>'+
+      '<div class="gc-readout">'+c.completed+' mission'+(c.completed===1?'':'s')+' done</div>'+
       '<div class="gc-sub">'+scoreTxt+'</div></div>';
   }).join('');
   gr.innerHTML = crewCards + fleetCard;
@@ -1315,7 +1317,7 @@ function renderStatusBoard(crew){
     // each boy: green if 100%, amber if some, red if none
     crew.forEach(c=>{
       const lamp = c.pct>=100?'green':(c.completed>0?'amber':'red');
-      const status = c.pct>=100?'All clear':(c.completed>0?c.completed+'/'+MISSION_TARGET:'None yet');
+      const status = c.pct>=100?'All clear':(c.completed>0?c.pct+'%':'None yet');
       rows.push({label:c.a.icon+' '+c.a.name, lamp, status});
     });
 
