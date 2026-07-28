@@ -2121,100 +2121,13 @@ function recalculateScore(agentId, dateStr){
 // Build the expected mission list for ANY date (not just today)
 // Mirrors buildMissions but accepts an explicit date
 function buildMissionsForDate(agentId, dayDate){
-  const dayOfWeek = dayDate.getDay();
-  const startOfYear = new Date(dayDate.getFullYear(), 0, 1);
-  const weekNum = Math.floor((dayDate - startOfYear) / (7*24*60*60*1000));
-  const weekParity = weekNum % 2;
-  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
-  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
-  const dishTeam = weekParity===0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
-  const onDishes = (agentId==='samuel'||agentId==='johnjr') ? dishTeam==='sj' : dishTeam==='sd';
-  const onSetup = !onDishes;
-  const wed = dayOfWeek===3;
-  const onLaundry = isLaundryDayFor(agentId, dayOfWeek);
-  const bathroomOrder = ['samuel','johnjr','stephen','daniel'];
-  const isBathroomWeek = (agentId === bathroomOrder[weekNum % 4]);
-  const officerOrder = ['samuel','johnjr','stephen','daniel'];
-  const dayNum = Math.floor((dayDate - startOfYear) / (24*60*60*1000));
-  const isOfficerOfWatch = (agentId === officerOrder[dayNum % 4]);
-
-  const missions = [];
-  missions.push({id:'bed', points:5});
-  missions.push({id:'bedroom', points:5});
-  missions.push({id:'rabbit-own', points:5});
-  missions.push({id:'typing-practice', points:5});
-  missions.push({id:'scratch-lesson', points:8});
-  missions.push({id:'khan-academy', points:8});
-  missions.push({id:'research-report', points:6});
-
-  if(onDishes){
-    for(let r=1; r<=3; r++){
-      if(agentId==='samuel'||agentId==='johnjr'){
-        missions.push({id:`dishwasher-load-${r}`, points:10});
-        missions.push({id:`dishwasher-unload-${r}`, points:10});
-      }
-      if(agentId==='stephen') missions.push({id:`dishwasher-unload-${r}`, points:10});
-      if(agentId==='daniel') missions.push({id:`dishwasher-load-${r}`, points:10});
-    }
-    missions.push({id:'table-clear', points:5});
-    missions.push({id:'table-wipe', points:5});
-  }
-  if(onSetup){
-    missions.push({id:'pots-pans-wash', points:10});
-    missions.push({id:'table-set', points:5});
-    if(agentId==='samuel'||agentId==='johnjr') missions.push({id:'drinks', points:5});
-    if(agentId!=='daniel' && !onLaundry){
-      missions.push({id:'stovetop', points:5});
-      missions.push({id:'microwave', points:5});
-    }
-  }
-
-  if(agentId==='samuel') missions.push({id:'floor-laundry', points:5});
-  if(agentId==='johnjr') missions.push({id:'floor-living', points:5});
-  if(agentId==='stephen'){
-    missions.push({id:'kitchen-counter', points:10});
-    missions.push({id:'floor-kitchen', points:5});
-  }
-  if(agentId==='daniel'){
-    missions.push({id:'floor-hallway', points:5});
-    missions.push({id:'floor-rabbit', points:5});
-  }
-
-  if(onLaundry){
-    if(agentId==='samuel') missions.push({id:'laundry-sam', points:15});
-    if(agentId==='johnjr') missions.push({id:'laundry-john', points:15});
-    if(agentId==='stephen') missions.push({id:'laundry-stephen', points:15});
-    if(agentId==='daniel') missions.push({id:'laundry-daniel', points:10});
-  }
-
-  if(wed && (agentId==='samuel'||agentId==='johnjr')) missions.push({id:'trash', points:10});
-  if(wed && agentId==='daniel') missions.push({id:'bathroom-trash', points:10});
-
-  if(agentId==='samuel'||agentId==='johnjr'||agentId==='stephen') missions.push({id:'fridge', points:10});
-  if(agentId==='stephen') missions.push({id:'hutch', points:10});
-  if(isBathroomWeek) missions.push({id:'bathroom-clean', points:15});
-  if(isOfficerOfWatch){
-    ['morning','midday','evening'].forEach(r => {
-      ['bread','fridge','lights','sink'].forEach(c => {
-        missions.push({id:`oow-${r}-${c}`, points:0});
-      });
-    });
-  }
-
-  missions.push({id:'rabbit-cage', points:15});
-
-  // Dinner sides — Mon/Wed/Thu
-  if(DINNER_SIDE_DAYS.includes(dayOfWeek)){
-    const assignment = getDinnerSideAssignment(dayDate);
-    const pair = PAIRS[agentId];
-    if(assignment && pair){
-      const side = assignment[pair.pairId];
-      if(side === 'starch') missions.push({id:'dinner-side-starch', points:10});
-      else missions.push({id:'dinner-side-veggie', points:5});
-    }
-  }
-
-  return missions;
+  // NOTE: this used to be a separate ~100-line mission list that had quietly
+  // drifted out of sync with buildMissions() (what the boy actually sees and
+  // checks off) — e.g. Daniel's "empty bathroom trash" wasn't being counted
+  // toward his score even though it was on his real checklist. Scoring must
+  // always match what's displayed, so this now just calls buildMissions()
+  // directly instead of maintaining a second list. Do not re-split these.
+  return buildMissions(agentId, dayDate);
 }
 
 // ══════════════════════════════════════════════════════
