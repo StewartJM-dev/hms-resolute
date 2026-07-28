@@ -58,6 +58,17 @@ async function clearHomeScreenBadge(){
   await setBadgeCount(0);
 }
 
+// Safety net for iOS's spotty support for setting badges from a service
+// worker while the app is closed. This re-applies whatever count is
+// already stored the moment the app is actually opened, so the badge
+// catches up even if the background update silently failed to stick.
+async function syncHomeScreenBadgeOnOpen(){
+  try{
+    const n = await getBadgeCount();
+    if(n > 0 && 'setAppBadge' in navigator) navigator.setAppBadge(n);
+  }catch(e){}
+}
+
 function getResoluteSession(){
   try{ return JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){ return null; }
 }
