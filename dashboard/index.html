@@ -650,7 +650,7 @@ body{
         <div class="card brown-hd" style="margin-bottom:14px;">
           <div class="card-hd"><div class="card-hd-icon">&#128227;</div><div class="card-hd-title">Post to All Agents</div></div>
           <div class="card-bd">
-            <textarea class="board-input" id="board-msg" placeholder="Post a message all boys can see..." maxlength="280"></textarea>
+            <textarea class="board-input" id="board-msg" placeholder="Post a message all boys can see..." maxlength="280" autocomplete="off" name="msg-board-nofill"></textarea>
             <div class="board-controls">
               <select class="board-from" id="board-from">
                 <option value="HQ">From: HQ</option>
@@ -713,7 +713,7 @@ body{
         </div>
         <div class="msg-messages" id="thread-messages"></div>
         <div class="msg-compose">
-          <input class="msg-input" type="text" id="thread-input" placeholder="Message..." maxlength="280">
+          <input class="msg-input" type="text" id="thread-input" placeholder="Message..." maxlength="280" autocomplete="off" name="msg-thread-nofill">
           <button class="msg-send" onclick="sendThreadMessage()">&#10148;</button>
         </div>
       </div>
