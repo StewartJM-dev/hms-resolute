@@ -61,6 +61,17 @@ body{
     <div class="lbl">Ship Account Balance</div>
   </div>
 
+  <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1px;color:var(--gold2);margin-bottom:8px;">HOW THE CHROMEBOOK CONTEST WORKS</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.75);line-height:1.7;">
+      &bull; Save <b>$45</b> in your Ship Account to claim your own Chromebook.<br>
+      &bull; Every dollar you earn from missions automatically goes into your account.<br>
+      &bull; Cash out to Greenlight any time instead, if you'd rather have the money.<br>
+      &bull; <b>Deadline: September 25.</b> After that, the contest closes for good &mdash; no more claiming a Chromebook this way.<br>
+      &bull; Four Chromebooks are available. First four agents to reach $45 before the deadline each get one.
+    </div>
+  </div>
+
   <div id="store-items">
     <div class="empty">Loading store&hellip;</div>
   </div>
@@ -85,8 +96,9 @@ const SHIP_STORE_ITEMS = [
     name: 'Your Own Chromebook',
     icon: '&#128187;',
     price: 45,
-    limitedQty: 2,
-    desc: "Own the Chromebook you use for school and Systems Seven. First two agents to save $45 claim one."
+    limitedQty: 4,
+    deadline: '2026-09-25',
+    desc: "Own the Chromebook you use for school and Systems Seven. Save $45 before the deadline to claim one — four available."
   }
 ];
 
@@ -137,11 +149,19 @@ function renderStore(){
     el.innerHTML = SHIP_STORE_ITEMS.map((item, i) => {
       const claimed = claimCounts[i];
       const soldOut = item.limitedQty && claimed >= item.limitedQty;
+      const expired = item.deadline && (localDateStr() > item.deadline);
       const canAfford = balance >= item.price;
-      const canBuy = canAfford && !soldOut;
+      const canBuy = canAfford && !soldOut && !expired;
       const availText = item.limitedQty
         ? (soldOut ? 'All claimed' : (item.limitedQty - claimed)+' of '+item.limitedQty+' left')
         : '';
+      const deadlineText = item.deadline
+        ? (expired ? 'Contest closed '+formatDate(item.deadline) : formatDate(item.deadline)+' deadline &mdash; '+daysUntil(item.deadline)+' days left')
+        : '';
+      let btnLabel = 'Redeem';
+      if(expired) btnLabel = 'Contest Closed';
+      else if(soldOut) btnLabel = 'Sold Out';
+      else if(!canAfford) btnLabel = 'Not Enough Saved';
       return `<div class="item-card">
         <div class="item-top">
           <div class="item-icon">${item.icon}</div>
@@ -149,20 +169,40 @@ function renderStore(){
             <div class="item-name">${item.name}</div>
             <div class="item-price">$${item.price}</div>
             ${availText ? `<div class="item-avail">${availText}</div>` : ''}
+            ${deadlineText ? `<div class="item-avail" style="color:${expired?'#cc5533':'var(--gold2)'};">${deadlineText}</div>` : ''}
           </div>
         </div>
         <div class="item-desc">${item.desc}</div>
         <button class="redeem-btn ${canBuy?'can':'cant'}" ${canBuy?'':'disabled'} onclick="redeemItem('${item.id}')">
-          ${soldOut ? 'Sold Out' : (canAfford ? 'Redeem' : 'Not Enough Saved')}
+          ${btnLabel}
         </button>
       </div>`;
     }).join('');
   });
 }
 
+function localDateStr(date){
+  const d = date ? new Date(date) : new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function formatDate(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'long',day:'numeric'});
+}
+function daysUntil(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const target = new Date(y,m-1,d);
+  const msLeft = target - new Date();
+  return Math.max(0, Math.ceil(msLeft/(24*60*60*1000)));
+}
+
 function redeemItem(itemId){
   const item = SHIP_STORE_ITEMS.find(i => i.id === itemId);
   if(!item || !_db || !currentPerson) return;
+  if(item.deadline && localDateStr() > item.deadline){ alert('This contest has closed.'); renderStore(); return; }
   if(!confirm('Spend $'+item.price+' on '+item.name+'?')) return;
 
   getBalance(currentPerson).then(balance => {
