@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Officers' Country · Help</title>
+<link rel="apple-touch-icon" href="../assets/app-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Help">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#1a4a2e;--green2:#2d6a47;
+  --indigo:#1e2d5a;--gold:#c8922a;--gold2:#e8b84a;
+  --white:#f9f7f2;--ink:#132437;--brown:#5c3d1e;
+  --rust:#b5451b;--muted:#4f7292;--border:#7fa8c9;--card:#f5fafd;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Lato',sans-serif;
+  background:url('../assets/textures/steel-blue-bg.jpg');background-size:cover;background-attachment:fixed;background-position:center;
+  color:var(--ink);min-height:100vh;padding:env(safe-area-inset-top) 0 40px;
+}
+.wrap{max-width:640px;margin:0 auto;padding:0 18px;}
+.back-link{display:inline-flex;align-items:center;gap:5px;margin:16px 0 6px;color:var(--indigo);text-decoration:none;font-size:13px;font-weight:700;}
+.mast{text-align:center;padding:10px 0 16px;}
+.mast h1{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(22px,6vw,28px);color:var(--indigo);letter-spacing:1px;}
+.mast .sub{font-size:13px;color:var(--muted);margin-top:6px;}
+.section{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.section-hd{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;}
+.section-hd .icon{font-size:20px;flex-shrink:0;}
+.section-hd .title{flex:1;font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--brown);}
+.section-hd .chev{color:var(--indigo);font-size:14px;transition:transform .2s;flex-shrink:0;}
+.section.open .chev{transform:rotate(90deg);}
+.section-body{display:none;padding:0 16px 16px 46px;font-size:13px;color:var(--ink);line-height:1.7;}
+.section.open .section-body{display:block;}
+.section-body b{color:var(--indigo);}
+.section-body ul{margin:6px 0 6px 18px;}
+.section-body li{margin-bottom:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Officers' Country</a>
+  <div class="mast">
+    <h1>&#10067; HELP</h1>
+    <div class="sub">Everything in Officers' Country, explained. Tap a topic.</div>
+  </div>
+  <div id="sections"></div>
+</div>
+
+<script>
+const SECTIONS = [
+  {
+    icon: '&#9875;',
+    title: 'The Big Picture',
+    body: `Officers' Country is command central — you can see and manage everything the boys are doing without needing their own Agent HQ login. <b>Ship's Watch</b> is your overview; the other tabs at the bottom (<b>Rounds, Mess Call, Comms, XO's Quarters, Ship's Log, Drydock</b>) each handle a different area.`
+  },
+  {
+    icon: '&#129517;',
+    title: "Standing Orders",
+    body: `Shows automatically when you log in — a checklist of what still needs doing today (White Glove, devotionals, lunch options, prayer/praise visits, and more). Tap any item and it takes you straight there instead of just checking a box. Quick Links at the bottom jump to the Vineyard and meal planning any time, whether or not they're on today's list.`
+  },
+  {
+    icon: '&#128737;',
+    title: 'White Glove Inspection',
+    body: `A per-room, per-category inspection you log three times a day (morning/afternoon/evening). The gold banner on Ship's Watch pulses when one is due for the current window — tap it to jump straight into XO's Quarters and log it.`
+  },
+  {
+    icon: '&#9989;',
+    title: "Rounds (Missions Tab)",
+    body: `See and adjust each boy's mission checklist directly — useful if you did something with them and want to check it off yourself. Changes here recalculate their score and pay immediately, same as if they'd checked it off themselves.`
+  },
+  {
+    icon: '&#127857;',
+    title: 'Mess Call (Lunch)',
+    body: `Load the week's lunch options here — pick a day, add items with quantities, save. Boys pick from the shared pool on their own page, first come first served. "Boys' Picks This Week" below shows what's been chosen so far.`
+  },
+  {
+    icon: '&#128225;',
+    title: 'Comms',
+    body: `Everything money- and message-related lives here: <b>Ship Account Pending Transfers</b> (mark done once you've actually moved money to Greenlight or handled a Store purchase), <b>Screen Time Approvals</b> (approve or deny cash-out requests), <b>Chat Moderation</b> (pause a boy's group chat), and <b>Private Threads</b> to message any boy directly.`
+  },
+  {
+    icon: '&#9875;',
+    title: "Ship Accounts & the Store",
+    body: `Each boy's running savings balance is visible right on Ship's Watch under Agent Status. The Chromebook Fund (Ship's Store) is the first thing they can save toward — $45 each, four available, deadline September 25.`
+  },
+  {
+    icon: '&#127942;',
+    title: "XO's Quarters",
+    body: `Your own space: White Glove logging, the Grace Dare (your personal devotional — private, boys never see it), the Family Devotional you lead together, and Dawn's Personal Devotional log.`
+  },
+  {
+    icon: '&#128218;',
+    title: "Ship's Log (Growth)",
+    body: `The Art of Parenting session tracker, weekly application notes, the character-qualities prayer list, and per-boy growth notes all live here.`
+  },
+  {
+    icon: '&#127959;',
+    title: 'Drydock (Projects)',
+    body: `House projects, exterior/yard projects, Family Night activity ideas, and Teach Me session management — including setting each week's Teach Me Vote winner.`
+  },
+  {
+    icon: '&#128172;',
+    title: 'Stuck or Confused?',
+    body: `Tap the compass-style Standing Orders whenever you're not sure what's next for the day. This Help page is always one tap away from the ? icon at the top.`
+  }
+];
+
+const el = document.getElementById('sections');
+el.innerHTML = SECTIONS.map((s,i) => `
+  <div class="section" id="sec-${i}">
+    <div class="section-hd" onclick="toggleSection(${i})">
+      <div class="icon">${s.icon}</div>
+      <div class="title">${s.title}</div>
+      <div class="chev">&#8250;</div>
+    </div>
+    <div class="section-body">${s.body}</div>
+  </div>
+`).join('');
+
+function toggleSection(i){
+  document.getElementById('sec-'+i).classList.toggle('open');
+}
+</script>
+</body>
+</html>
