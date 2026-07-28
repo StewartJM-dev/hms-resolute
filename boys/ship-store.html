@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Systems Seven · Ship's Store</title>
+<link rel="apple-touch-icon" href="../assets/app-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ship's Store">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --teal:#0a7a7a;--teal2:#0d9e9e;--teal3:#12c4c4;
+  --black:#0a0a0a;--dark:#111a1a;--dark2:#1a2626;
+  --white:#f0fafa;--gold:#e8b84a;--gold2:#f5d070;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:'Exo 2',sans-serif;
+  background:radial-gradient(ellipse at top,rgba(232,184,74,.08),transparent 55%),
+    linear-gradient(170deg,var(--dark),var(--black));
+  background-attachment:fixed;color:var(--white);min-height:100vh;
+  padding:env(safe-area-inset-top) 0 40px;
+}
+.wrap{max-width:640px;margin:0 auto;padding:0 18px;}
+.back-link{display:inline-flex;align-items:center;gap:5px;margin:16px 0 6px;color:var(--gold2);text-decoration:none;font-size:13px;}
+.mast{text-align:center;padding:16px 0 10px;}
+.mast h1{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(22px,6vw,30px);color:var(--gold2);letter-spacing:1px;}
+.mast .sub{font-size:13px;color:rgba(255,255,255,.5);margin-top:6px;}
+.balance-strip{text-align:center;background:rgba(232,184,74,.08);border:1px solid rgba(232,184,74,.25);border-radius:12px;padding:14px;margin:16px 0;}
+.balance-strip .amt{font-family:'Orbitron',sans-serif;font-size:26px;font-weight:700;color:var(--gold);}
+.balance-strip .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-top:2px;}
+.item-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px;margin-bottom:14px;}
+.item-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.item-icon{font-size:32px;flex-shrink:0;}
+.item-name{font-family:'Orbitron',sans-serif;font-size:15px;color:var(--white);}
+.item-price{font-size:12px;color:var(--gold2);margin-top:2px;}
+.item-avail{font-size:11px;color:rgba(255,255,255,.45);margin-top:2px;}
+.item-desc{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:12px;}
+.redeem-btn{width:100%;padding:11px;border-radius:8px;border:none;font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;cursor:pointer;}
+.redeem-btn.can{background:var(--gold);color:var(--black);}
+.redeem-btn.cant{background:rgba(255,255,255,.06);color:rgba(255,255,255,.3);cursor:default;}
+.empty{text-align:center;color:rgba(255,255,255,.4);font-style:italic;padding:30px 20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">&#8592; Back to Ship Account</a>
+  <div class="mast">
+    <h1>&#127974; SHIP'S STORE</h1>
+    <div class="sub">Spend what you've saved, Agent.</div>
+  </div>
+
+  <div class="balance-strip">
+    <div class="amt" id="balance-amt">$0.00</div>
+    <div class="lbl">Ship Account Balance</div>
+  </div>
+
+  <div id="store-items">
+    <div class="empty">Loading store&hellip;</div>
+  </div>
+</div>
+
+<script>
+const FB_CONFIG = {
+  apiKey: "AIzaSyAXfFW3rWpChcTDqCiFKwk9QIJMY0fhnfw",
+  authDomain: "stewart-family-3cece.firebaseapp.com",
+  databaseURL: "https://stewart-family-3cece-default-rtdb.firebaseio.com",
+  projectId: "stewart-family-3cece",
+  storageBucket: "stewart-family-3cece.firebasestorage.app",
+  messagingSenderId: "43602660041",
+  appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
+};
+
+// The catalog. Add future goals here — that's the whole point of this
+// being general instead of hardcoded to one contest.
+const SHIP_STORE_ITEMS = [
+  {
+    id: 'chromebook',
+    name: 'Your Own Chromebook',
+    icon: '&#128187;',
+    price: 45,
+    limitedQty: 2,
+    desc: "Own the Chromebook you use for school and Systems Seven. First two agents to save $45 claim one."
+  }
+];
+
+let _db = null;
+let currentPerson = null;
+
+function getSession(){
+  try{ return JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){ return null; }
+}
+
+function getEarned(agentId){
+  return _db.ref('stewart/scores/'+agentId).once('value').then(snap => {
+    const scores = snap.val() || {};
+    return Object.values(scores).reduce((sum,s) => sum + (typeof s==='number' ? s/100 : 0), 0);
+  });
+}
+function getRegister(agentId){
+  return _db.ref('stewart/shipAccount/'+agentId+'/register').once('value').then(snap => {
+    const reg = snap.val() || {};
+    return Object.entries(reg).map(([key,v]) => ({key,...v}));
+  });
+}
+function getBalance(agentId){
+  return Promise.all([getEarned(agentId), getRegister(agentId)]).then(([earned, register]) => {
+    const spent = register.reduce((s,r) => s+(r.amount||0), 0);
+    return Math.max(0, earned - spent);
+  });
+}
+function getClaimCount(itemId){
+  return _db.ref('stewart/shipStoreClaims/'+itemId).once('value').then(snap => {
+    const claims = snap.val() || {};
+    return Object.keys(claims).length;
+  });
+}
+
+function renderStore(){
+  const agentId = currentPerson;
+  Promise.all([
+    getBalance(agentId),
+    Promise.all(SHIP_STORE_ITEMS.map(item => item.limitedQty ? getClaimCount(item.id) : Promise.resolve(0)))
+  ]).then(([balance, claimCounts]) => {
+    document.getElementById('balance-amt').textContent = '$'+balance.toFixed(2);
+
+    const el = document.getElementById('store-items');
+    el.innerHTML = SHIP_STORE_ITEMS.map((item, i) => {
+      const claimed = claimCounts[i];
+      const soldOut = item.limitedQty && claimed >= item.limitedQty;
+      const canAfford = balance >= item.price;
+      const canBuy = canAfford && !soldOut;
+      const availText = item.limitedQty
+        ? (soldOut ? 'All claimed' : (item.limitedQty - claimed)+' of '+item.limitedQty+' left')
+        : '';
+      return `<div class="item-card">
+        <div class="item-top">
+          <div class="item-icon">${item.icon}</div>
+          <div>
+            <div class="item-name">${item.name}</div>
+            <div class="item-price">$${item.price}</div>
+            ${availText ? `<div class="item-avail">${availText}</div>` : ''}
+          </div>
+        </div>
+        <div class="item-desc">${item.desc}</div>
+        <button class="redeem-btn ${canBuy?'can':'cant'}" ${canBuy?'':'disabled'} onclick="redeemItem('${item.id}')">
+          ${soldOut ? 'Sold Out' : (canAfford ? 'Redeem' : 'Not Enough Saved')}
+        </button>
+      </div>`;
+    }).join('');
+  });
+}
+
+function redeemItem(itemId){
+  const item = SHIP_STORE_ITEMS.find(i => i.id === itemId);
+  if(!item || !_db || !currentPerson) return;
+  if(!confirm('Spend $'+item.price+' on '+item.name+'?')) return;
+
+  getBalance(currentPerson).then(balance => {
+    if(balance < item.price){ alert("You don't have enough saved yet."); return; }
+    if(item.limitedQty){
+      getClaimCount(itemId).then(count => {
+        if(count >= item.limitedQty){ alert('Sorry, Agent — all claimed already.'); renderStore(); return; }
+        finishRedeem(item);
+      });
+    } else {
+      finishRedeem(item);
+    }
+  });
+}
+
+function finishRedeem(item){
+  const session = getSession();
+  _db.ref('stewart/shipAccount/'+currentPerson+'/register').push({
+    type: 'purchase',
+    itemId: item.id,
+    itemName: item.name,
+    amount: item.price,
+    agentName: session ? session.person : currentPerson,
+    timestamp: Date.now(),
+    status: 'pending'
+  }).then(() => {
+    if(item.limitedQty){
+      _db.ref('stewart/shipStoreClaims/'+item.id+'/'+currentPerson).set(Date.now());
+    }
+    alert('Redeemed! Mom or Dad has been notified to arrange your '+item.name+'.');
+    renderStore();
+  });
+}
+
+(function init(){
+  const s = getSession();
+  if(!s || !s.person || s.role !== 'boy'){ window.location.replace('../index.html'); return; }
+  currentPerson = s.person;
+  firebase.initializeApp(FB_CONFIG);
+  _db = firebase.database();
+  renderStore();
+})();
+</script>
+</body>
+</html>
