@@ -1430,7 +1430,11 @@ function printDailyChores(){
 // page and Bridge, so the percentage here always matches the real stored
 // score in stewart/scores instead of a separately-maintained mission list.
 function computeMissionStats(agentId, doneObj){
-  const expected = buildMissions(agentId, new Date());
+  // Computer Missions are excluded here, matching calculateDayScore — they
+  // don't count toward pay, so counting them in the fraction would make the
+  // percentage and the "X/Y" number contradict each other (e.g. showing
+  // 100% but 9/13, which doesn't add up).
+  const expected = buildMissions(agentId, new Date()).filter(m => m.category !== 'computer');
   const completed = expected.filter(m => doneObj[m.id]).length;
   const total = expected.length;
   const score = calculateDayScore(agentId, expected, doneObj);
