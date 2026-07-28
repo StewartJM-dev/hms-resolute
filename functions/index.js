@@ -105,3 +105,38 @@ exports.notifyScreenTimeResolved = functions.database
     await sendToPerson(agentId, title, body, 'boys/');
     return null;
   });
+
+// Ship Account — notify parents when a boy cashes out or buys a store item
+exports.notifyShipAccountRequest = functions.database
+  .ref('/stewart/shipAccount/{agentId}/register/{regId}')
+  .onCreate(async (snap, context) => {
+    const r = snap.val();
+    if (!r || r.status !== 'pending') return null;
+
+    const name = r.agentName || context.params.agentId;
+    const title = r.type === 'purchase' ? "Ship's Store Purchase" : 'Ship Account Cash Out';
+    const body = r.type === 'purchase'
+      ? (name + ' bought ' + (r.itemName || 'an item') + ' for $' + r.amount.toFixed(2) + '.')
+      : (name + ' cashed out $' + r.amount.toFixed(2) + ' to Greenlight.');
+
+    await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+    return null;
+  });
+
+// Ship Account — notify the boy once a parent marks the transfer/delivery done
+exports.notifyShipAccountResolved = functions.database
+  .ref('/stewart/shipAccount/{agentId}/register/{regId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.val();
+    const after = change.after.val();
+    if (!after || before.status !== 'pending' || after.status !== 'complete') return null;
+
+    const agentId = context.params.agentId;
+    const title = after.type === 'purchase' ? 'Your Ship\'s Store Order Is Ready!' : 'Money Transferred!';
+    const body = after.type === 'purchase'
+      ? ('Your ' + (after.itemName || 'item') + ' is ready — go check with Dad or Mom.')
+      : ('$' + after.amount.toFixed(2) + ' has been moved to your Greenlight card.');
+
+    await sendToPerson(agentId, title, body, 'boys/');
+    return null;
+  });
