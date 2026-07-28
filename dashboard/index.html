@@ -1211,12 +1211,24 @@ function closeShipsDirectory(){
   if(overlay) overlay.style.display = 'none';
 }
 
+// Restored — this was being called but had gone missing entirely from an
+// earlier cleanup pass, silently breaking Dawn's Ship's Orders every time
+// it tried to render (a synchronous ReferenceError here aborts the whole
+// function before the overlay ever gets shown).
+function getOfficerOfWatch(_d){
+  const order = ['samuel','johnjr','stephen','daniel'];
+  const now = _d ? new Date(_d) : new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const dayNum = Math.floor((now - startOfYear) / (24*60*60*1000));
+  return order[dayNum % 4];
+}
+
 function renderDawnShipsOrders(){
   if(!_db) return;
   const today = localDateStr();
   const weekStart = getDawnOrdersWeekStart();
   const devWeekKey = (typeof getDevotionalWeekKey === 'function') ? getDevotionalWeekKey() : weekStart;
-  const officer = getOfficerOfWatch_u();
+  const officer = getOfficerOfWatch();
   const officerNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
 
   Promise.all([
