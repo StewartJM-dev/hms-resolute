@@ -600,11 +600,23 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
 <!-- CHROMEBOOK CONTEST REMINDER — shown every time after Ship's Orders closes -->
 <div id="chromebook-reminder-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:9998;align-items:center;justify-content:center;padding:20px;">
   <div style="max-width:640px;width:100%;background:#050a10;border:1px solid rgba(232,184,74,.4);border-radius:14px;overflow:hidden;text-align:center;">
-    <img src="assets/chromebook-contest.png" alt="Own Your Own Chromebook" style="width:100%;display:block;">
+    <img src="assets/chromebook-contest.jpg" alt="Own Your Own Chromebook" style="width:100%;display:block;">
     <div style="padding:16px 20px 20px;">
       <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:14px;">Save $45 in your Ship Account to claim one — four available. <b style="color:var(--gold2,#e8b84a);">Deadline: September 25.</b> After that, this contest is over for good. Check your progress on the Pay tab.</div>
       <button onclick="closeChromebookReminder()" style="width:100%;padding:12px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">LET'S GO ⚓</button>
     </div>
+  </div>
+</div>
+
+<!-- FIRST-LOGIN WALKTHROUGH — shown once per agent, then never again automatically -->
+<div id="walkthrough-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.94);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:420px;width:100%;background:linear-gradient(180deg,#0d1b2a,#050a10);border:1px solid rgba(232,184,74,.4);border-radius:14px;padding:26px 22px;text-align:center;">
+    <a href="#" onclick="skipWalkthrough();return false;" style="display:block;text-align:right;font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px;">Skip tour</a>
+    <div id="wt-icon" style="font-size:44px;margin-bottom:14px;"></div>
+    <div id="wt-title" style="font-family:'Orbitron',sans-serif;font-size:16px;color:var(--gold,#e8b84a);letter-spacing:.5px;margin-bottom:10px;"></div>
+    <div id="wt-body" style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.6;margin-bottom:20px;"></div>
+    <div id="wt-dots" style="display:flex;justify-content:center;gap:6px;margin-bottom:18px;"></div>
+    <button id="wt-next-btn" onclick="walkthroughNext()" style="width:100%;padding:13px;border-radius:24px;background:var(--gold,#e8b84a);border:none;color:#000;font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">NEXT</button>
   </div>
 </div>
 
@@ -730,6 +742,7 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
       <a href="../warroom/" title="War Room" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);color:inherit;text-decoration:none;font-size:16px;">⚔️</a>
       <a href="../saga/" title="Wardroom" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);color:inherit;text-decoration:none;font-size:16px;">📖</a>
       <button onclick="showTutorial()" title="Ship's Manual" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);background:none;color:inherit;cursor:pointer;font-size:16px;padding:0;">🧭</button>
+      <a href="help.html" title="Help" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);color:inherit;text-decoration:none;font-size:16px;">❓</a>
       <button onclick="showShipsDirectory()" title="Ship's Directory" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;border:1.5px solid rgba(255,255,255,.3);background:none;color:inherit;cursor:pointer;font-size:16px;padding:0;">🗂️</button>
     </div>
   </div>
@@ -1183,7 +1196,61 @@ function selectAgent(id, codename, name, rank, theme, icon){
   renderFamilyDevotionalDisplay();
   renderCourageDare();
   setTimeout(() => checkCelebrations(), 2000);
-  setTimeout(() => showTutorial(), 1200);
+  setTimeout(() => showTutorialOrWalkthrough(), 1200);
+}
+
+// ── FIRST-LOGIN WALKTHROUGH ──
+// Shown once per agent (tracked in Firebase so it persists across devices),
+// then Ship's Orders takes over as normal from then on. Revisitable anytime
+// via the Help (?) icon, which is a separate, full reference page — this
+// walkthrough is deliberately short, just the big picture.
+const WALKTHROUGH_STEPS = [
+  { icon:'&#9875;', title:'Welcome Aboard, Agent', body:"Quick tour before you get started — six short stops, then you're set. Skip anytime with the link up top." },
+  { icon:'&#9989;', title:'Missions', body:"Every day you've got a list of missions — chores worth points. Finish them and you earn both money and screen time." },
+  { icon:'&#127918;', title:'Screen Time Bank', body:"Finish your missions and earn bonus screen time — up to 30 minutes a day, on top of your normal Chromebook time. Cash it out anytime from the Missions tab." },
+  { icon:'&#9875;', title:'Ship Account', body:"Every dollar you earn goes straight into your own account on the Pay tab. Cash it out to Greenlight, or save it up." },
+  { icon:'&#127974;', title:"Ship's Store", body:"Spend what you've saved on real prizes — right now, your own Chromebook for $45. Find it from the Ship Account card." },
+  { icon:'&#129517;', title:"Ship's Orders", body:"Tap the compass icon anytime for today's checklist — tap any item and it takes you right there. That's opening now." },
+];
+let wtStep = 0;
+
+function showTutorialOrWalkthrough(){
+  if(!_db || !currentAgent){ showTutorial(); return; }
+  _db.ref('stewart/helpSeen/'+currentAgent.id).once('value', snap => {
+    if(snap.val()) showTutorial();
+    else startWalkthrough();
+  });
+}
+function startWalkthrough(){
+  wtStep = 0;
+  renderWalkthroughStep();
+  const overlay = document.getElementById('walkthrough-overlay');
+  if(overlay) overlay.style.display = 'flex';
+}
+function renderWalkthroughStep(){
+  const s = WALKTHROUGH_STEPS[wtStep];
+  document.getElementById('wt-icon').innerHTML = s.icon;
+  document.getElementById('wt-title').textContent = s.title;
+  document.getElementById('wt-body').innerHTML = s.body;
+  document.getElementById('wt-dots').innerHTML = WALKTHROUGH_STEPS.map((_,i) =>
+    `<span style="width:6px;height:6px;border-radius:50%;background:${i===wtStep?'var(--gold,#e8b84a)':'rgba(255,255,255,.2)'};"></span>`
+  ).join('');
+  document.getElementById('wt-next-btn').textContent = (wtStep === WALKTHROUGH_STEPS.length-1) ? "LET'S GO ⚓" : 'NEXT';
+}
+function walkthroughNext(){
+  if(wtStep < WALKTHROUGH_STEPS.length - 1){
+    wtStep++;
+    renderWalkthroughStep();
+  } else {
+    finishWalkthrough();
+  }
+}
+function skipWalkthrough(){ finishWalkthrough(); }
+function finishWalkthrough(){
+  const overlay = document.getElementById('walkthrough-overlay');
+  if(overlay) overlay.style.display = 'none';
+  if(_db && currentAgent) _db.ref('stewart/helpSeen/'+currentAgent.id).set(true);
+  showTutorial();
 }
 
 function backToSelect(){
