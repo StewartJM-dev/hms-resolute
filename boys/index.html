@@ -2438,17 +2438,24 @@ function renderPrivateMessages(msgs){
   el.scrollTop = el.scrollHeight;
 }
 
+// A message can get double-sent when Enter is held (key auto-repeat) or the
+// Send button double-tapped: the input didn't clear until AFTER the Firebase
+// write finished, leaving a window where the same text sends twice. Now the
+// input clears synchronously before writing, plus a short lock as a backstop.
+let _sendLock = false;
 function sendPrivateMessage(){
-  if(!currentAgent||!_db) return;
+  if(!currentAgent||!_db||_sendLock) return;
   const input = document.getElementById('private-input');
   const text = input.value.trim();
   if(!text) return;
+  _sendLock = true;
+  input.value = '';
   _db.ref(`stewart/messages/${currentAgent.id}`).push({
     text,
     from: currentAgent.name,
     agentId: currentAgent.id,
     timestamp: Date.now()
-  }).then(() => { input.value = ''; });
+  }).finally(() => { _sendLock = false; });
 }
 
 // ══════════════════════════════════════════════════════
@@ -2521,10 +2528,14 @@ function renderGroupMessages(msgs){
 }
 
 function sendGroupMessage(){
-  if(!currentAgent||!_db) return;
+  if(!currentAgent||!_db||_sendLock) return;
   const input = document.getElementById('group-input');
   const text = input.value.trim();
   if(!text) return;
+  // Clear immediately — the async mute check below adds an extra delay
+  // during which a held Enter key would fire this again with the same text.
+  _sendLock = true;
+  input.value = '';
   // Check if this agent is muted by a parent
   _db.ref('stewart/chatmutes/'+currentAgent.id).once('value', mSnap => {
     const mute = mSnap.val();
@@ -2532,6 +2543,8 @@ function sendGroupMessage(){
     if(mutedUntil && Date.now() < mutedUntil){
       const when = (mutedUntil===Infinity) ? 'until a parent lifts it' : ('until '+new Date(mutedUntil).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}));
       alert('Your group chat is paused by Mom or Dad '+when+'. Take a breather, Agent.');
+      input.value = text; // give their message back so it isn't lost
+      _sendLock = false;
       return;
     }
     _db.ref('stewart/groupchat').push({
@@ -2539,7 +2552,7 @@ function sendGroupMessage(){
       from: currentAgent.name,
       agentId: currentAgent.id,
       timestamp: Date.now()
-    }).then(() => { input.value = ''; });
+    }).finally(() => { _sendLock = false; });
   });
 }
 
@@ -4453,7 +4466,7 @@ function renderFamilyDevotionalDisplay(){
 
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
-  if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter') sendPrivateMessage(); });
+  if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) sendPrivateMessage(); });
 
   // ── Sign-out reminder: triggers once per visit when the mouse nears the
   //    bottom-right corner of the page (where they head to sign out / close up). ──
