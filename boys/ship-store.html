@@ -239,13 +239,20 @@ function finishRedeem(item){
 
 (function init(){
   const s = getSession();
+  const urlAgent = new URLSearchParams(location.search).get('agent');
+  const parentSessionValid = s && s.role === 'parent' && (Date.now()-s.ts) < 1000*60*60*12;
   let agentId = null;
   if(s && s.role === 'boy' && s.person){
     agentId = s.person;
-  } else if(s && s.role === 'parent' && s.assist && s.assist.as && (Date.now()-s.ts) < 1000*60*60*12){
-    // A parent viewing a specific boy's account via "Assist" on the Gangway —
-    // same identity resolution as the main Agent HQ page.
+  } else if(parentSessionValid && s.assist && s.assist.as){
+    // The Gangway's explicit "Assist" flow, which does persist to storage.
     agentId = s.assist.as;
+  } else if(parentSessionValid && urlAgent){
+    // "Captain Viewing" on Agent HQ — that identity only ever lived in that
+    // page's JS memory, never in storage, so it has to be passed via the
+    // link itself instead. Only trusted because we already confirmed a
+    // real, recent parent session above.
+    agentId = urlAgent;
   }
   if(!agentId){ window.location.replace('../index.html'); return; }
   currentPerson = agentId;
