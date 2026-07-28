@@ -646,41 +646,8 @@ body{
     <div class="tab" id="tab-messenger">
       <!-- Thread list view -->
       <div id="messenger-list-view">
-        <div class="sec-hd">Family Board</div>
-        <div class="card brown-hd" style="margin-bottom:14px;">
-          <div class="card-hd"><div class="card-hd-icon">&#128227;</div><div class="card-hd-title">Post to All Agents</div></div>
-          <div class="card-bd">
-            <textarea class="board-input" id="board-msg" placeholder="Post a message all boys can see..." maxlength="280" autocomplete="off" name="msg-board-nofill"></textarea>
-            <div class="board-controls">
-              <select class="board-from" id="board-from">
-                <option value="HQ">From: HQ</option>
-                <option value="Dad">From: Dad</option>
-                <option value="Mom">From: Mom</option>
-              </select>
-              <button class="board-send" onclick="sendBoardMessage()">Post</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="sec-hd">Family Channel</div>
-        <div class="thread-list" style="margin-bottom:14px;">
-          <div class="thread-item" onclick="openGroupChat()">
-            <div class="thread-dot" style="background:var(--gold,#c8922a);"></div>
-            <div><div class="thread-name">&#128172; Agent Group Chat <span id="group-new-tag" style="display:none;background:var(--gold,#c8922a);color:#000;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;">NEW</span></div><div class="thread-preview" id="preview-group">All agents can see this</div></div>
-            <div class="thread-arrow">&#8250;</div>
-          </div>
-        </div>
-
-        <div class="sec-hd">Chat Moderation</div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-bd">
-            <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
-            <div id="mod-list"></div>
-          </div>
-        </div>
-
         <div class="sec-hd">Private Threads</div>
-        <div class="thread-list">
+        <div class="thread-list" style="margin-bottom:14px;">
           <div class="thread-item" onclick="openThread('samuel','Samuel','Agent Alpha','var(--alpha)')">
             <div class="thread-dot" style="background:#1e3a6e;"></div>
             <div><div class="thread-name">Samuel</div><div class="thread-preview" id="preview-samuel">Agent Alpha</div></div>
@@ -700,6 +667,23 @@ body{
             <div class="thread-dot" style="background:#7a5c1e;"></div>
             <div><div class="thread-name">Daniel</div><div class="thread-preview" id="preview-daniel">Agent Wildcard</div></div>
             <div class="thread-arrow">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="sec-hd">Family Channel</div>
+        <div class="thread-list" style="margin-bottom:14px;">
+          <div class="thread-item" onclick="openGroupChat()">
+            <div class="thread-dot" style="background:var(--gold,#c8922a);"></div>
+            <div><div class="thread-name">&#128172; Agent Group Chat <span id="group-new-tag" style="display:none;background:var(--gold,#c8922a);color:#000;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;">NEW</span></div><div class="thread-preview" id="preview-group">All agents can see this</div></div>
+            <div class="thread-arrow">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="sec-hd">Chat Moderation</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-bd">
+            <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
+            <div id="mod-list"></div>
           </div>
         </div>
       </div>
@@ -1553,7 +1537,6 @@ let currentThread = null;
 
 function renderMessenger(){
   if(!_db) return;
-  loadBoardMessages();
   loadThreadPreviews();
   updateDashGroupBadge();
   renderModeration();
