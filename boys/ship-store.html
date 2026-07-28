@@ -97,10 +97,13 @@ function getSession(){
   try{ return JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){ return null; }
 }
 
+const SHIP_ACCOUNT_START_DATE = '2026-07-27';
 function getEarned(agentId){
   return _db.ref('stewart/scores/'+agentId).once('value').then(snap => {
     const scores = snap.val() || {};
-    return Object.values(scores).reduce((sum,s) => sum + (typeof s==='number' ? s/100 : 0), 0);
+    return Object.entries(scores)
+      .filter(([date]) => date >= SHIP_ACCOUNT_START_DATE)
+      .reduce((sum,[,s]) => sum + (typeof s==='number' ? s/100 : 0), 0);
   });
 }
 function getRegister(agentId){
