@@ -642,8 +642,9 @@ function loadCrewStatus(){
       const completed = Object.values(done).filter(Boolean).length;
       const score = results[i][1].val();
       const scoreTxt = (score===null||score===undefined) ? 'No score yet' : (score+' pts · $'+(score/100).toFixed(2));
-      // We show completed count; total isn't recomputed here (engine lives in the app), so show count + a soft bar capped at 12
-      const pct = Math.min(100, Math.round((completed/12)*100));
+      // score is already 0-100 (percent of that boy's actual mission list for the day,
+      // whatever it is) — use it directly rather than guessing a fixed mission count.
+      const pct = (score===null||score===undefined) ? 0 : Math.max(0, Math.min(100, score));
       return `<div class="crewcard">
         <div class="cname">${a.icon} ${a.name}</div>
         <div class="cmiss">${completed} mission${completed===1?'':'s'} done today</div>
