@@ -17,7 +17,10 @@ const ALL_PEOPLE = ['john', 'dawn', 'samuel', 'johnjr', 'stephen', 'daniel'];
 async function sendToPerson(person, title, body, url) {
   const snap = await db.ref('notifications/tokens/' + person).once('value');
   const tokensObj = snap.val() || {};
-  const tokens = Object.values(tokensObj).map(t => t.token).filter(Boolean);
+  // Dedupe by the actual token VALUE, not just the storage key — if a
+  // device's token ever rotated and the old entry never got cleaned up,
+  // this is what stops it from receiving the same push twice.
+  const tokens = [...new Set(Object.values(tokensObj).map(t => t.token).filter(Boolean))];
   if (!tokens.length) return;
 
   const resp = await messaging.sendEachForMulticast({
