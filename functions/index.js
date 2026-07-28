@@ -39,12 +39,24 @@ async function sendToPerson(person, title, body, url) {
   });
 }
 
+// Cloud Functions only guarantee "at least once" execution for database
+// triggers — under retries (timeouts, transient errors) the same event can
+// legitimately fire a function twice. This transaction ensures only the
+// first invocation for a given event actually sends; any duplicate firing
+// finds the marker already claimed and backs off silently.
+async function alreadyNotified(key) {
+  const ref = db.ref('stewart/notifiedEvents/' + key);
+  const result = await ref.transaction(current => current === null ? true : undefined);
+  return !result.committed;
+}
+
 // Family Channel — group chat
 exports.notifyGroupChat = functions.database
   .ref('/stewart/groupchat/{msgId}')
-  .onCreate(async (snap) => {
+  .onCreate(async (snap, context) => {
     const m = snap.val();
     if (!m || !m.text) return null;
+    if (await alreadyNotified('groupchat_' + context.params.msgId)) return null;
 
     const senderPerson = m.agentId === 'parent' ? (PARENTS[m.from] || 'john') : m.agentId;
     const recipients = ALL_PEOPLE.filter(p => p !== senderPerson);
@@ -63,6 +75,7 @@ exports.notifyPrivateThread = functions.database
     const m = snap.val();
     const agentId = context.params.agentId; // which boy this thread belongs to
     if (!m || !m.text) return null;
+    if (await alreadyNotified('privatemsg_' + agentId + '_' + context.params.msgId)) return null;
 
     const isParentSender = (m.from === 'Dad' || m.from === 'Mom' || m.from === 'HQ');
     const title = 'Private Message — ' + (m.from || 'Someone');
@@ -82,6 +95,7 @@ exports.notifyScreenTimeRequest = functions.database
   .onCreate(async (snap, context) => {
     const r = snap.val();
     if (!r || r.status !== 'pending') return null;
+    if (await alreadyNotified('strequest_' + context.params.agentId + '_' + context.params.reqId)) return null;
 
     const title = 'Screen Time Request';
     const body = (r.agentName || context.params.agentId) + ' wants to cash out ' + r.amount + ' minutes.';
@@ -97,6 +111,7 @@ exports.notifyScreenTimeResolved = functions.database
     const before = change.before.val();
     const after = change.after.val();
     if (!after || before.status !== 'pending' || after.status === 'pending') return null;
+    if (await alreadyNotified('stresolved_' + context.params.agentId + '_' + context.params.reqId)) return null;
 
     const agentId = context.params.agentId;
     const approved = after.status === 'approved';
@@ -115,6 +130,7 @@ exports.notifyShipAccountRequest = functions.database
   .onCreate(async (snap, context) => {
     const r = snap.val();
     if (!r || r.status !== 'pending') return null;
+    if (await alreadyNotified('sarequest_' + context.params.agentId + '_' + context.params.regId)) return null;
 
     const name = r.agentName || context.params.agentId;
     const title = r.type === 'purchase' ? "Ship's Store Purchase" : 'Ship Account Cash Out';
@@ -133,6 +149,7 @@ exports.notifyShipAccountResolved = functions.database
     const before = change.before.val();
     const after = change.after.val();
     if (!after || before.status !== 'pending' || after.status !== 'complete') return null;
+    if (await alreadyNotified('saresolved_' + context.params.agentId + '_' + context.params.regId)) return null;
 
     const agentId = context.params.agentId;
     const title = after.type === 'purchase' ? 'Your Ship\'s Store Order Is Ready!' : 'Money Transferred!';
