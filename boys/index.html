@@ -2025,11 +2025,105 @@ function renderPayScreen(){
           <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;">earned so far this week</div>
           ${isFriday()?'<div style="font-size:11px;color:var(--gold);margin-top:6px;font-style:italic;">&#9733; Payday! Collect your $'+totalDollars.toFixed(2)+' from Dad.</div>':''}
         </div>
+        <div id="chromebook-fund"></div>
         ${transferNote}
         ${deductionNote}
         ${familyNightHtml}`;
+      renderChromebookFund(currentAgent.id, totalDollars, weekStart);
     });
   });
+  });
+}
+
+// ── CHROMEBOOK FUND ──
+// Individual 60-day savings race, real money: each boy chooses how much of
+// that week's earned pay goes toward his own $45, the rest goes to
+// Greenlight as normal. No match from Dad — their own money, their own
+// pace. First two to reach $45 get one of the two Chromebooks currently in
+// family use (Dad sorts out delivery in real life — this just tracks money).
+const CHROMEBOOK_FUND_GOAL = 45;
+const CHROMEBOOK_FUND_START = '2026-07-27';
+const CHROMEBOOK_FUND_DAYS = 60;
+
+function chromebookFundDaysLeft(){
+  const start = parseLocalDate(CHROMEBOOK_FUND_START);
+  const end = new Date(start); end.setDate(end.getDate() + CHROMEBOOK_FUND_DAYS);
+  const msLeft = end - new Date();
+  return Math.max(0, Math.ceil(msLeft / (24*60*60*1000)));
+}
+
+function renderChromebookFund(agentId, weekEarned, weekStart){
+  const el = document.getElementById('chromebook-fund');
+  if(!el || !_db) return;
+  Promise.all([
+    _db.ref(`stewart/chromebookFund/${agentId}/balance`).once('value'),
+    _db.ref(`stewart/chromebookFund/${agentId}/contributions/${weekStart}`).once('value')
+  ]).then(([balSnap, contribSnap]) => {
+    const balance = balSnap.val() || 0;
+    const alreadyContributed = contribSnap.val();
+    const daysLeft = chromebookFundDaysLeft();
+    const pct = Math.min(100, Math.round((balance/CHROMEBOOK_FUND_GOAL)*100));
+    const won = balance >= CHROMEBOOK_FUND_GOAL;
+
+    let contributeHtml = '';
+    if(!won && isFriday() && (alreadyContributed===null || alreadyContributed===undefined) && weekEarned > 0){
+      const maxAmt = Math.min(weekEarned, CHROMEBOOK_FUND_GOAL - balance);
+      contributeHtml = `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.15);">
+          <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:6px;">How much of this week's $${weekEarned.toFixed(2)} toward your Chromebook?</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="cbfund-amount" min="0" max="${maxAmt.toFixed(2)}" step="0.25" value="0" style="width:70px;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;font-size:13px;">
+            <button onclick="contributeChromebookFund('${agentId}','${weekStart}',${maxAmt})" style="padding:8px 12px;border-radius:6px;border:none;background:var(--gold);color:var(--black);font-size:11px;font-weight:700;cursor:pointer;">Save</button>
+          </div>
+          <div id="cbfund-status" style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px;"></div>
+        </div>`;
+    } else if(!won && alreadyContributed!==null && alreadyContributed!==undefined){
+      contributeHtml = `<div style="font-size:11px;color:#4aaa6a;margin-top:8px;">&#10003; Put in $${alreadyContributed.toFixed(2)} this week.</div>`;
+    }
+
+    el.innerHTML = `
+      <div class="hw-card" style="margin-bottom:14px;">
+        <div class="hw-card-head"><div class="hw-card-icon">&#128187;</div><div class="hw-card-title">Chromebook Fund</div></div>
+        <div class="hw-card-body">
+          ${won
+            ? `<div style="text-align:center;padding:8px 0;"><div style="font-size:26px;margin-bottom:4px;">&#127881;</div><div style="font-size:13px;color:#4aaa6a;font-weight:700;">Goal reached! $${balance.toFixed(2)} saved.</div><div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;">Talk to Dad about your Chromebook.</div></div>`
+            : `<div style="background:rgba(255,255,255,.06);border-radius:6px;height:8px;overflow:hidden;margin-bottom:6px;">
+                 <div style="height:100%;width:${pct}%;background:var(--gold);border-radius:6px;transition:width .5s;"></div>
+               </div>
+               <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.5);">
+                 <span>$${balance.toFixed(2)} of $${CHROMEBOOK_FUND_GOAL}</span>
+                 <span>${daysLeft} days left</span>
+               </div>`
+          }
+          ${contributeHtml}
+        </div>
+      </div>`;
+  });
+}
+
+function contributeChromebookFund(agentId, weekStart, maxAmt){
+  if(!_db) return;
+  const input = document.getElementById('cbfund-amount');
+  const statusEl = document.getElementById('cbfund-status');
+  let amount = parseFloat(input.value);
+  if(isNaN(amount) || amount < 0){ if(statusEl) statusEl.textContent = 'Enter a valid amount.'; return; }
+  if(amount > maxAmt) amount = maxAmt;
+
+  const balRef = _db.ref(`stewart/chromebookFund/${agentId}/balance`);
+  balRef.once('value', balSnap => {
+    const current = balSnap.val() || 0;
+    const newBal = Math.min(CHROMEBOOK_FUND_GOAL, current + amount);
+    balRef.set(newBal);
+    _db.ref(`stewart/chromebookFund/${agentId}/contributions/${weekStart}`).set(amount);
+    if(newBal >= CHROMEBOOK_FUND_GOAL){
+      _db.ref(`stewart/chromebookFund/${agentId}/reachedAt`).once('value', rSnap => {
+        if(!rSnap.val()) _db.ref(`stewart/chromebookFund/${agentId}/reachedAt`).set(Date.now());
+      });
+      showCelebration('&#127881;', 'Chromebook Fund Complete!', 'You saved the full $45, Agent!');
+    } else {
+      showCelebration('&#128176;', 'Saved!', '$'+amount.toFixed(2)+' added to your Chromebook Fund.');
+    }
+    renderPayScreen();
   });
 }
 
