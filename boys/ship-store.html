@@ -218,14 +218,14 @@ function redeemItem(itemId){
   });
 }
 
+const AGENT_DISPLAY_NAMES = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
 function finishRedeem(item){
-  const session = getSession();
   _db.ref('stewart/shipAccount/'+currentPerson+'/register').push({
     type: 'purchase',
     itemId: item.id,
     itemName: item.name,
     amount: item.price,
-    agentName: session ? session.person : currentPerson,
+    agentName: AGENT_DISPLAY_NAMES[currentPerson] || currentPerson,
     timestamp: Date.now(),
     status: 'pending'
   }).then(() => {
@@ -239,8 +239,16 @@ function finishRedeem(item){
 
 (function init(){
   const s = getSession();
-  if(!s || !s.person || s.role !== 'boy'){ window.location.replace('../index.html'); return; }
-  currentPerson = s.person;
+  let agentId = null;
+  if(s && s.role === 'boy' && s.person){
+    agentId = s.person;
+  } else if(s && s.role === 'parent' && s.assist && s.assist.as && (Date.now()-s.ts) < 1000*60*60*12){
+    // A parent viewing a specific boy's account via "Assist" on the Gangway —
+    // same identity resolution as the main Agent HQ page.
+    agentId = s.assist.as;
+  }
+  if(!agentId){ window.location.replace('../index.html'); return; }
+  currentPerson = agentId;
   firebase.initializeApp(FB_CONFIG);
   _db = firebase.database();
   renderStore();
