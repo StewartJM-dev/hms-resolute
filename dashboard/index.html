@@ -1697,6 +1697,13 @@ function renderThreadMessages(msgs){
 }
 
 let _dashSendLock = false;
+function getSenderName(){
+  try{
+    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+    if(s && s.person === 'dawn') return 'Mom';
+  }catch(e){}
+  return 'Dad';
+}
 function sendThreadMessage(){
   if(!currentThread||!_db||_dashSendLock) return;
   const input = document.getElementById('thread-input');
@@ -1706,13 +1713,14 @@ function sendThreadMessage(){
   // from writing the same message twice.
   _dashSendLock = true;
   input.value='';
+  const sender = getSenderName();
   if(currentThread.group){
     _db.ref('stewart/groupchat').push({
-      text, from:'Dad', agentId:'parent', timestamp:Date.now()
+      text, from:sender, agentId:'parent', timestamp:Date.now()
     }).finally(()=>{ _dashSendLock=false; });
   } else {
     _db.ref(`stewart/messages/${currentThread.agentId}`).push({
-      text, from:'Dad', timestamp:Date.now()
+      text, from:sender, timestamp:Date.now()
     }).finally(()=>{ _dashSendLock=false; });
   }
 }
