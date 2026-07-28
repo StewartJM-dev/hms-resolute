@@ -2180,7 +2180,7 @@ function renderShipAccount(agentId){
             <button onclick="requestCashOut('${agentId}',${balance})" style="padding:9px 14px;border-radius:6px;border:none;background:var(--gold);color:var(--black);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Cash Out to Greenlight</button>
           </div>
           <div id="cashout-status" style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:10px;"></div>
-          <a href="ship-store.html" style="display:block;text-align:center;padding:10px;border-radius:8px;border:1px dashed rgba(232,184,74,.4);color:var(--gold);text-decoration:none;font-size:12px;font-weight:700;margin-bottom:14px;">&#127974; Visit the Ship's Store &#8250;</a>
+          <a href="ship-store.html?agent=${agentId}" style="display:block;text-align:center;padding:10px;border-radius:8px;border:1px dashed rgba(232,184,74,.4);color:var(--gold);text-decoration:none;font-size:12px;font-weight:700;margin-bottom:14px;">&#127974; Visit the Ship's Store &#8250;</a>
           <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,.4);margin-bottom:4px;">RECENT ACTIVITY</div>
           ${registerHtml}
         </div>
