@@ -14,6 +14,50 @@
 // ════════════════════════════════════════════════════
 const PUSH_VAPID_KEY = "BAZvZcHTWYtqiIivjknmnqM4YmktBf4TJjiScLL_sh8mM_oS3i1EsLIlVfb0E7n3-Pvl_U627mKS5T_Y6MkPx_o";
 
+// ════════════════════════════════════════════════════
+// Home Screen icon badge count.
+// The count has to persist even when the app is fully closed, so it's
+// stored in IndexedDB (localStorage isn't available inside a service worker).
+// The service worker increments it on every background push; app pages
+// clear it back to 0 whenever the person actually reads their messages.
+// ════════════════════════════════════════════════════
+function openBadgeDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('resolute-badge', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('meta');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function getBadgeCount(){
+  try{
+    const db = await openBadgeDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction('meta','readonly').objectStore('meta').get('count');
+      tx.onsuccess = () => resolve(tx.result || 0);
+      tx.onerror = () => resolve(0);
+    });
+  }catch(e){ return 0; }
+}
+async function setBadgeCount(n){
+  try{
+    const db = await openBadgeDB();
+    await new Promise((resolve) => {
+      const tx = db.transaction('meta','readwrite').objectStore('meta').put(n, 'count');
+      tx.oncomplete = resolve;
+      tx.onerror = resolve;
+    });
+  }catch(e){}
+  try{
+    if(n > 0 && 'setAppBadge' in navigator) navigator.setAppBadge(n);
+    else if('clearAppBadge' in navigator) navigator.clearAppBadge();
+  }catch(e){}
+}
+// Call this from app pages once the person has actually viewed/read their messages.
+async function clearHomeScreenBadge(){
+  await setBadgeCount(0);
+}
+
 function getResoluteSession(){
   try{ return JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){ return null; }
 }
