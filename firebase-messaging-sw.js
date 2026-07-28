@@ -46,19 +46,26 @@ async function bumpBadgeCount(){
 }
 
 // Background message handler — fires when the app is closed or in another tab.
-messaging.onBackgroundMessage((payload) => {
-  bumpBadgeCount();
+messaging.onBackgroundMessage(async (payload) => {
   const title = (payload.notification && payload.notification.title) || 'HMS Resolute';
   const body = (payload.notification && payload.notification.body) || 'New message aboard.';
   const relUrl = (payload.data && payload.data.url) || '';
   const targetUrl = new URL(relUrl, self.registration.scope).href;
   const iconUrl = new URL('assets/app-icon-192.png', self.registration.scope).href;
-  self.registration.showNotification(title, {
-    body,
-    icon: iconUrl,
-    badge: iconUrl,
-    data: { url: targetUrl }
-  });
+
+  // Both operations have to actually finish before this handler returns, or
+  // the browser can suspend the service worker mid-write and the badge
+  // count silently never updates (this was happening before — the previous
+  // version fired bumpBadgeCount() without waiting for it at all).
+  await Promise.all([
+    bumpBadgeCount(),
+    self.registration.showNotification(title, {
+      body,
+      icon: iconUrl,
+      badge: iconUrl,
+      data: { url: targetUrl }
+    })
+  ]);
 });
 
 // Tapping the notification opens (or focuses) the relevant page.
