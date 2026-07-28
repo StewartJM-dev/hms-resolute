@@ -429,6 +429,11 @@ body{
     <div id="tx-status" class="tx-stat"></div>
   </div>
 
+    <!-- SCREEN TIME APPROVALS -->
+    <div class="shead" style="margin-top:22px;">Screen Time Approvals</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Bonus screen time cashed out from missions — approving deducts it from the bank; denying leaves it untouched.</div>
+    <div id="screentime-approvals" style="margin-bottom:8px;"></div>
+
     <!-- CHAT MODERATION -->
     <div class="shead" style="margin-top:22px;">Chat Moderation</div>
     <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
@@ -942,7 +947,7 @@ function showBTab(name, btn){
   document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); }
+  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); }
   if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
   window.scrollTo(0,0);
@@ -1054,6 +1059,60 @@ function muteBoy(id,hours){
   }
 }
 function unmuteBoy(id){ if(_db) _db.ref('stewart/chatmutes/'+id).set(null); }
+
+// ════════════════════════════════════════════
+// SCREEN TIME APPROVALS
+// Boys cash out banked screen time as a request, not an instant deduction —
+// approving here is what actually moves it out of the bank. After approving,
+// go add the equivalent bonus time in Family Link yourself; this app has no
+// way to touch Family Link directly.
+// ════════════════════════════════════════════
+function renderScreenTimeApprovals(){
+  if(!_db) return;
+  _db.ref('stewart/screenTimeRequests').on('value', s => {
+    const all = s.val() || {};
+    const pending = [];
+    Object.entries(all).forEach(([agentId, reqs]) => {
+      Object.entries(reqs||{}).forEach(([key, r]) => {
+        if(r && r.status === 'pending') pending.push({agentId, key, ...r});
+      });
+    });
+    pending.sort((a,b) => (a.timestamp||0) - (b.timestamp||0));
+    const el = document.getElementById('screentime-approvals');
+    if(!el) return;
+    if(!pending.length){
+      el.innerHTML = '<div style="font-size:12px;opacity:.5;font-style:italic;">No pending requests.</div>';
+      return;
+    }
+    const agentIcons = {samuel:'🦅',johnjr:'🦁',stephen:'🦖',daniel:'🐘'};
+    el.innerHTML = pending.map(r => {
+      const time = r.timestamp ? new Date(r.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(200,146,42,.2);">'+
+        '<div style="font-size:20px;">'+(agentIcons[r.agentId]||'')+'</div>'+
+        '<div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--cream,#f7f2ea);">'+esc(r.agentName||r.agentId)+' wants '+r.amount+' min</div>'+
+        '<div style="font-size:11px;opacity:.6;">Requested '+time+'</div></div>'+
+        '<button onclick="resolveScreenTimeRequest(\''+r.agentId+'\',\''+r.key+'\',\'approved\')" style="padding:7px 10px;border-radius:7px;border:none;background:var(--green2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Approve</button>'+
+        '<button onclick="resolveScreenTimeRequest(\''+r.agentId+'\',\''+r.key+'\',\'denied\')" style="padding:7px 10px;border-radius:7px;border:1px solid #b5451b;background:none;color:#e08a6a;font-size:11px;cursor:pointer;margin-left:5px;">Deny</button>'+
+        '</div>';
+    }).join('');
+  });
+}
+function resolveScreenTimeRequest(agentId, key, status){
+  if(!_db) return;
+  const reqRef = _db.ref('stewart/screenTimeRequests/'+agentId+'/'+key);
+  reqRef.once('value', snap => {
+    const req = snap.val();
+    if(!req || req.status !== 'pending') return;
+    reqRef.update({status, resolvedAt: Date.now()});
+    if(status === 'approved'){
+      const balRef = _db.ref('stewart/screenTimeBalance/'+agentId);
+      balRef.once('value', balSnap => {
+        const current = balSnap.val() || 0;
+        balRef.set(Math.max(0, current - req.amount));
+      });
+    }
+  });
+}
 
 // ----- Comms unread notification badge -----
 const COMMS_BOYS = ['samuel','johnjr','stephen','daniel'];
