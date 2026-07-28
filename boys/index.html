@@ -2043,11 +2043,14 @@ function renderPayScreen(){
 // the deduction happens the moment they request it. What Dad/Mom get is a
 // notification + a checklist to mark once the real-world money has actually
 // moved, since that part can't happen automatically.
+const SHIP_ACCOUNT_START_DATE = '2026-07-27'; // don't backdate earnings from before the account existed
 function getShipAccountEarned(agentId){
   if(!_db) return Promise.resolve(0);
   return _db.ref(`stewart/scores/${agentId}`).once('value').then(snap => {
     const scores = snap.val() || {};
-    return Object.values(scores).reduce((sum, s) => sum + (typeof s === 'number' ? s/100 : 0), 0);
+    return Object.entries(scores)
+      .filter(([date]) => date >= SHIP_ACCOUNT_START_DATE)
+      .reduce((sum, [,s]) => sum + (typeof s === 'number' ? s/100 : 0), 0);
   });
 }
 function getShipAccountRegister(agentId){
