@@ -41,15 +41,16 @@ function isLaundryDay(agentId, _d){
   return isLaundryDayFor(agentId, (_d?new Date(_d):new Date()).getDay());
 }
 
+// Continuous daily alternation from a fixed epoch — guarantees the dish
+// team NEVER repeats two days in a row. (The old version used a per-weekday
+// lookup table that duplicated Sunday and Monday onto the same team every
+// single week — e.g. Stephen & Daniel doing dishes Sun AND Mon back to back.
+// Do not go back to a day-of-week table; that's what caused the bug.)
 function getDishTeam(_d){
   const now = _d ? new Date(_d) : new Date();
-  const dayOfWeek = now.getDay();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const weekNum = Math.floor((now - startOfYear) / (7 * 24 * 60 * 60 * 1000));
-  const weekParity = weekNum % 2;
-  const weekAPattern = {0:'sj',1:'sj',2:'sd',3:'sj',4:'sd',5:'sj',6:'sd'};
-  const weekBPattern = {0:'sd',1:'sd',2:'sj',3:'sd',4:'sj',5:'sd',6:'sj'};
-  return weekParity === 0 ? weekAPattern[dayOfWeek] : weekBPattern[dayOfWeek];
+  const epoch = new Date(2024, 0, 1); // fixed reference point, arbitrary but stable
+  const daysSinceEpoch = Math.floor((now - epoch) / (24*60*60*1000));
+  return (daysSinceEpoch % 2 === 0) ? 'sj' : 'sd';
 }
 function isWeekend(_d){
   const d = (_d?new Date(_d):new Date()).getDay();
