@@ -399,6 +399,16 @@ input:focus,select:focus{ outline:none; border-color:var(--brass); }
       </select>
       <button class="ghost-btn" onclick="startAssist()">Board Agent HQ as Assisting Officer</button>
     </div>
+    <div class="assist-row" id="pwResetRow" style="display:none;">
+      <label>Reset a password</label>
+      <select id="pwResetWho">
+        <option value="john">John (Captain)</option>
+        <option value="dawn">Dawn (Executive Officer)</option>
+      </select>
+      <input type="password" id="pwResetNew" placeholder="New password" autocomplete="new-password" style="margin-top:8px;">
+      <button class="ghost-btn" style="margin-top:8px;" onclick="resetOfficerPassword()">Set New Password</button>
+      <div class="msg" id="pwResetMsg"></div>
+    </div>
     <button class="ghost-btn" style="margin-top:16px;" onclick="logout()">Depart Ship (log out)</button>
   </div>
 </div>
@@ -623,6 +633,16 @@ function showDecks(who){
   document.getElementById('loginCard').style.display='none';
   document.getElementById('deckCard').style.display='block';
   document.getElementById('whoName').textContent = OFFICERS[who].name + ' · ' + OFFICERS[who].pos;
+  const pwRow = document.getElementById('pwResetRow');
+  if(pwRow) pwRow.style.display = (who === 'john') ? 'block' : 'none';
+}
+async function resetOfficerPassword(){
+  const who = document.getElementById('pwResetWho').value;
+  const pw = document.getElementById('pwResetNew').value;
+  if(!pw || pw.length < 4){ say('pwResetMsg','err','Password must be at least 4 characters.'); return; }
+  await db.ref('resolute/auth/parents/'+who).set(await sha256(pw));
+  say('pwResetMsg','ok', OFFICERS[who].name + '\'s password has been updated.');
+  document.getElementById('pwResetNew').value = '';
 }
 function startAssist(){
   const s = getSession();
