@@ -125,6 +125,26 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   flex-shrink:0;
 }
+.brass-btn{
+  font-family:'Cinzel',serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:#16283f;text-decoration:none;font-weight:700;
+  background:url('../assets/textures/dark-brass.jpg');background-size:cover;background-position:center;
+  border:1.5px solid #e8c368;border-radius:6px;
+  padding:7px 12px;cursor:pointer;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.35),
+    inset 0 -2px 3px rgba(0,0,0,.5),
+    0 1px 3px rgba(0,0,0,.35);
+  transition:box-shadow .2s;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.brass-btn:hover,.brass-btn:active{
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.4),
+    inset 0 -2px 3px rgba(0,0,0,.5),
+    0 0 14px rgba(255,180,60,.65),
+    0 1px 3px rgba(0,0,0,.35);
+}
 .topbar-logo{
   font-family:'Cinzel',serif;font-size:14px;font-weight:900;
   color:var(--white);letter-spacing:1px;
@@ -535,10 +555,10 @@ body{
     </div>
   </div>
   <div style="background:transparent;padding:8px 14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
-    <a href="../" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">⚓ Gangway</a>
-    <a href="../registry.html" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">📜 Registry &amp; Muster</a>
-    <a href="../vineyard/" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">🍇 Captain's Quarters</a>
-    <button onclick="showShipsDirectory()" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;background:none;cursor:pointer;">🗂️ Ship's Directory</button>
+    <a href="../" class="brass-btn">⚓ Gangway</a>
+    <a href="../registry.html" class="brass-btn">📜 Registry &amp; Muster</a>
+    <a href="../vineyard/" class="brass-btn">🍇 Captain's Quarters</a>
+    <button onclick="showShipsDirectory()" class="brass-btn">🗂️ Ship's Directory</button>
   </div>
 
   <div class="content">
