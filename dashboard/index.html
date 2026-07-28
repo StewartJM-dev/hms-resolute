@@ -231,6 +231,23 @@ body{
 }
 .card-bd{padding:12px 13px;}
 
+/* ── COMMS TAB: dark glass-panel look, matching the Bridge ── */
+#tab-messenger{
+  background:
+    radial-gradient(ellipse at top,rgba(46,63,122,.18),transparent 60%),
+    linear-gradient(160deg,#0c1326 0%,#0e1a2e 45%,#0a1422 100%);
+  margin:-16px;padding:16px;border-radius:0 0 12px 12px;
+}
+#tab-messenger .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);}
+#tab-messenger .card-bd{color:rgba(255,255,255,.85);}
+#tab-messenger .card-bd div{color:inherit;}
+#tab-messenger .thread-item{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);}
+#tab-messenger .thread-item:active{background:rgba(255,255,255,.09);}
+#tab-messenger .thread-name{color:rgba(255,255,255,.9);}
+#tab-messenger .thread-preview,#tab-messenger .thread-arrow{color:rgba(255,255,255,.5);}
+#tab-messenger .board-input{background:rgba(0,0,0,.25);color:#fff;border:1px solid rgba(255,255,255,.15);}
+#tab-messenger .board-from{background:rgba(0,0,0,.25);color:#fff;border:1px solid rgba(255,255,255,.15);}
+
 .green-hd .card-hd{background:var(--green);}
 .indigo-hd .card-hd{background:var(--indigo);}
 .brown-hd .card-hd{background:url('../assets/textures/gold-metal.jpg');background-size:cover;background-position:center;}
@@ -498,7 +515,7 @@ body{
 
 <!-- ═══ SHIP'S ORDERS (Dawn's daily checklist) ═══ -->
 <div id="dawn-orders-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px;">
-  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;" id="dawn-orders-content">
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:url('assets/textures/parchment.jpg');background-size:cover;background-position:center;border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;" id="dawn-orders-content">
     <!-- filled dynamically by renderDawnShipsOrders() -->
   </div>
 </div>
@@ -2109,7 +2126,7 @@ function renderWGOverviewNudge(){
   const win = getWGWindow();
   _db.ref(`stewart/whiteglove/${today}/${win.key}`).once('value', snap => {
     if(snap.exists()){ el.innerHTML = ''; return; }
-    el.innerHTML = `<div class="card" style="border:2.5px solid #f5d070;background:linear-gradient(rgba(0,0,0,.15),rgba(0,0,0,.15)),url('assets/textures/gold-metal.jpg');background-size:cover;background-position:center;cursor:pointer;animation:wgPulse 2.2s ease-in-out infinite;" onclick="document.querySelector('.bnb[onclick*=\\'dawn\\']').click();">
+    el.innerHTML = `<div class="card" style="border:2.5px solid #d99a5a;background:linear-gradient(rgba(0,0,0,.15),rgba(0,0,0,.15)),url('assets/textures/bronze-metal.jpg');background-size:cover;background-position:center;cursor:pointer;animation:wgPulse 2.2s ease-in-out infinite;" onclick="document.querySelector('.bnb[onclick*=\\'dawn\\']').click();">
       <div class="card-bd" style="padding:13px 14px;display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:#fff8e8;text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 4px rgba(0,0,0,.6);">\u26F5 White Glove Due \u2014 ${win.label}</div>
@@ -2118,7 +2135,7 @@ function renderWGOverviewNudge(){
         <div style="font-size:20px;color:#fff8e8;text-shadow:0 1px 2px rgba(0,0,0,.9);">\u203A</div>
       </div>
     </div>
-    <style>@keyframes wgPulse{0%,100%{box-shadow:0 0 0 rgba(245,208,112,0);}50%{box-shadow:0 0 16px rgba(245,208,112,.7);}}</style>`;
+    <style>@keyframes wgPulse{0%,100%{box-shadow:0 0 0 rgba(217,154,90,0);}50%{box-shadow:0 0 16px rgba(217,154,90,.7);}}</style>`;
   });
 }
 
