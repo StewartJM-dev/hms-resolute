@@ -1216,9 +1216,20 @@ let wtStep = 0;
 
 function showTutorialOrWalkthrough(){
   if(!_db || !currentAgent){ showTutorial(); return; }
-  _db.ref('stewart/helpSeen/'+currentAgent.id).once('value', snap => {
-    if(snap.val()) showTutorial();
-    else startWalkthrough();
+  const TWO_WEEKS_MS = 14*24*60*60*1000;
+  const firstSeenRef = _db.ref('stewart/helpFirstSeen/'+currentAgent.id);
+  firstSeenRef.once('value', snap => {
+    const firstSeen = snap.val();
+    if(!firstSeen){
+      // First time ever logging in — start the two-week window now.
+      firstSeenRef.set(Date.now());
+      startWalkthrough();
+    } else if(Date.now() - firstSeen < TWO_WEEKS_MS){
+      // Still within the first two weeks — show it every login.
+      startWalkthrough();
+    } else {
+      showTutorial();
+    }
   });
 }
 function startWalkthrough(){
@@ -1249,7 +1260,8 @@ function skipWalkthrough(){ finishWalkthrough(); }
 function finishWalkthrough(){
   const overlay = document.getElementById('walkthrough-overlay');
   if(overlay) overlay.style.display = 'none';
-  if(_db && currentAgent) _db.ref('stewart/helpSeen/'+currentAgent.id).set(true);
+  // No "seen forever" flag anymore — showTutorialOrWalkthrough's two-week
+  // window (tracked via helpFirstSeen) governs whether this shows again.
   showTutorial();
 }
 
