@@ -1696,26 +1696,31 @@ function renderThreadMessages(msgs){
   el.scrollTop = el.scrollHeight;
 }
 
+let _dashSendLock = false;
 function sendThreadMessage(){
-  if(!currentThread||!_db) return;
+  if(!currentThread||!_db||_dashSendLock) return;
   const input = document.getElementById('thread-input');
   const text = input.value.trim();
   if(!text) return;
+  // Clear synchronously + lock — prevents a held Enter key or double-tap
+  // from writing the same message twice.
+  _dashSendLock = true;
+  input.value='';
   if(currentThread.group){
     _db.ref('stewart/groupchat').push({
       text, from:'Dad', agentId:'parent', timestamp:Date.now()
-    }).then(()=>{ input.value=''; });
+    }).finally(()=>{ _dashSendLock=false; });
   } else {
     _db.ref(`stewart/messages/${currentThread.agentId}`).push({
       text, from:'Dad', timestamp:Date.now()
-    }).then(()=>{ input.value=''; });
+    }).finally(()=>{ _dashSendLock=false; });
   }
 }
 
 // Enter key sends
 document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('thread-input').addEventListener('keydown', e => {
-    if(e.key==='Enter') sendThreadMessage();
+    if(e.key==='Enter' && !e.repeat) sendThreadMessage();
   });
 });
 
