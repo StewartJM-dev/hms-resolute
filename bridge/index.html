@@ -467,6 +467,10 @@ body{
     <div class="shead">Crew Instruments — Today</div>
     <div class="gauge-row" id="gauge-row"></div>
 
+    <div class="shead">Chromebook Fund</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Each boy's own $45, their pace. First two there win a Chromebook.</div>
+    <div id="chromebook-fund-overview" style="margin-bottom:18px;"></div>
+
     <div class="shead">Status Board</div>
     <div class="xmas-tree" id="xmas-tree"></div>
     <div class="tree-legend">
@@ -1314,7 +1318,40 @@ function loadInstruments(){
     renderGauges(crew);
     renderStatusBoard(crew);
     renderBridgeWeekGrid();
+    renderChromebookFundOverview();
   }).catch(()=>{});
+}
+
+const CHROMEBOOK_FUND_GOAL = 45;
+const CHROMEBOOK_FUND_START = '2026-07-27';
+const CHROMEBOOK_FUND_DAYS = 60;
+function renderChromebookFundOverview(){
+  if(!_db) return;
+  const start = parseLocalDate(CHROMEBOOK_FUND_START);
+  const end = new Date(start); end.setDate(end.getDate() + CHROMEBOOK_FUND_DAYS);
+  const daysLeft = Math.max(0, Math.ceil((end - new Date())/(24*60*60*1000)));
+  Promise.all(AGENTS.map(a => Promise.all([
+    _db.ref('stewart/chromebookFund/'+a.id+'/balance').once('value'),
+    _db.ref('stewart/chromebookFund/'+a.id+'/reachedAt').once('value')
+  ]))).then(results => {
+    const el = document.getElementById('chromebook-fund-overview');
+    if(!el) return;
+    const rows = AGENTS.map((a,i) => {
+      const balance = results[i][0].val() || 0;
+      const reachedAt = results[i][1].val();
+      const pct = Math.min(100, Math.round((balance/CHROMEBOOK_FUND_GOAL)*100));
+      const won = balance >= CHROMEBOOK_FUND_GOAL;
+      const wonLabel = won ? (reachedAt ? ' — reached '+new Date(reachedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ' — reached') : '';
+      return '<div style="margin-bottom:10px;">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'+
+        '<span>'+a.icon+' '+a.name+(won?' &#127942;':'')+'</span>'+
+        '<span style="opacity:.75;">$'+balance.toFixed(2)+' / $'+CHROMEBOOK_FUND_GOAL+wonLabel+'</span></div>'+
+        '<div style="background:rgba(255,255,255,.08);border-radius:6px;height:7px;overflow:hidden;">'+
+        '<div style="height:100%;width:'+pct+'%;background:'+(won?'#2d6a47':'var(--gold)')+';border-radius:6px;"></div></div>'+
+        '</div>';
+    }).join('');
+    el.innerHTML = rows + '<div style="font-size:11px;opacity:.6;margin-top:2px;">'+daysLeft+' days left in the contest</div>';
+  });
 }
 
 const AGENT_COLORS = {samuel:'#4d9fff', johnjr:'#34d399', stephen:'#f5a623', daniel:'#ec4899'};
