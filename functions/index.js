@@ -72,3 +72,36 @@ exports.notifyPrivateThread = functions.database
     }
     return null;
   });
+
+// Screen Time cash-out requests — notify parents when a boy asks
+exports.notifyScreenTimeRequest = functions.database
+  .ref('/stewart/screenTimeRequests/{agentId}/{reqId}')
+  .onCreate(async (snap, context) => {
+    const r = snap.val();
+    if (!r || r.status !== 'pending') return null;
+
+    const title = 'Screen Time Request';
+    const body = (r.agentName || context.params.agentId) + ' wants to cash out ' + r.amount + ' minutes.';
+
+    await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+    return null;
+  });
+
+// Screen Time cash-out requests — notify the boy once a parent resolves it
+exports.notifyScreenTimeResolved = functions.database
+  .ref('/stewart/screenTimeRequests/{agentId}/{reqId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.val();
+    const after = change.after.val();
+    if (!after || before.status !== 'pending' || after.status === 'pending') return null;
+
+    const agentId = context.params.agentId;
+    const approved = after.status === 'approved';
+    const title = approved ? 'Screen Time Approved!' : 'Screen Time Request Denied';
+    const body = approved
+      ? (after.amount + ' minutes approved — enjoy, Agent!')
+      : ('Your request for ' + after.amount + ' minutes was declined.');
+
+    await sendToPerson(agentId, title, body, 'boys/');
+    return null;
+  });
