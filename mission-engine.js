@@ -117,9 +117,14 @@ function getMyDinnerSide(agentId, _d){
 // ══════════════════════════════════════════════════════
 // POINTS SYSTEM — 100 points = $1.00 = 6 minutes per day (weekdays only)
 // ══════════════════════════════════════════════════════
+// Computer Missions (typing, Scratch, Khan Academy, research) are bonus —
+// they're checkable and trackable but do NOT count toward pay or game time.
+// That's a deliberate family rule, not an oversight — don't "fix" this by
+// including them again.
 function calculateDayScore(agentId, missions, doneMap){
-  const possible = missions.reduce((sum,m) => sum + (m.points||0), 0);
-  const earned = missions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
+  const payMissions = missions.filter(m => m.category !== 'computer');
+  const possible = payMissions.reduce((sum,m) => sum + (m.points||0), 0);
+  const earned = payMissions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
   const pct = possible > 0 ? (earned / possible) : 0;
   return {
     earned, possible, pct,
