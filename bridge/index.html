@@ -429,6 +429,11 @@ body{
     <div id="tx-status" class="tx-stat"></div>
   </div>
 
+    <!-- CHAT MODERATION -->
+    <div class="shead" style="margin-top:22px;">Chat Moderation</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
+    <div id="mod-list" style="margin-bottom:8px;"></div>
+
     <!-- PRIVATE THREADS -->
     <div class="shead">Private Threads</div>
     <div id="bpt-selector" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
@@ -937,7 +942,7 @@ function showBTab(name, btn){
   document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); }
+  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); }
   if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
   window.scrollTo(0,0);
@@ -1004,6 +1009,51 @@ function sendBridgeChat(){
   const text=inp.value.trim(); if(!text) return;
   _db.ref('stewart/groupchat').push({ text, from:'Dad', agentId:'parent', timestamp:Date.now() }).then(()=>{ inp.value=''; });
 }
+
+// ════════════════════════════════════════════
+// CHAT MODERATION — pause a boy's group chat (reversible)
+// Same feature as Officers' Country, same data path (stewart/chatmutes),
+// so a pause set from either page shows up correctly on both.
+// ════════════════════════════════════════════
+function renderModeration(){
+  if(!_db) return;
+  _db.ref('stewart/chatmutes').on('value', s=>{
+    const mutes = s.val()||{};
+    const el=document.getElementById('mod-list');
+    if(!el) return;
+    el.innerHTML = AGENTS.map(a=>{
+      const mute = mutes[a.id];
+      const until = (mute===true)?Infinity:(typeof mute==='number'?mute:0);
+      const active = until && Date.now()<until;
+      const statusTxt = active
+        ? (until===Infinity ? 'Paused (until lifted)' : 'Paused until '+new Date(until).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}))
+        : 'Active';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(200,146,42,.2);">'+
+        '<div style="font-size:20px;">'+a.icon+'</div>'+
+        '<div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--cream,#f7f2ea);">'+a.name+'</div>'+
+        '<div style="font-size:11px;opacity:.75;'+(active?'color:#e08a6a;':'')+'">'+statusTxt+'</div></div>'+
+        (active
+          ? '<button onclick="unmuteBoy(\''+a.id+'\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Unpause</button>'
+          : '<div style="display:flex;gap:5px;">'+
+            '<button onclick="muteBoy(\''+a.id+'\',1)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--gold);background:none;color:var(--gold2);font-size:11px;cursor:pointer;">1 hr</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',24)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--gold);background:none;color:var(--gold2);font-size:11px;cursor:pointer;">1 day</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',0)" style="padding:6px 9px;border-radius:7px;border:1px solid #b5451b;background:none;color:#e08a6a;font-size:11px;cursor:pointer;">Hold</button>'+
+            '</div>')+
+        '</div>';
+    }).join('');
+  });
+}
+function muteBoy(id,hours){
+  if(!_db) return;
+  const name=(AGENTS.find(a=>a.id===id)||{}).name||'this agent';
+  if(hours===0){
+    if(!confirm('Pause '+name+"'s group chat until you lift it?")) return;
+    _db.ref('stewart/chatmutes/'+id).set(true);
+  }else{
+    _db.ref('stewart/chatmutes/'+id).set(Date.now()+hours*3600*1000);
+  }
+}
+function unmuteBoy(id){ if(_db) _db.ref('stewart/chatmutes/'+id).set(null); }
 
 // ----- Comms unread notification badge -----
 const COMMS_BOYS = ['samuel','johnjr','stephen','daniel'];
