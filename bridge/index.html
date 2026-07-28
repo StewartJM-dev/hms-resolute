@@ -348,6 +348,21 @@ body{
 </style>
 </head>
 <body>
+<script>
+// ── Access guard: Bridge is parent-only ──
+// Runs immediately, before any content renders, so a boy who navigates
+// here directly never sees the page at all.
+(function guardBridge(){
+  try{
+    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+    if(!s || s.role !== 'parent' || (Date.now()-s.ts) > 1000*60*60*12){
+      window.location.replace('../index.html');
+    }
+  }catch(e){
+    window.location.replace('../index.html');
+  }
+})();
+</script>
 <div class="wrap">
 
   <div class="bridge-banner"><img src="assets/bridge-interior.jpg" alt="" loading="eager"></div>
