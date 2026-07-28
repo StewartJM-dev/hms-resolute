@@ -1365,10 +1365,13 @@ function loadInstruments(){
   }).catch(()=>{});
 }
 
+const SHIP_ACCOUNT_START_DATE = '2026-07-27';
 function getShipEarned(agentId){
   return _db.ref('stewart/scores/'+agentId).once('value').then(snap => {
     const scores = snap.val() || {};
-    return Object.values(scores).reduce((sum,s) => sum + (typeof s==='number' ? s/100 : 0), 0);
+    return Object.entries(scores)
+      .filter(([date]) => date >= SHIP_ACCOUNT_START_DATE)
+      .reduce((sum,[,s]) => sum + (typeof s==='number' ? s/100 : 0), 0);
   });
 }
 function getShipRegister(agentId){
