@@ -23,16 +23,20 @@
   --indigo:#1e2d5a;--indigo2:#2e3f7a;
   --gold:#c8922a;--gold2:#e8b84a;
   --white:#f9f7f2;--offwhite:#ede9e0;--cream:#f7f2ea;
-  --black:#0e0e0e;--ink:#1a1410;--brown:#5c3d1e;
-  --rust:#b5451b;--muted:#8a7a65;--border:#e0d5c0;
-  --card:#ffffff;
+  --black:#0e0e0e;--ink:#eef3fb;--brown:#5c3d1e;
+  --rust:#b5451b;--muted:#8aa4c4;--border:#35496b;
+  --card:#101c30;
   --alpha:#1e3a6e;--bravo:#6e1e1e;--dino:#1e5c2a;--wild:#7a5c1e;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html{height:-webkit-fill-available;}
 body{
   font-family:'Lato',sans-serif;
-  background:var(--cream);color:var(--ink);
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,.012) 0px, rgba(255,255,255,.012) 1px, transparent 1px, transparent 4px),
+    radial-gradient(ellipse at top,rgba(46,63,122,.18),transparent 60%),
+    linear-gradient(160deg,#0c1326 0%,#0e1a2e 45%,#0a1422 100%);
+  color:var(--ink);
   min-height:100vh;min-height:-webkit-fill-available;
   font-size:14px;
 }
@@ -106,7 +110,7 @@ body{
 }
 .gw-link:active{ background:rgba(176,141,62,.32); }
 .gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:12px;}
-.gauge-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
+.gauge-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 8px 12px;text-align:center;}
 .gauge-card .gc-name{font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
 .gauge-card .gc-icon{font-size:22px;margin-bottom:2px;}
 .gauge-card .gc-sub{font-size:11px;color:var(--muted);margin-top:6px;}
@@ -115,7 +119,7 @@ body{
 .gauge-fill{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
 .gauge-pctline{font-family:'Cinzel',serif;font-weight:700;font-size:20px;margin-top:2px;}
 .topbar{
-  background:var(--green);
+  background:var(--indigo);
   border-bottom:3px solid var(--gold);
   padding:10px 14px;
   display:flex;align-items:center;justify-content:space-between;
@@ -305,7 +309,7 @@ body{
 .msg-input{
   flex:1;padding:8px 11px;border:1px solid var(--border);
   border-radius:20px;font-family:'Lato',sans-serif;
-  font-size:13px;background:var(--cream);color:var(--ink);
+  font-size:13px;background:var(--card);color:var(--ink);
 }
 .msg-input:focus{outline:none;border-color:var(--green2);}
 .msg-send{
@@ -411,7 +415,7 @@ body{
 .badge-red{background:#fdf0eb;color:var(--rust);}
 /* weekly chore grid */
 .bwc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
-.bwc-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fff;}
+.bwc-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--card);}
 .bwc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border);cursor:pointer;}
 .bwc-chevron{font-size:11px;opacity:.5;margin-left:8px;transition:transform .15s;}
 .bwc-card.open .bwc-chevron{transform:rotate(180deg);}
@@ -458,28 +462,28 @@ body{
 
 <!-- ═══ SHIP'S ORDERS (Dawn's daily checklist) ═══ -->
 <div id="dawn-orders-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px;">
-  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:#fff;border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;" id="dawn-orders-content">
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;" id="dawn-orders-content">
     <!-- filled dynamically by renderDawnShipsOrders() -->
   </div>
 </div>
 
 <!-- ═══ SHIP'S DIRECTORY ═══ -->
 <div id="ships-directory-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:20px;">
-  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:#fff;border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;">
+  <div style="max-width:420px;width:100%;max-height:85vh;overflow-y:auto;background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:26px 22px;text-align:left;">
     <div style="text-align:center;font-size:40px;margin-bottom:6px;">🗂️</div>
-    <div style="text-align:center;font-family:'Cinzel',serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:4px;">Ship's Directory</div>
+    <div style="text-align:center;font-family:'Cinzel',serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--gold2);text-transform:uppercase;margin-bottom:4px;">Ship's Directory</div>
     <div style="text-align:center;font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:20px;">Where Everything Is Aboard the Resolute</div>
 
     <div style="display:grid;gap:10px;margin-bottom:18px;">
-      <a href="../bridge/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚓</span><div><strong style="color:var(--brown);font-size:13px;">Bridge</strong><br><span style="font-size:11.5px;color:var(--muted);">Dad's command post &mdash; keeps the whole ship on course.</span></div></a>
-      <a href="../warroom/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚔️</span><div><strong style="color:var(--brown);font-size:13px;">War Room</strong><br><span style="font-size:11.5px;color:var(--muted);">Prayer requests &mdash; submit one, pray for the crew's.</span></div></a>
-      <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(232,184,74,.15);border:1px solid var(--gold);border-radius:10px;padding:12px;"><span style="font-size:22px;">🏠</span><div><strong style="color:var(--brown);font-size:13px;">Officers' Country</strong><br><span style="font-size:11.5px;color:var(--muted);">You're here right now &mdash; runs the home front.</span></div></div>
-      <a href="../boys/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🎯</span><div><strong style="color:var(--brown);font-size:13px;">Agent HQ</strong><br><span style="font-size:11.5px;color:var(--muted);">Mission control for the boys' daily orders.</span></div></a>
-      <a href="../crowsnest/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🔭</span><div><strong style="color:var(--brown);font-size:13px;">Crow's Nest</strong><br><span style="font-size:11.5px;color:var(--muted);">The lookout &mdash; log a praise, see what others are grateful for.</span></div></a>
-      <a href="../kitchen/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍽️</span><div><strong style="color:var(--brown);font-size:13px;">The Galley</strong><br><span style="font-size:11.5px;color:var(--muted);">The ship's kitchen &mdash; meals planned and made here.</span></div></a>
-      <a href="../saga/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">📖</span><div><strong style="color:var(--brown);font-size:13px;">Wardroom</strong><br><span style="font-size:11.5px;color:var(--muted);">Where the crew gathers for stories and downtime.</span></div></a>
-      <a href="../registry.html" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">📜</span><div><strong style="color:var(--brown);font-size:13px;">Registry &amp; Muster</strong><br><span style="font-size:11.5px;color:var(--muted);">The full crew roster and ship's records.</span></div></a>
-      <a href="../vineyard/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍇</span><div><strong style="color:var(--brown);font-size:13px;">Captain's Quarters</strong><br><span style="font-size:11.5px;color:var(--muted);">Yours and John's own space aboard the ship.</span></div></a>
+      <a href="../bridge/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚓</span><div><strong style="color:var(--gold2);font-size:13px;">Bridge</strong><br><span style="font-size:11.5px;color:var(--muted);">Dad's command post &mdash; keeps the whole ship on course.</span></div></a>
+      <a href="../warroom/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">⚔️</span><div><strong style="color:var(--gold2);font-size:13px;">War Room</strong><br><span style="font-size:11.5px;color:var(--muted);">Prayer requests &mdash; submit one, pray for the crew's.</span></div></a>
+      <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(232,184,74,.15);border:1px solid var(--gold);border-radius:10px;padding:12px;"><span style="font-size:22px;">🏠</span><div><strong style="color:var(--gold2);font-size:13px;">Officers' Country</strong><br><span style="font-size:11.5px;color:var(--muted);">You're here right now &mdash; runs the home front.</span></div></div>
+      <a href="../boys/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🎯</span><div><strong style="color:var(--gold2);font-size:13px;">Agent HQ</strong><br><span style="font-size:11.5px;color:var(--muted);">Mission control for the boys' daily orders.</span></div></a>
+      <a href="../crowsnest/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🔭</span><div><strong style="color:var(--gold2);font-size:13px;">Crow's Nest</strong><br><span style="font-size:11.5px;color:var(--muted);">The lookout &mdash; log a praise, see what others are grateful for.</span></div></a>
+      <a href="../kitchen/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍽️</span><div><strong style="color:var(--gold2);font-size:13px;">The Galley</strong><br><span style="font-size:11.5px;color:var(--muted);">The ship's kitchen &mdash; meals planned and made here.</span></div></a>
+      <a href="../saga/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">📖</span><div><strong style="color:var(--gold2);font-size:13px;">Wardroom</strong><br><span style="font-size:11.5px;color:var(--muted);">Where the crew gathers for stories and downtime.</span></div></a>
+      <a href="../registry.html" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">📜</span><div><strong style="color:var(--gold2);font-size:13px;">Registry &amp; Muster</strong><br><span style="font-size:11.5px;color:var(--muted);">The full crew roster and ship's records.</span></div></a>
+      <a href="../vineyard/" style="display:flex;gap:10px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;"><span style="font-size:22px;">🍇</span><div><strong style="color:var(--gold2);font-size:13px;">Captain's Quarters</strong><br><span style="font-size:11.5px;color:var(--muted);">Yours and John's own space aboard the ship.</span></div></a>
     </div>
 
     <button onclick="closeShipsDirectory()" style="width:100%;padding:13px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
@@ -527,11 +531,11 @@ body{
       <button class="topbar-lock" onclick="lockApp()">Lock</button>
     </div>
   </div>
-  <div style="background:var(--cream);padding:8px 14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
-    <a href="../" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">⚓ Gangway</a>
-    <a href="../registry.html" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">📜 Registry &amp; Muster</a>
-    <a href="../vineyard/" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">🍇 Captain's Quarters</a>
-    <button onclick="showShipsDirectory()" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--brown);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;background:none;cursor:pointer;">🗂️ Ship's Directory</button>
+  <div style="background:var(--card);padding:8px 14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+    <a href="../" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold2);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">⚓ Gangway</a>
+    <a href="../registry.html" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold2);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">📜 Registry &amp; Muster</a>
+    <a href="../vineyard/" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold2);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;">🍇 Captain's Quarters</a>
+    <button onclick="showShipsDirectory()" style="font-family:'Lato',sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold2);opacity:.8;text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:6px 11px;background:none;cursor:pointer;">🗂️ Ship's Directory</button>
   </div>
 
   <div class="content">
@@ -791,7 +795,7 @@ body{
       <div class="card" style="margin-bottom:12px;">
         <div class="card-bd">
           <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">What from your session are you and Dawn focusing on applying this week? One or two concrete things.</p>
-          <textarea id="growth-application" placeholder="e.g. This week we're focusing on responding instead of reacting when the boys argue..." style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Lato',sans-serif;font-size:13px;background:var(--cream);resize:none;height:80px;margin-bottom:8px;"></textarea>
+          <textarea id="growth-application" placeholder="e.g. This week we're focusing on responding instead of reacting when the boys argue..." style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Lato',sans-serif;font-size:13px;background:var(--card);resize:none;height:80px;margin-bottom:8px;"></textarea>
           <button onclick="saveGrowthApplication()" class="btn-primary">Save This Week's Focus</button>
         </div>
       </div>
@@ -1153,15 +1157,15 @@ function renderDawnShipsOrdersUI(checks, officerName){
 
   el.innerHTML = `
     <div style="text-align:center;font-size:40px;margin-bottom:6px;">⚓</div>
-    <div style="text-align:center;font-family:'Cinzel',serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:4px;">Ship's Orders</div>
+    <div style="text-align:center;font-family:'Cinzel',serif;font-size:17px;font-weight:700;letter-spacing:1px;color:var(--gold2);text-transform:uppercase;margin-bottom:4px;">Ship's Orders</div>
     <div style="text-align:center;font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:18px;">Today's Standing Orders</div>
 
     <div style="background:rgba(232,184,74,.12);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:18px;text-align:center;">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Officer of the Watch Today</div>
-      <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--brown);font-weight:700;">${officerName}</div>
+      <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold2);font-weight:700;">${officerName}</div>
     </div>
 
-    <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;color:var(--brown);text-transform:uppercase;margin-bottom:8px;">Before You're Done Today</div>
+    <div style="font-family:'Cinzel',serif;font-size:11px;letter-spacing:1px;color:var(--gold2);text-transform:uppercase;margin-bottom:8px;">Before You're Done Today</div>
     ${listHtml}
 
     <button onclick="closeDawnShipsOrders()" style="width:100%;padding:13px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;">UNDERSTOOD ⚓</button>
@@ -1936,10 +1940,10 @@ function renderWGOverviewNudge(){
     el.innerHTML = `<div class="card" style="border:2px solid var(--gold);background:linear-gradient(135deg,rgba(232,184,74,.08),rgba(92,61,30,.04));cursor:pointer;" onclick="document.querySelector('.bnb[onclick*=\\'dawn\\']').click();">
       <div class="card-bd" style="padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-family:'Cinzel',serif;font-weight:700;font-size:13px;color:var(--brown);">\u26F5 White Glove Due \u2014 ${win.label}</div>
+          <div style="font-family:'Cinzel',serif;font-weight:700;font-size:13px;color:var(--gold2);">\u26F5 White Glove Due \u2014 ${win.label}</div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Tap to inspect in XO's Quarters</div>
         </div>
-        <div style="font-size:18px;color:var(--brown);">\u203A</div>
+        <div style="font-size:18px;color:var(--gold2);">\u203A</div>
       </div>
     </div>`;
   });
@@ -1974,7 +1978,7 @@ function renderWhiteGlove(){
 
     el.innerHTML = `<div class="card" style="border:2px solid var(--gold);background:linear-gradient(135deg,rgba(232,184,74,.08),rgba(92,61,30,.04));">
       <div class="card-bd" style="padding:14px;">
-        <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);">\u26F5 White Glove Inspection Due \u2014 ${win.label}</div>
+        <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--gold2);">\u26F5 White Glove Inspection Due \u2014 ${win.label}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;">Check trash, dishes, clothing, floor, and counters in every compartment \u2014 then rate whether whoever was responsible met your standard.</div>
         <button onclick="startWhiteGloveInspection()" style="width:100%;margin-top:10px;padding:13px;border:none;border-radius:8px;background:var(--rust);color:#fff;font-family:'Cinzel',serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(181,69,27,.4);">&#9813; Start Inspection</button>
       </div>
@@ -2021,7 +2025,7 @@ function startWhiteGloveInspection(){
   const win = getWGWindow();
   el.innerHTML = `<div class="card" style="border:2px solid var(--gold);">
     <div class="card-bd" style="padding:14px;">
-      <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);margin-bottom:10px;">\u26F5 ${win.label} Inspection</div>
+      <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--gold2);margin-bottom:10px;">\u26F5 ${win.label} Inspection</div>
       <div id="wg-room-rows"></div>
       <button onclick="saveWhiteGloveInspection()" id="wg-save-btn" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--border);color:var(--muted);font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:not-allowed;" disabled>Log Inspection (finish every compartment)</button>
     </div>
@@ -2141,7 +2145,7 @@ function renderDawnTab(){
   if(dow===0){
     const restHtml = `<div class="card"><div class="card-bd" style="text-align:center;padding:20px;">
       <div style="font-size:28px;margin-bottom:8px;">&#9203;</div>
-      <div style="font-family:'Cinzel',serif;font-size:13px;color:var(--brown);">Rest Today</div>
+      <div style="font-family:'Cinzel',serif;font-size:13px;color:var(--gold2);">Rest Today</div>
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">No missions on the Sabbath. Be still.</div>
     </div></div>`;
     missionsEl && (missionsEl.innerHTML = restHtml);
@@ -2404,7 +2408,7 @@ function renderGrowthTab(){
   const qEl = document.getElementById('character-qualities');
   qEl.innerHTML = CHARACTER_QUALITIES.map(q =>
     `<div style="background:var(--offwhite);border-radius:6px;padding:6px 10px;font-size:11px;">
-      <span style="font-weight:700;color:var(--brown);">${q.name}</span>
+      <span style="font-weight:700;color:var(--gold2);">${q.name}</span>
       <span style="color:var(--muted);"> &mdash; ${q.ref}</span>
     </div>`
   ).join('');
@@ -2465,7 +2469,7 @@ function renderGrowthLog(){
 
       return `<div class="card" style="margin-bottom:8px;">
         <div class="card-bd">
-          <div style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:var(--brown);margin-bottom:4px;">Week of ${label}</div>
+          <div style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:var(--gold2);margin-bottom:4px;">Week of ${label}</div>
           ${application ? `<div style="font-size:12px;color:var(--ink);margin-bottom:6px;"><strong>Focus:</strong> ${application}</div>` : ''}
           ${reflection ? `<div style="font-size:12px;color:var(--muted);font-style:italic;"><strong>How it went:</strong> ${reflection}</div>` :
             `<div style="display:flex;gap:8px;">
@@ -3039,12 +3043,12 @@ function renderStoneLog(){
 
     el.innerHTML = `
       <div style="background:rgba(92,61,30,.06);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-        <div style="font-size:22px;font-weight:700;font-family:\'Cinzel\',serif;color:var(--brown);text-align:center;">${totalAll}</div>
+        <div style="font-size:22px;font-weight:700;font-family:\'Cinzel\',serif;color:var(--gold2);text-align:center;">${totalAll}</div>
         <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:8px;">total stones collected</div>
         ${Object.entries(totals).map(([size,count]) =>
           `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border);">
             <span style="color:var(--muted);">${size}</span>
-            <span style="font-weight:700;color:var(--brown);">${count}</span>
+            <span style="font-weight:700;color:var(--gold2);">${count}</span>
           </div>`
         ).join('')}
       </div>
@@ -3511,12 +3515,12 @@ function renderGraceDare(){
         return;
       }
       el.innerHTML = `
-        <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;color:var(--brown);text-transform:uppercase;margin-bottom:4px;">Day ${day} of 40</div>
+        <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;color:var(--gold2);text-transform:uppercase;margin-bottom:4px;">Day ${day} of 40</div>
         <div style="font-family:'Cinzel',serif;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px;">${data.title}</div>
         <div style="font-size:13px;color:var(--ink);line-height:1.8;margin-bottom:12px;white-space:pre-wrap;">${data.story}</div>
         <div style="background:rgba(232,184,74,.12);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:12px;">
           <div style="font-size:13px;color:var(--ink);line-height:1.7;font-style:italic;">&ldquo;${data.scriptureText}&rdquo;</div>
-          <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:var(--brown);margin-top:5px;">${data.scriptureRef}</div>
+          <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:var(--gold2);margin-top:5px;">${data.scriptureRef}</div>
         </div>
         <div style="background:rgba(45,106,71,.08);border:1px solid rgba(45,106,71,.2);border-radius:8px;padding:11px 13px;margin-bottom:12px;">
           <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2d6a47;margin-bottom:5px;">TODAY'S DARE</div>
@@ -3791,9 +3795,9 @@ function renderModeration(){
         (active
           ? '<button onclick="unmuteBoy(\''+a.id+'\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Unpause</button>'
           : '<div style="display:flex;gap:5px;">'+
-            '<button onclick="muteBoy(\''+a.id+'\',1)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;">1 hr</button>'+
-            '<button onclick="muteBoy(\''+a.id+'\',24)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;">1 day</button>'+
-            '<button onclick="muteBoy(\''+a.id+'\',0)" style="padding:6px 9px;border-radius:7px;border:1px solid #c0504d;background:#fff;color:#c0504d;font-size:11px;cursor:pointer;">Hold</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',1)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:var(--card);font-size:11px;cursor:pointer;">1 hr</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',24)" style="padding:6px 9px;border-radius:7px;border:1px solid var(--border);background:var(--card);font-size:11px;cursor:pointer;">1 day</button>'+
+            '<button onclick="muteBoy(\''+a.id+'\',0)" style="padding:6px 9px;border-radius:7px;border:1px solid #c0504d;background:var(--card);color:#c0504d;font-size:11px;cursor:pointer;">Hold</button>'+
             '</div>')+
         '</div>';
     }).join('');
@@ -3839,7 +3843,7 @@ function renderScreenTimeApprovals(){
         '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">'+escapeHtml(r.agentName||r.agentId)+' wants '+r.amount+' min</div>'+
         '<div style="font-size:12px;opacity:.7;">Requested '+time+'</div></div>'+
         '<button onclick="resolveScreenTimeRequest(\''+r.agentId+'\',\''+r.key+'\',\'approved\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Approve</button>'+
-        '<button onclick="resolveScreenTimeRequest(\''+r.agentId+'\',\''+r.key+'\',\'denied\')" style="padding:7px 12px;border-radius:8px;border:1px solid var(--rust);background:#fff;color:var(--rust);font-size:12px;cursor:pointer;margin-left:6px;">Deny</button>'+
+        '<button onclick="resolveScreenTimeRequest(\''+r.agentId+'\',\''+r.key+'\',\'denied\')" style="padding:7px 12px;border-radius:8px;border:1px solid var(--rust);background:var(--card);color:var(--rust);font-size:12px;cursor:pointer;margin-left:6px;">Deny</button>'+
         '</div>';
     }).join('');
   });
