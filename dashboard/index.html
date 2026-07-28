@@ -232,22 +232,15 @@ body{
 }
 .card-bd{padding:12px 13px;}
 
-/* ── COMMS TAB: dark glass-panel look, matching the Bridge ── */
-#tab-messenger{
-  background:
-    radial-gradient(ellipse at top,rgba(46,63,122,.18),transparent 60%),
-    linear-gradient(160deg,#0c1326 0%,#0e1a2e 45%,#0a1422 100%);
-  border-radius:12px;
+/* ── COMMS TAB: inline chat threads on the same blue stainless background as the rest of the page ── */
+.dash-chat-thread{
+  background:url('../assets/textures/steel-blue-bg.jpg');background-size:cover;background-position:center;
+  border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;
 }
-#tab-messenger .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);}
-#tab-messenger .card-bd{color:rgba(255,255,255,.85);}
-#tab-messenger .card-bd div{color:inherit;}
-#tab-messenger .thread-item{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);}
-#tab-messenger .thread-item:active{background:rgba(255,255,255,.09);}
-#tab-messenger .thread-name{color:rgba(255,255,255,.9);}
-#tab-messenger .thread-preview,#tab-messenger .thread-arrow{color:rgba(255,255,255,.5);}
-#tab-messenger .board-input{background:rgba(0,0,0,.25);color:#fff;border:1px solid rgba(255,255,255,.15);}
-#tab-messenger .board-from{background:rgba(0,0,0,.25);color:#fff;border:1px solid rgba(255,255,255,.15);}
+.dash-chat-messages{max-height:280px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 13px;display:flex;flex-direction:column;gap:8px;}
+.dash-chat-compose{display:flex;gap:8px;padding:10px 13px;border-top:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.15);}
+.dash-chat-compose input{flex:1;padding:8px 11px;border:1px solid rgba(255,255,255,.4);border-radius:20px;font-family:'Lato',sans-serif;font-size:13px;background:rgba(255,255,255,.85);color:var(--ink);}
+.dash-chat-compose button{width:36px;height:36px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:14px;cursor:pointer;flex-shrink:0;}
 
 .green-hd .card-hd{background:var(--green);}
 .indigo-hd .card-hd{background:var(--indigo);}
@@ -644,61 +637,37 @@ body{
     <!-- TAB: HOMESTEAD (Dawn's household home base) -->
     <!-- TAB: MESSENGER -->
     <div class="tab" id="tab-messenger">
-      <!-- Thread list view -->
-      <div id="messenger-list-view">
-        <div class="sec-hd">Private Threads</div>
-        <div class="thread-list" style="margin-bottom:14px;">
-          <div class="thread-item" onclick="openThread('samuel','Samuel','Agent Alpha','var(--alpha)')">
-            <div class="thread-dot" style="background:#1e3a6e;"></div>
-            <div><div class="thread-name">Samuel</div><div class="thread-preview" id="preview-samuel">Agent Alpha</div></div>
-            <div class="thread-arrow">&#8250;</div>
-          </div>
-          <div class="thread-item" onclick="openThread('johnjr','John Jr.','Agent Bravo','var(--bravo)')">
-            <div class="thread-dot" style="background:#6e1e1e;"></div>
-            <div><div class="thread-name">John Jr.</div><div class="thread-preview" id="preview-johnjr">Agent Bravo</div></div>
-            <div class="thread-arrow">&#8250;</div>
-          </div>
-          <div class="thread-item" onclick="openThread('stephen','Stephen','Agent Dino','var(--dino)')">
-            <div class="thread-dot" style="background:#1e5c2a;"></div>
-            <div><div class="thread-name">Stephen</div><div class="thread-preview" id="preview-stephen">Agent Dino</div></div>
-            <div class="thread-arrow">&#8250;</div>
-          </div>
-          <div class="thread-item" onclick="openThread('daniel','Daniel','Agent Wildcard','var(--wild)')">
-            <div class="thread-dot" style="background:#7a5c1e;"></div>
-            <div><div class="thread-name">Daniel</div><div class="thread-preview" id="preview-daniel">Agent Wildcard</div></div>
-            <div class="thread-arrow">&#8250;</div>
-          </div>
-        </div>
-
-        <div class="sec-hd">Family Channel</div>
-        <div class="thread-list" style="margin-bottom:14px;">
-          <div class="thread-item" onclick="openGroupChat()">
-            <div class="thread-dot" style="background:var(--gold,#c8922a);"></div>
-            <div><div class="thread-name">&#128172; Agent Group Chat <span id="group-new-tag" style="display:none;background:var(--gold,#c8922a);color:#000;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;">NEW</span></div><div class="thread-preview" id="preview-group">All agents can see this</div></div>
-            <div class="thread-arrow">&#8250;</div>
-          </div>
-        </div>
-
-        <div class="sec-hd">Chat Moderation</div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-bd">
-            <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
-            <div id="mod-list"></div>
-          </div>
+      <!-- PRIVATE THREADS — inline, no tap needed -->
+      <div class="sec-hd">Private Threads</div>
+      <div id="dash-pt-selector" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="filter-btn active" onclick="openDashThread('samuel','Samuel',this)">🦅 Samuel</button>
+        <button class="filter-btn" onclick="openDashThread('johnjr','John Jr.',this)">🦁 John Jr.</button>
+        <button class="filter-btn" onclick="openDashThread('stephen','Stephen',this)">🦖 Stephen</button>
+        <button class="filter-btn" onclick="openDashThread('daniel','Daniel',this)">🐘 Daniel</button>
+      </div>
+      <div class="dash-chat-thread">
+        <div class="dash-chat-messages" id="thread-messages"></div>
+        <div class="dash-chat-compose">
+          <input type="text" id="thread-input" placeholder="Message..." maxlength="280" autocomplete="off" name="msg-thread-nofill">
+          <button onclick="sendThreadMessage()">&#10148;</button>
         </div>
       </div>
 
-      <!-- Thread detail view -->
-      <div id="messenger-thread-view" style="display:none;flex-direction:column;height:calc(100vh - 120px);">
-        <div class="msg-thread-header">
-          <button class="msg-back" onclick="closeThread()">&#8592;</button>
-          <div class="msg-thread-name" id="thread-title">Thread</div>
-          <div style="font-size:10px;color:var(--muted);" id="thread-sub"></div>
+      <!-- FAMILY CHANNEL — inline, no tap needed -->
+      <div class="sec-hd" style="margin-top:22px;">Family Channel</div>
+      <div class="dash-chat-thread">
+        <div class="dash-chat-messages" id="dash-group-messages"></div>
+        <div class="dash-chat-compose">
+          <input type="text" id="dash-group-input" placeholder="Message the family…" maxlength="280" autocomplete="off" name="msg-group-nofill">
+          <button onclick="sendDashGroupMessage()">&#10148;</button>
         </div>
-        <div class="msg-messages" id="thread-messages"></div>
-        <div class="msg-compose">
-          <input class="msg-input" type="text" id="thread-input" placeholder="Message..." maxlength="280" autocomplete="off" name="msg-thread-nofill">
-          <button class="msg-send" onclick="sendThreadMessage()">&#10148;</button>
+      </div>
+
+      <div class="sec-hd" style="margin-top:22px;">Chat Moderation</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-bd">
+          <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
+          <div id="mod-list"></div>
         </div>
       </div>
     </div>
@@ -1537,8 +1506,8 @@ let currentThread = null;
 
 function renderMessenger(){
   if(!_db) return;
-  loadThreadPreviews();
-  updateDashGroupBadge();
+  if(!currentDashPrivateAgent) openDashThread('samuel','Samuel', document.querySelector('#dash-pt-selector .filter-btn'));
+  initDashGroupChat();
   renderModeration();
   renderScreenTimeApprovals();
   renderShipPending();
@@ -1584,36 +1553,28 @@ function sendBoardMessage(){
   });
 }
 
-function openThread(agentId, name, codename, color){
-  currentThread = {agentId, name, codename};
-  document.getElementById('thread-title').textContent = name;
-  document.getElementById('thread-sub').textContent = codename;
-  document.getElementById('messenger-list-view').style.display = 'none';
-  document.getElementById('messenger-thread-view').style.display = 'flex';
-  loadThreadMessages(agentId);
-
-  // Listen for new messages
+let currentDashPrivateAgent = null;
+function openDashThread(agentId, name, btn){
+  currentDashPrivateAgent = agentId;
+  if(btn){
+    document.querySelectorAll('#dash-pt-selector .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  if(!_db) return;
+  _db.ref(`stewart/messages/${agentId}`).off();
   _db.ref(`stewart/messages/${agentId}`).on('value', snap => {
-    if(currentThread && currentThread.agentId === agentId) renderThreadMessages(snap.val()||{});
+    if(currentDashPrivateAgent === agentId) renderThreadMessages(snap.val()||{}, 'thread-messages');
   });
 }
 
-function openGroupChat(){
-  currentThread = {group:true, name:'Agent Group Chat'};
-  document.getElementById('thread-title').textContent = '\u{1F4AC} Agent Group Chat';
-  document.getElementById('thread-sub').textContent = 'All agents + Mom & Dad';
-  document.getElementById('messenger-list-view').style.display = 'none';
-  document.getElementById('messenger-thread-view').style.display = 'flex';
+function initDashGroupChat(){
   if(!_db) return;
+  _db.ref('stewart/groupchat').off();
   _db.ref('stewart/groupchat').on('value', snap => {
-    if(currentThread && currentThread.group){
-      const msgs = snap.val()||{};
-      renderThreadMessages(msgs);
-      const latest = Object.values(msgs).reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
-      try{ localStorage.setItem('pd-group-seen', String(latest)); }catch(e){}
-      const tag = document.getElementById('group-new-tag');
-      if(tag) tag.style.display = 'none';
-    }
+    const msgs = snap.val()||{};
+    renderThreadMessages(msgs, 'dash-group-messages');
+    const latest = Object.values(msgs).reduce((mx,m)=>Math.max(mx, m.timestamp||0), 0);
+    try{ localStorage.setItem('pd-group-seen', String(latest)); }catch(e){}
   });
 }
 
@@ -1635,23 +1596,9 @@ function updateDashGroupBadge(){
   });
 }
 
-function closeThread(){
-  currentThread = null;
-  document.getElementById('messenger-thread-view').style.display = 'none';
-  document.getElementById('messenger-list-view').style.display = 'block';
-  if(_db){ _db.ref('stewart/messages').off(); _db.ref('stewart/groupchat').off(); }
-  updateDashGroupBadge();
-  renderMessenger();
-}
-
-function loadThreadMessages(agentId){
-  _db.ref(`stewart/messages/${agentId}`).once('value', snap => {
-    renderThreadMessages(snap.val()||{});
-  });
-}
-
-function renderThreadMessages(msgs){
-  const el = document.getElementById('thread-messages');
+function renderThreadMessages(msgs, targetId){
+  const el = document.getElementById(targetId);
+  if(!el) return;
   const items = Object.values(msgs).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
   if(!items.length){
     el.innerHTML = '<div class="empty-state">No messages yet. Start the conversation.</div>';
@@ -1692,30 +1639,36 @@ function getSenderName(){
   return 'Dad';
 }
 function sendThreadMessage(){
-  if(!currentThread||!_db||_dashSendLock) return;
+  if(!currentDashPrivateAgent||!_db||_dashSendLock) return;
   const input = document.getElementById('thread-input');
   const text = input.value.trim();
   if(!text) return;
-  // Clear synchronously + lock — prevents a held Enter key or double-tap
-  // from writing the same message twice.
   _dashSendLock = true;
   input.value='';
-  const sender = getSenderName();
-  if(currentThread.group){
-    _db.ref('stewart/groupchat').push({
-      text, from:sender, agentId:'parent', timestamp:Date.now()
-    }).finally(()=>{ _dashSendLock=false; });
-  } else {
-    _db.ref(`stewart/messages/${currentThread.agentId}`).push({
-      text, from:sender, timestamp:Date.now()
-    }).finally(()=>{ _dashSendLock=false; });
-  }
+  _db.ref(`stewart/messages/${currentDashPrivateAgent}`).push({
+    text, from:getSenderName(), timestamp:Date.now()
+  }).finally(()=>{ _dashSendLock=false; });
+}
+function sendDashGroupMessage(){
+  if(!_db||_dashSendLock) return;
+  const input = document.getElementById('dash-group-input');
+  const text = input.value.trim();
+  if(!text) return;
+  _dashSendLock = true;
+  input.value='';
+  _db.ref('stewart/groupchat').push({
+    text, from:getSenderName(), agentId:'parent', timestamp:Date.now()
+  }).finally(()=>{ _dashSendLock=false; });
 }
 
 // Enter key sends
 document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('thread-input').addEventListener('keydown', e => {
     if(e.key==='Enter' && !e.repeat) sendThreadMessage();
+  });
+  const gi = document.getElementById('dash-group-input');
+  if(gi) gi.addEventListener('keydown', e => {
+    if(e.key==='Enter' && !e.repeat) sendDashGroupMessage();
   });
 });
 
