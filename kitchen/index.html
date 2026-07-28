@@ -300,6 +300,7 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
     <div class="sc-title">Pantry &amp; Freezer</div>
     <div class="sc-sub">Update after every surplus run and weekly shop</div>
     <button class="shop-gen" onclick="resetInventoryToSheet()" style="margin-bottom:10px;">&#8635; Load Dawn's Inventory Sheet</button>
+    <button class="shop-gen" onclick="printInventorySheet()" style="margin-bottom:10px;">&#128424; Print Inventory Sheet</button>
     <div id="inventory-list"></div>
   </div>
   <div class="screen" id="screen-shopping">
@@ -1182,6 +1183,44 @@ function resetInventoryToSheet(){
   saveInv(fresh);
   renderInv();
   alert("Inventory loaded. Adjust any counts with + and - as needed.");
+}
+
+// Opens a clean, print-friendly checklist of everything currently tracked
+// in each section — walk the house with it, write down real counts by
+// hand, then come back and update the +/- counts here to match.
+function printInventorySheet(){
+  const inv = getInv();
+  const secs = [{key:'freezer',label:'Freezer'},{key:'pantry',label:'Pantry & Dry Goods'},{key:'fridge',label:'Refrigerator & Fresh'}];
+  const today = new Date().toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric', year:'numeric'});
+
+  const sectionsHtml = secs.map(sec => `
+    <h2>${sec.label}</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Unit</th><th>Actual Count</th></tr></thead>
+      <tbody>
+        ${inv[sec.key].map(item => `<tr><td>${item.name}</td><td>${item.unit}</td><td class="count-box"></td></tr>`).join('')}
+      </tbody>
+    </table>`).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Inventory Sheet — ${today}</title><style>
+    body{font-family:Georgia,serif;color:#2a1f14;padding:24px;max-width:800px;margin:0 auto;}
+    h1{font-size:20px;margin-bottom:2px;}
+    .sub{font-size:12px;color:#6b5c47;margin-bottom:20px;}
+    h2{font-size:15px;margin-top:26px;margin-bottom:6px;border-bottom:2px solid #2a1f14;padding-bottom:4px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;padding:5px 6px;border-bottom:1px solid #999;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b5c47;}
+    td{padding:5px 6px;border-bottom:1px solid #ddd;}
+    .count-box{width:90px;}
+    @media print{ body{padding:0;} }
+  </style></head><body>
+    <h1>HMS Resolute — Inventory Sheet</h1>
+    <div class="sub">Printed ${today} &middot; write the actual count next to each item, then update the app to match</div>
+    ${sectionsHtml}
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 300);
 }
 
 function getShop(){
