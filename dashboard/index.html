@@ -440,6 +440,19 @@ body{
 </style>
 </head>
 <body>
+<script>
+// ── Access guard: block boys who are already logged in ──
+// The legacy PIN screen below is a fallback for edge cases, but a boy
+// who's authenticated as himself should never even see it.
+(function guardDashboard(){
+  try{
+    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+    if(s && s.role === 'boy'){
+      window.location.replace('../boys/');
+    }
+  }catch(e){}
+})();
+</script>
 
 <!-- ═══ SHIP'S ORDERS (Dawn's daily checklist) ═══ -->
 <div id="dawn-orders-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px;">
