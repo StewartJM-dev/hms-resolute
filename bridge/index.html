@@ -455,7 +455,7 @@ body{
     </div>
     <div class="bchat-thread" id="bpt-thread"></div>
     <div class="bchat-input-row">
-      <input type="text" id="bpt-input" placeholder="Reply privately…">
+      <input type="text" id="bpt-input" placeholder="Reply privately…" autocomplete="off" name="msg-reply-nofill">
       <button onclick="sendBridgePrivateReply()">Send</button>
     </div>
 
@@ -463,7 +463,7 @@ body{
     <div class="shead">Family Channel</div>
     <div class="bchat-thread" id="bchat-thread"></div>
     <div class="bchat-input-row">
-      <input type="text" id="bchat-input" placeholder="Message the family…" maxlength="280">
+      <input type="text" id="bchat-input" placeholder="Message the family…" maxlength="280" autocomplete="off" name="msg-chat-nofill">
       <button onclick="sendBridgeChat()">Send</button>
     </div>
   </div>
