@@ -949,6 +949,18 @@ function renderCadenceLine(){
   return '<div class="sn-cadence'+(daysLeft<=0?' sn-overdue':'')+'">'+msg+' <span onclick="setCadence()" style="cursor:pointer;text-decoration:underline;opacity:.7;">change</span></div>';
 }
 function esc(s){ return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function linkify(text){
+  const escaped = esc(text);
+  const urlRe = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+  return escaped.replace(urlRe, (url) => {
+    let href = url;
+    if(/^www\./i.test(href)) href = 'https://' + href;
+    let trail = '';
+    const tm = href.match(/[.,!?)]+$/);
+    if(tm){ trail = url.slice(url.length - tm[0].length); href = href.slice(0, href.length - tm[0].length); url = url.slice(0, url.length - tm[0].length); }
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;font-weight:600;word-break:break-all;">${url}</a>${trail}`;
+  });
+}
 
 // ════════════════════════════════════════════
 // TAB SWITCHING
@@ -987,7 +999,7 @@ function openBridgeThread(agentId, name, btnEl){
       const isParent = m.from==='Dad'||m.from==='Mom'||m.from==='HQ';
       const time=m.timestamp?new Date(m.timestamp).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}):'';
       return '<div class="bchat-msg '+(isParent?'me':'them')+'">'+
-        '<div class="bcm-from">'+esc(m.from||'')+'</div>'+esc(m.text||'')+
+        '<div class="bcm-from">'+esc(m.from||'')+'</div>'+linkify(m.text||'')+
         '<div class="bcm-time">'+time+'</div></div>';
     }).join('');
     el.scrollTop=el.scrollHeight;
@@ -1013,7 +1025,7 @@ function loadBridgeChat(){
       const mine=(m.agentId==='parent');
       const time=m.timestamp?new Date(m.timestamp).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}):'';
       return '<div class="bchat-msg '+(mine?'me':'them')+'">'+
-        '<div class="bcm-from">'+esc(m.from||'')+'</div>'+esc(m.text||'')+
+        '<div class="bcm-from">'+esc(m.from||'')+'</div>'+linkify(m.text||'')+
         '<div class="bcm-time">'+time+'</div></div>';
     }).join('');
     el.scrollTop=el.scrollHeight;
