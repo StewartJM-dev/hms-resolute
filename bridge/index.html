@@ -1006,11 +1006,16 @@ function openBridgeThread(agentId, name, btnEl){
   });
   bridgePrivateThreadListener = ref;
 }
+// Input clears synchronously before the write + a short lock — prevents the
+// same message sending twice from a held Enter key or double-tapped button.
+let _bridgeSendLock = false;
 function sendBridgePrivateReply(){
-  if(!_db || !bridgePrivateThreadAgent) return;
+  if(!_db || !bridgePrivateThreadAgent || _bridgeSendLock) return;
   const inp=document.getElementById('bpt-input');
   const text=inp.value.trim(); if(!text) return;
-  _db.ref(`stewart/messages/${bridgePrivateThreadAgent}`).push({ text, from:'Dad', timestamp:Date.now() }).then(()=>{ inp.value=''; });
+  _bridgeSendLock = true;
+  inp.value='';
+  _db.ref(`stewart/messages/${bridgePrivateThreadAgent}`).push({ text, from:'Dad', timestamp:Date.now() }).finally(()=>{ _bridgeSendLock=false; });
 }
 
 function loadBridgeChat(){
@@ -1032,10 +1037,12 @@ function loadBridgeChat(){
   });
 }
 function sendBridgeChat(){
-  if(!_db) return;
+  if(!_db || _bridgeSendLock) return;
   const inp=document.getElementById('bchat-input');
   const text=inp.value.trim(); if(!text) return;
-  _db.ref('stewart/groupchat').push({ text, from:'Dad', agentId:'parent', timestamp:Date.now() }).then(()=>{ inp.value=''; });
+  _bridgeSendLock = true;
+  inp.value='';
+  _db.ref('stewart/groupchat').push({ text, from:'Dad', agentId:'parent', timestamp:Date.now() }).finally(()=>{ _bridgeSendLock=false; });
 }
 
 // ════════════════════════════════════════════
