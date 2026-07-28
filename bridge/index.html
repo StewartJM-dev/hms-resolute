@@ -1366,18 +1366,24 @@ function gaugeSVG(pct, color){
 function loadInstruments(){
   if(!_db) return;
   const today = localDateStr();
-  Promise.all(AGENTS.map(a => Promise.all([
-    _db.ref('stewart/missions/'+a.id+'/'+today).once('value'),
-    _db.ref('stewart/scores/'+a.id+'/'+today).once('value')
-  ]))).then(results => {
+  Promise.all(AGENTS.map(a => _db.ref('stewart/missions/'+a.id+'/'+today).once('value')))
+  .then(results => {
     const crew = AGENTS.map((a,i)=>{
-      const done = results[i][0].val() || {};
-      const completed = Object.keys(done).filter(id => done[id] && !id.startsWith('oow-')).length;
-      const score = results[i][1].val();
-      // score is already 0-100 (the boy's real percentage for the day) —
-      // use it directly instead of guessing a fixed mission count.
-      const pct = (score===null||score===undefined) ? 0 : Math.max(0, Math.min(100, score));
-      return {a, completed, score, pct};
+      const done = results[i].val() || {};
+      // Computed fresh from the same shared engine Officers' Country uses —
+      // used to read a cached stewart/scores value instead, which could go
+      // stale (e.g. after the dish-team rotation changes) and silently
+      // disagree with Officers' Country's live numbers for the same day.
+      // Computer Missions are excluded here too, matching calculateDayScore
+      // — they don't count toward pay, so counting them in the fraction
+      // would make the percentage and the "X/Y" number contradict each
+      // other (e.g. showing 100% but 9/13, which doesn't add up).
+      const expected = buildMissions(a.id, new Date()).filter(m => m.category !== 'computer');
+      const completed = expected.filter(m => done[m.id]).length;
+      const total = expected.length;
+      const dayScore = calculateDayScore(a.id, expected, done);
+      const pct = dayScore.points100;
+      return {a, completed, total, score: dayScore.points100, pct};
     });
     renderGauges(crew);
     renderStatusBoard(crew);
@@ -1436,7 +1442,7 @@ function renderGauges(crew){
       '<div class="gc-icon">'+c.a.icon+'</div>'+
       gaugeSVG(c.pct,color)+
       '<div class="gauge-pctline" style="color:'+color+';">'+c.pct+'%</div>'+
-      '<div class="gc-readout">'+c.completed+' mission'+(c.completed===1?'':'s')+' done</div>'+
+      '<div class="gc-readout">'+c.completed+'/'+c.total+' missions</div>'+
       '<div class="gc-sub">'+scoreTxt+'</div></div>';
   }).join('');
   gr.innerHTML = crewCards + fleetCard;
