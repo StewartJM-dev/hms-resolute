@@ -1226,8 +1226,10 @@ function renderDawnShipsOrders(){
     _db.ref(`stewart/dawnDailyOrders/${today}/warroom`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/crowsnest`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${weekStart}/lunchoptions`).once('value'),
-    _db.ref(`stewart/dawnDailyOrders/${today}/gracedare`).once('value')
-  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap, gdManual]) => {
+    _db.ref(`stewart/dawnDailyOrders/${today}/gracedare`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/comms`).once('value'),
+    _db.ref(`stewart/dawnDailyOrders/${today}/laundry`).once('value')
+  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap, gdManual, commsSnap, laundrySnap]) => {
     const checks = [];
     if(!vineSnap.val()) checks.push({text:'Tend to the Vineyard', key:'vineyard', scope:today});
     if(!potsSnap.val()) checks.push({text:'Wash dinner pots and pans', key:'pots', scope:today});
@@ -1235,6 +1237,9 @@ function renderDawnShipsOrders(){
     if(!warRoomSnap.val()) checks.push({text:'Visit the War Room — submit a prayer request and pray for yours and others', key:'warroom', scope:today});
     if(!crowsNestSnap.val()) checks.push({text:'Visit the Crow\'s Nest — add a praise or see what someone else is grateful for', key:'crowsnest', scope:today});
     if(!lunchSnap.val()) checks.push({text:'Load lunch options for the week', key:'lunchoptions', scope:weekStart});
+    if(!commsSnap.val()) checks.push({text:'Check Comms — group chat, private threads, pending approvals', key:'comms', scope:today});
+    const dow = new Date().getDay(); // 1=Mon, 4=Thu — the two laundry days
+    if((dow===1||dow===4) && !laundrySnap.val()) checks.push({text:'Check on today\'s laundry', key:'laundry', scope:today});
 
     // Grace Dare completion needs the current day number first
     _db.ref('stewart/gracedare/progress/currentDay').once('value', gdDaySnap => {
@@ -1265,7 +1270,9 @@ const DAWN_ORDER_DESTINATIONS = {
   warroom:    {type:'link', href:'../warroom/'},
   crowsnest:  {type:'link', href:'../crowsnest/'},
   lunchoptions: {type:'tab', tab:'lunch'},
-  gracedare:  {type:'tab', tab:'dawn'}
+  gracedare:  {type:'tab', tab:'dawn'},
+  comms:      {type:'tab', tab:'messenger'},
+  laundry:    {type:'tab', tab:'missions'}
 };
 function goToDawnOrderItem(key, scope){
   toggleDawnOrderItem(key, scope).then(() => {
