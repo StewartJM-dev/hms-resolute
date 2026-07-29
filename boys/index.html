@@ -2127,7 +2127,7 @@ function getShipAccountRegister(agentId){
 }
 function getShipAccountBalance(agentId){
   return Promise.all([getShipAccountEarned(agentId), getShipAccountRegister(agentId)]).then(([earned, register]) => {
-    const spent = register.reduce((s,r) => s + (r.amount||0), 0);
+    const spent = register.filter(r => r.status !== 'denied').reduce((s,r) => s + (r.amount||0), 0);
     return Math.max(0, earned - spent);
   });
 }
@@ -2136,7 +2136,7 @@ function renderShipAccount(agentId){
   const el = document.getElementById('ship-account');
   if(!el || !_db) return;
   Promise.all([getShipAccountEarned(agentId), getShipAccountRegister(agentId)]).then(([earned, register]) => {
-    const spent = register.reduce((s,r) => s + (r.amount||0), 0);
+    const spent = register.filter(r => r.status !== 'denied').reduce((s,r) => s + (r.amount||0), 0);
     const balance = Math.max(0, earned - spent);
     const recent = register.slice(0, 6);
 
@@ -2144,11 +2144,13 @@ function renderShipAccount(agentId){
       ? recent.map(r => {
           const date = r.timestamp ? new Date(r.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
           const label = r.type === 'purchase' ? ('Ship\'s Store: '+(r.itemName||'item')) : 'Cash out to Greenlight';
-          const statusTxt = r.status === 'complete' ? '&#10003; done' : '&#9203; pending';
-          const statusColor = r.status === 'complete' ? '#4aaa6a' : 'var(--gold)';
+          const statusTxt = r.status === 'complete' ? '&#10003; done' : r.status === 'denied' ? '&#8635; refunded' : '&#9203; pending';
+          const statusColor = r.status === 'complete' ? '#4aaa6a' : r.status === 'denied' ? 'rgba(255,255,255,.4)' : 'var(--gold)';
+          const amountColor = r.status === 'denied' ? 'rgba(255,255,255,.35)' : '#cc5533';
+          const amountStyle = r.status === 'denied' ? 'text-decoration:line-through;' : '';
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;">
             <div><div style="color:rgba(255,255,255,.8);">${label}</div><div style="color:rgba(255,255,255,.4);font-size:10px;">${date}</div></div>
-            <div style="text-align:right;"><div style="color:#cc5533;">-$${(r.amount||0).toFixed(2)}</div><div style="color:${statusColor};font-size:10px;">${statusTxt}</div></div>
+            <div style="text-align:right;"><div style="color:${amountColor};${amountStyle}">-$${(r.amount||0).toFixed(2)}</div><div style="color:${statusColor};font-size:10px;">${statusTxt}</div></div>
           </div>`;
         }).join('')
       : '<div style="font-size:11px;color:rgba(255,255,255,.35);font-style:italic;padding:6px 0;">No transactions yet.</div>';
