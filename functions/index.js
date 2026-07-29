@@ -24,8 +24,13 @@ async function sendToPerson(person, title, body, url) {
   if (!tokens.length) return;
 
   const resp = await messaging.sendEachForMulticast({
-    notification: { title, body },
-    data: { url: url || '/' },
+    // IMPORTANT: data-only, no top-level "notification" field.
+    // Including both a notification payload AND a custom onBackgroundMessage
+    // handler in the service worker causes some platforms to auto-display
+    // the notification AND run the handler's own showNotification() call —
+    // two displays for one single push, every time, regardless of sender.
+    // This was the actual cause of the persistent duplicate notifications.
+    data: { title, body, url: url || '/' },
     tokens
   });
 
