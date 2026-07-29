@@ -153,14 +153,21 @@ exports.notifyShipAccountResolved = functions.database
   .onUpdate(async (change, context) => {
     const before = change.before.val();
     const after = change.after.val();
-    if (!after || before.status !== 'pending' || after.status !== 'complete') return null;
+    if (!after || before.status !== 'pending') return null;
+    if (after.status !== 'complete' && after.status !== 'denied') return null;
     if (await alreadyNotified('saresolved_' + context.params.agentId + '_' + context.params.regId)) return null;
 
     const agentId = context.params.agentId;
-    const title = after.type === 'purchase' ? 'Your Ship\'s Store Order Is Ready!' : 'Money Transferred!';
-    const body = after.type === 'purchase'
-      ? ('Your ' + (after.itemName || 'item') + ' is ready — go check with Dad or Mom.')
-      : ('$' + after.amount.toFixed(2) + ' has been moved to your Greenlight card.');
+    let title, body;
+    if (after.status === 'denied') {
+      title = 'Ship Account Request Denied';
+      body = 'Your $' + after.amount.toFixed(2) + ' ' + (after.type === 'purchase' ? 'purchase' : 'cash out') + ' was denied — the money is back in your Ship Account.';
+    } else {
+      title = after.type === 'purchase' ? 'Your Ship\'s Store Order Is Ready!' : 'Money Transferred!';
+      body = after.type === 'purchase'
+        ? ('Your ' + (after.itemName || 'item') + ' is ready — go check with Dad or Mom.')
+        : ('$' + after.amount.toFixed(2) + ' has been moved to your Greenlight card.');
+    }
 
     await sendToPerson(agentId, title, body, 'boys/');
     return null;
