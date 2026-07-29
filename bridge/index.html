@@ -1155,6 +1155,7 @@ function renderShipPending(){
         '<div style="flex:1;"><div style="font-weight:700;font-size:14px;color:var(--cream,#f7f2ea);">'+r.agent.name+' &mdash; $'+(r.amount||0).toFixed(2)+'</div>'+
         '<div style="font-size:11px;opacity:.6;">'+label+' &middot; '+time+'</div></div>'+
         '<button onclick="markShipTransferDone(\''+r.agent.id+'\',\''+r.key+'\')" style="padding:7px 12px;border-radius:7px;border:none;background:var(--green2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Mark Done</button>'+
+        '<button onclick="denyShipTransfer(\''+r.agent.id+'\',\''+r.key+'\')" style="padding:7px 12px;border-radius:7px;border:none;background:var(--rust);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Deny</button>'+
         '</div>';
     }).join('');
   });
@@ -1162,6 +1163,12 @@ function renderShipPending(){
 function markShipTransferDone(agentId, key){
   if(!_db) return;
   _db.ref('stewart/shipAccount/'+agentId+'/register/'+key).update({status:'complete', resolvedAt: Date.now()});
+  setTimeout(renderShipPending, 300);
+}
+function denyShipTransfer(agentId, key){
+  if(!_db) return;
+  if(!confirm('Deny this and put the money back in their Ship Account?')) return;
+  _db.ref('stewart/shipAccount/'+agentId+'/register/'+key).update({status:'denied', resolvedAt: Date.now()});
   setTimeout(renderShipPending, 300);
 }
 
@@ -1401,7 +1408,7 @@ function renderShipAccountsOverview(){
     if(!el) return;
     const rows = AGENTS.map((a,i) => {
       const [earned, register] = results[i];
-      const spent = register.reduce((s,r)=>s+(r.amount||0),0);
+      const spent = register.filter(r => r.status !== 'denied').reduce((s,r)=>s+(r.amount||0),0);
       const balance = Math.max(0, earned - spent);
       return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;">'+
         '<span>'+a.icon+' '+a.name+'</span><span style="color:var(--gold2,#e8b84a);font-weight:700;">$'+balance.toFixed(2)+'</span></div>';
