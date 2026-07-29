@@ -1399,7 +1399,7 @@ function computeMissionStats(agentId, doneObj){
   const total = expected.length;
   const score = calculateDayScore(agentId, expected, doneObj);
   const pct = Math.round(score.pct * 100);
-  return { expected, completed, total, pct };
+  return { expected, completed, total, pct, dollars: score.dollars };
 }
 
 function getWeekDays(){
@@ -1446,16 +1446,15 @@ function renderOverview(){
     const agentsEl = document.getElementById('overview-agents');
     agentsEl.innerHTML = AGENTS.map((a,i) => {
       const done = snaps[i].val()||{};
-      const {completed, total, pct} = computeMissionStats(a.id, done);
-      const allDone = completed===total&&total>0;
-      const earned = allDone&&!isWeekend;
+      const {completed, total, pct, dollars} = computeMissionStats(a.id, done);
+      const earned = dollars>0&&!isWeekend;
       return `<div class="gauge-card">
         <div class="gc-name">${a.name}</div>
         <div class="gc-icon">${a.icon}</div>
         ${gaugeSVG(pct, GAUGE_COLORS[a.id])}
         <div class="gauge-pctline" style="color:${GAUGE_COLORS[a.id]};">${pct}%</div>
         <div class="gc-sub">${completed}/${total} missions</div>
-        <div class="gc-sub" style="color:${earned?'#4ade80':isWeekend?'#8fb4d9':'#f87171'};font-weight:700;">${isWeekend?'Family day':earned?'$1.00':'$0.00'}</div>
+        <div class="gc-sub" style="color:${earned?'#4ade80':isWeekend?'#8fb4d9':'#f87171'};font-weight:700;">${isWeekend?'Family day':'$'+dollars.toFixed(2)}</div>
       </div>`;
     }).join('');
   });
@@ -4031,6 +4030,7 @@ function renderShipPending(){
         '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">'+r.agent.name+' &mdash; $'+(r.amount||0).toFixed(2)+'</div>'+
         '<div style="font-size:12px;opacity:.7;">'+label+' &middot; '+time+'</div></div>'+
         '<button onclick="markShipTransferDone(\''+r.agent.id+'\',\''+r.key+'\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Mark Done</button>'+
+        '<button onclick="denyShipTransfer(\''+r.agent.id+'\',\''+r.key+'\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--rust);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Deny</button>'+
         '</div>';
     }).join('');
   });
@@ -4038,6 +4038,12 @@ function renderShipPending(){
 function markShipTransferDone(agentId, key){
   if(!_db) return;
   _db.ref('stewart/shipAccount/'+agentId+'/register/'+key).update({status:'complete', resolvedAt: Date.now()});
+  setTimeout(renderShipPending, 300);
+}
+function denyShipTransfer(agentId, key){
+  if(!_db) return;
+  if(!confirm('Deny this and put the money back in their Ship Account?')) return;
+  _db.ref('stewart/shipAccount/'+agentId+'/register/'+key).update({status:'denied', resolvedAt: Date.now()});
   setTimeout(renderShipPending, 300);
 }
 
