@@ -47,8 +47,8 @@ async function bumpBadgeCount(){
 
 // Background message handler — fires when the app is closed or in another tab.
 messaging.onBackgroundMessage(async (payload) => {
-  const title = (payload.notification && payload.notification.title) || 'HMS Resolute';
-  const body = (payload.notification && payload.notification.body) || 'New message aboard.';
+  const title = (payload.data && payload.data.title) || 'HMS Resolute';
+  const body = (payload.data && payload.data.body) || 'New message aboard.';
   const relUrl = (payload.data && payload.data.url) || '';
   const targetUrl = new URL(relUrl, self.registration.scope).href;
   const iconUrl = new URL('assets/app-icon-192.png', self.registration.scope).href;
