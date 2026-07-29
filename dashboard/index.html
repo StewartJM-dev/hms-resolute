@@ -1651,6 +1651,7 @@ function sendThreadMessage(){
   const text = input.value.trim();
   if(!text) return;
   _dashSendLock = true;
+  setTimeout(() => { _dashSendLock = false; }, 3000); // safety net — never stay stuck if the write hangs
   input.value='';
   _db.ref(`stewart/messages/${currentDashPrivateAgent}`).push({
     text, from:getSenderName(), timestamp:Date.now()
@@ -1662,6 +1663,7 @@ function sendDashGroupMessage(){
   const text = input.value.trim();
   if(!text) return;
   _dashSendLock = true;
+  setTimeout(() => { _dashSendLock = false; }, 3000); // safety net — never stay stuck if the write hangs
   input.value='';
   _db.ref('stewart/groupchat').push({
     text, from:getSenderName(), agentId:'parent', timestamp:Date.now()
