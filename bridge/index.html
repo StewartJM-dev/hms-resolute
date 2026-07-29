@@ -995,6 +995,7 @@ function sendBridgePrivateReply(){
   const inp=document.getElementById('bpt-input');
   const text=inp.value.trim(); if(!text) return;
   _bridgeSendLock = true;
+  setTimeout(() => { _bridgeSendLock = false; }, 3000); // safety net — never stay stuck if the write hangs
   inp.value='';
   _db.ref(`stewart/messages/${bridgePrivateThreadAgent}`).push({ text, from:'Dad', timestamp:Date.now() }).finally(()=>{ _bridgeSendLock=false; });
 }
@@ -1022,6 +1023,7 @@ function sendBridgeChat(){
   const inp=document.getElementById('bchat-input');
   const text=inp.value.trim(); if(!text) return;
   _bridgeSendLock = true;
+  setTimeout(() => { _bridgeSendLock = false; }, 3000); // safety net — never stay stuck if the write hangs
   inp.value='';
   _db.ref('stewart/groupchat').push({ text, from:'Dad', agentId:'parent', timestamp:Date.now() }).finally(()=>{ _bridgeSendLock=false; });
 }
