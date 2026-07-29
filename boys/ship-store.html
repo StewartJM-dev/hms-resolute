@@ -126,7 +126,7 @@ function getRegister(agentId){
 }
 function getBalance(agentId){
   return Promise.all([getEarned(agentId), getRegister(agentId)]).then(([earned, register]) => {
-    const spent = register.reduce((s,r) => s+(r.amount||0), 0);
+    const spent = register.filter(r => r.status !== 'denied').reduce((s,r) => s+(r.amount||0), 0);
     return Math.max(0, earned - spent);
   });
 }
