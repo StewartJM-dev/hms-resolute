@@ -1393,3 +1393,168 @@ exports.autoGenerateWeeklyReportCard = functions
     await buildFullWeeklyReportCard(weekOf);
     return null;
   });
+
+// ════════════════════════════════════════════════════
+// MEDALS — Step 5: criteria checker
+// All 5 criteria are modeled as "how many consecutive qualifying days does
+// he currently have" — even the two that read as weekly checks (zero
+// strikes, wish restraint) are really just 7-day streaks of a different
+// qualifying condition. One shared streak/dedup mechanism handles all five
+// instead of five bespoke ones, and "avoid re-firing a medal for an
+// already-credited streak" becomes a single rule: don't re-award unless
+// the streak's START DATE has changed (i.e. it broke and restarted).
+// ════════════════════════════════════════════════════
+const MEDAL_LOOKBACK_DAYS = 40; // covers the 30-day streak with room to spare
+const CLEAN_SCORE_THRESHOLD = 90;
+// "Not spending all 3 wishes every day" is literally impossible to violate
+// on the day they're earned — the wish economy's own rule is that a day's
+// earnings aren't spendable until the NEXT day. So restraint is evaluated
+// as "never used 3+ wishes in a single day" — the closest real analogue to
+// burning through a full max-day's-worth in one sitting, regardless of
+// which day's earnings those wishes came from.
+const WISH_RESTRAINT_MAX_DAILY_USE = 3;
+
+const MEDAL_CRITERIA = [
+  { key: 'clean7', label: '7-Day Clean Streak', streakKey: 'clean', threshold: 7 },
+  { key: 'clean30', label: '30-Day Clean Streak', streakKey: 'clean', threshold: 30 },
+  { key: 'strikeFree7', label: 'Clean Conduct Week', streakKey: 'strikeFree', threshold: 7 },
+  { key: 'wishRestraint7', label: 'Wish Restraint', streakKey: 'wishRestraint', threshold: 7 },
+  { key: 'devotional7', label: 'Devotional Consistency', streakKey: 'devotional', threshold: 7 }
+];
+
+function isWeekendStr(dateStr) {
+  const dow = parseDateStr(dateStr).getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
+// dates must be DESCENDING, today first. Walks backward while
+// isQualifyingDay holds; 'skip' (weekends, for the score streak) neither
+// extends nor breaks it. Returns the run ending TODAY, or null if today
+// itself doesn't qualify — a streak that lapsed isn't "current."
+function computeStreak(dates, isQualifyingDay) {
+  let length = 0;
+  let startDate = null;
+  for (const date of dates) {
+    const q = isQualifyingDay(date);
+    if (q === 'skip') continue;
+    if (q) { length++; startDate = date; } else break;
+  }
+  return length > 0 ? { length, startDate } : null;
+}
+
+async function fetchMedalCheckData(agentId, dates) {
+  const [scoreSnaps, strikeSnaps, wishSnaps, couragedareSnap] = await Promise.all([
+    Promise.all(dates.map(d => db.ref(`stewart/scores/${agentId}/${d}`).once('value'))),
+    Promise.all(dates.map(d => db.ref(`stewart/strikes/${agentId}/${d}/count`).once('value'))),
+    Promise.all(dates.map(d => db.ref(`stewart/wishes/${agentId}/${d}/used`).once('value'))),
+    db.ref(`stewart/couragedare/progress/${agentId}`).once('value')
+  ]);
+
+  const scoreByDate = {}, strikeByDate = {}, wishUsedByDate = {};
+  dates.forEach((d, i) => {
+    scoreByDate[d] = scoreSnaps[i].val();
+    strikeByDate[d] = strikeSnaps[i].val() || 0;
+    wishUsedByDate[d] = wishSnaps[i].val() || 0;
+  });
+
+  // Courage Dare is program-day-numbered, not calendar-dated (same as the
+  // report card's Step 1 handling) — map each completion's real timestamp
+  // to the calendar day it happened on.
+  const couragedareDates = new Set();
+  Object.values(couragedareSnap.val() || {}).forEach(entry => {
+    if (entry && typeof entry.completedAt === 'number') {
+      couragedareDates.add(formatDateStr(new Date(entry.completedAt)));
+    }
+  });
+
+  return { scoreByDate, strikeByDate, wishUsedByDate, couragedareDates };
+}
+
+function evaluateMedalStreaks(dates, data) {
+  return {
+    clean: computeStreak(dates, d => {
+      if (isWeekendStr(d)) return 'skip'; // weekends aren't scored — skip, don't break
+      const s = data.scoreByDate[d];
+      return (s !== null && s !== undefined) ? s >= CLEAN_SCORE_THRESHOLD : false;
+    }),
+    strikeFree: computeStreak(dates, d => data.strikeByDate[d] === 0),
+    wishRestraint: computeStreak(dates, d => data.wishUsedByDate[d] < WISH_RESTRAINT_MAX_DAILY_USE),
+    devotional: computeStreak(dates, d => data.couragedareDates.has(d))
+  };
+}
+
+// Evaluates all 5 criteria for one boy and records any newly-qualifying
+// medal (streak start date not already credited) under
+// stewart/medals/{agentId}/{weekOf} — {weekOf} being the week the
+// qualifying event happened in, not the streak's own span. Internal
+// dedup bookkeeping lives separately at stewart/medalState/{agentId}/{key}
+// so re-earning after a streak breaks and restarts works naturally.
+// Step 7: family group chat announcement — Tom's voice, agentId:'tom' so
+// moderateGroupChatMessage's own guard (only ALLOWED_AGENT_IDS get
+// classified) exempts it structurally rather than relying on the AI
+// classifier to judge a templated announcement as clean every time.
+// 'tom' also isn't in ALL_PEOPLE, so notifyGroupChat's recipient filter
+// excludes no one — the push notification correctly reaches every parent
+// AND every boy, matching "public, to everyone."
+const MEDAL_ANNOUNCEMENT_TEMPLATES = {
+  clean7: name => `${name} just logged a 7-Day Clean Streak, crew — steady hands finish strong. Let's hear it for him.`,
+  clean30: name => `${name} just hit a 30-Day Clean Streak. That's Officer-grade steadiness, sailors — well sailed.`,
+  strikeFree7: name => `${name} sailed a full week clean of conduct — not a single strike. Well done, sailor.`,
+  wishRestraint7: name => `${name} showed real restraint with his wishes this week instead of burning through them. That's discipline worth noticing, crew.`,
+  devotional7: name => `${name} kept the Word in view seven days running. The Word's the true north — well sailed, sailor.`
+};
+
+async function postMedalAnnouncement(agentName, medalKey) {
+  const template = MEDAL_ANNOUNCEMENT_TEMPLATES[medalKey];
+  const text = template ? template(agentName) : `${agentName} just earned a medal, crew — let's all congratulate him!`;
+  await db.ref('stewart/groupchat').push({ text, from: 'Tom', agentId: 'tom', timestamp: Date.now() });
+}
+
+async function checkAndRecordMedals(agentId, weekOf) {
+  const today = new Date();
+  const dates = [];
+  for (let i = 0; i < MEDAL_LOOKBACK_DAYS; i++) {
+    dates.push(formatDateStr(new Date(today.getTime() - i * 24 * 60 * 60 * 1000)));
+  }
+
+  const data = await fetchMedalCheckData(agentId, dates);
+  const streaks = evaluateMedalStreaks(dates, data);
+
+  const newlyAwarded = [];
+  for (const crit of MEDAL_CRITERIA) {
+    const streak = streaks[crit.streakKey];
+    if (!streak || streak.length < crit.threshold) continue;
+
+    const stateRef = db.ref(`stewart/medalState/${agentId}/${crit.key}`);
+    const stateSnap = await stateRef.once('value');
+    const state = stateSnap.val() || {};
+    if (state.creditedStartDate === streak.startDate) continue; // already credited for this exact run
+
+    await stateRef.set({ creditedStartDate: streak.startDate, awardedAt: Date.now() });
+    const medalRecord = { key: crit.key, label: crit.label, streakLength: streak.length, awardedAt: Date.now() };
+    await db.ref(`stewart/medals/${agentId}/${weekOf}`).push(medalRecord);
+    newlyAwarded.push({ agentId, ...medalRecord });
+    await postMedalAnnouncement(AGENT_DISPLAY_NAMES[agentId] || agentId, crit.key);
+  }
+  return newlyAwarded;
+}
+
+// On-demand trigger — same shape as generateWeeklyReportCard's manual
+// Check In, useful for testing and for a future "check now" UI hook.
+exports.checkMedalsNow = functions.https.onCall(async () => {
+  const weekOf = mostRecentMonday(formatDateStr(new Date()));
+  const results = await Promise.all(ALLOWED_AGENT_IDS.map(id => checkAndRecordMedals(id, weekOf)));
+  return { newlyAwarded: results.flat() };
+});
+
+// Fires daily, evening Eastern — after most of a day's real activity has
+// happened, so a streak crossing its threshold today is picked up same-day
+// rather than waiting for the next morning's chores to even start.
+exports.checkMedalsDaily = functions.pubsub
+  .schedule('0 21 * * *')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    const weekOf = mostRecentMonday(formatDateStr(new Date()));
+    await Promise.all(ALLOWED_AGENT_IDS.map(id => checkAndRecordMedals(id, weekOf)));
+    return null;
+  });

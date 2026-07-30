@@ -737,6 +737,7 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
   <div class="topbar">
     <div class="topbar-left">
       <a href="../" class="topbar-back" title="Back to Gangway">&#8592;</a>
+      <div id="topbar-icon" style="font-size:24px;line-height:1;" title="This week's badge"></div>
       <div>
         <div class="topbar-codename" id="topbar-codename">AGENT</div>
         <div class="topbar-name" id="topbar-name">Loading...</div>
@@ -1174,6 +1175,7 @@ function selectAgent(id, codename, name, rank, theme, icon){
   // Update topbar
   document.getElementById('topbar-codename').textContent = codename;
   document.getElementById('topbar-name').textContent = name + ' — ' + rank;
+  renderTopbarIcon();
 
   // Switch screens
   document.getElementById('screen-select').classList.remove('active');
@@ -2468,7 +2470,7 @@ function renderGroupMessages(msgs){
     el.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.3);">No messages yet.<br>Say hi to the group!</div>';
     return;
   }
-  const AGENT_ICONS = {samuel:'\u{1F985}',johnjr:'\u{1F981}',stephen:'\u{1F996}',daniel:'\u{1F418}'};
+  const AGENT_ICONS = {samuel:'\u{1F985}',johnjr:'\u{1F981}',stephen:'\u{1F996}',daniel:'\u{1F418}',tom:'⚓'};
   const HANS_ICON = '\u{1F9D1}';
   el.innerHTML = items.map(m => {
     const isMe = m.agentId === currentAgent.id;
@@ -3576,6 +3578,72 @@ function stopConfetti(){
   }
 }
 
+// ── MEDALS — private celebration + temporary topbar icon ──
+// stewart/medals/{agentId}/{weekOf} is written server-side (the criteria
+// checker). Everything here is read-only client behavior: show the
+// celebration once per medal (same stewart/celebrations/{type}/{key}/{agentId}
+// "seen" pattern already used for daily/family-night/game-time
+// celebrations above), and swap the topbar icon to a badge for any medal
+// earned in the CURRENT week only — it naturally reverts once a new
+// week's mostRecentMondayStr() no longer matches.
+const MEDAL_INFO = {
+  clean7:         { emoji:'&#127941;', title:'7-Day Clean Streak!',    msg: a => `Seven days of steady hands, Agent ${a.codename.split(' ')[1]}. That's the mark of a real professional.` },
+  clean30:        { emoji:'&#127942;', title:'30-Day Clean Streak!',   msg: a => `Thirty days running, Agent ${a.codename.split(' ')[1]}. That's Officer-grade discipline.` },
+  strikeFree7:    { emoji:'&#128330;&#65039;', title:'Clean Conduct Week!', msg: a => `A full week without a single strike, Agent ${a.codename.split(' ')[1]}. Well sailed.` },
+  wishRestraint7: { emoji:'&#128142;', title:'Wish Restraint!',        msg: a => `A week of real restraint with your wishes, Agent ${a.codename.split(' ')[1]}. That's discipline.` },
+  devotional7:    { emoji:'&#10013;&#65039;', title:'Devotional Consistency!', msg: a => `Seven days running with the Word, Agent ${a.codename.split(' ')[1]}. Well done.` }
+};
+
+function mostRecentMondayStr(){
+  const d = new Date();
+  const dow = d.getDay(); // 0=Sun,1=Mon,...6=Sat
+  const diff = (dow === 0) ? 6 : dow - 1;
+  return localDateStr(new Date(d.getTime() - diff*24*60*60*1000));
+}
+
+function renderTopbarIcon(){
+  const el = document.getElementById('topbar-icon');
+  if(!el || !currentAgent) return;
+  el.innerHTML = currentAgent.icon; // default; overridden below if a medal is active this week
+  if(!_db) return;
+  _db.ref(`stewart/medals/${currentAgent.id}/${mostRecentMondayStr()}`).on('value', snap => {
+    const medalsForWeek = snap.val();
+    if(!medalsForWeek){ el.innerHTML = currentAgent.icon; return; }
+    const top = Object.values(medalsForWeek).sort((a,b) => (b.awardedAt||0)-(a.awardedAt||0))[0];
+    const info = MEDAL_INFO[top.key];
+    el.innerHTML = info ? info.emoji : currentAgent.icon;
+  });
+}
+
+function checkMedalCelebrations(){
+  if(!currentAgent||!_db) return;
+  _db.ref(`stewart/medals/${currentAgent.id}`).once('value', snap => {
+    const weeks = snap.val() || {};
+    const allMedals = [];
+    Object.entries(weeks).forEach(([weekOf, medalsForWeek]) => {
+      Object.entries(medalsForWeek||{}).forEach(([pushKey, rec]) => {
+        allMedals.push({ weekOf, pushKey, ...rec });
+      });
+    });
+    allMedals.sort((a,b) => (a.awardedAt||0) - (b.awardedAt||0));
+    showNextUnseenMedal(allMedals, 0);
+  });
+}
+function showNextUnseenMedal(medals, i){
+  if(i >= medals.length || !currentAgent || !_db) return;
+  const m = medals[i];
+  const seenRef = _db.ref(`stewart/celebrations/medal/${m.weekOf}/${currentAgent.id}/${m.pushKey}`);
+  seenRef.once('value', seenSnap => {
+    if(!seenSnap.val()){
+      const info = MEDAL_INFO[m.key] || { emoji:'&#127942;', title: m.label, msg: () => 'Well earned, Agent.' };
+      showCelebration(info.emoji, info.title, info.msg(currentAgent));
+      seenRef.set(true);
+      return; // one at a time, matching the no-stacking convention below
+    }
+    showNextUnseenMedal(medals, i+1);
+  });
+}
+
 function checkCelebrations(){
   if(!currentAgent||!_db) return;
   const weekStart = getWeekStart();
@@ -3616,6 +3684,9 @@ function checkWeeklyCelebrations(){
       });
     }
   });
+
+  // MEDALS celebration — independent of the pair-based checks below
+  checkMedalCelebrations();
 
   // GAME TIME celebration — check this agent's pair
   const pair = PAIRS[currentAgent.id];

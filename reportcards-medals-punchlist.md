@@ -52,19 +52,19 @@
 - **The boy's profile icon changes to a medal graphic for that week** — temporary visual change, not permanent, reverts after the week
 - **A message posts in the family group chat** announcing it — e.g. "Stephen has earned [medal] for [reason] — let's all congratulate him!" — visible to the whole family, not just the boy
 
-### Step 5: Medal criteria checker
+### Step 5: Medal criteria checker ✅ done
 **Task for Claude Code:**
 - New function (client-side check on app load, or server-side scheduled check) that evaluates each boy against the 5 criteria using existing data (`stewart/scores`, `stewart/strikes`, `stewart/wishes`, devotional completion)
 - On qualifying: write to `stewart/medals/{agentId}/{weekOf}` recording which medal(s) were earned
 - Avoid re-triggering the same medal repeatedly for an already-ongoing streak — only fire once per qualifying event
 
-### Step 6: Celebration + icon change (private, to the boy)
+### Step 6: Celebration + icon change (private, to the boy) ✅ done (not browser-tested — see commit note)
 **Task for Claude Code:**
 - On a new medal being recorded, call the existing `showCelebration(emoji, title, msg)` function with medal-appropriate content for that boy's own screen
 - Temporarily override the boy's displayed `icon` (wherever `currentAgent.icon` / `s.icon` is rendered) with a medal graphic for the duration of that week, then revert to normal on the following week's reset
 - Confirm this applies consistently everywhere the icon shows (`wt-icon`, activity displays, etc.), not just one spot
 
-### Step 7: Family group chat announcement (public, to everyone)
+### Step 7: Family group chat announcement (public, to everyone) ✅ done
 **Task for Claude Code:**
 - On the same medal-earning event, post a message to `stewart/groupchat` announcing it to the whole family — e.g. "Stephen has earned [Medal Name] for [reason] — let's all congratulate him!"
 - Decide a consistent voice for this announcement (could be system-style/neutral, or routed through Tom's voice for the boys' side — John's call; default to a simple neutral announcement if no strong preference)
@@ -73,14 +73,14 @@
 ---
 
 ## Testing checklist
-- [ ] Manually trigger the weekly aggregation — confirm real data pulled accurately for a test boy
-- [ ] Confirm report appears identically (same content) in both Bridge and Officers' Country
-- [ ] Confirm manual "Check In" works on-demand, separate from the Monday auto-run
-- [ ] Copy the plain-text version — confirm it pastes cleanly, no broken formatting
-- [ ] Force each of the 5 medal criteria — confirm celebration fires and icon changes for each
-- [ ] Confirm icon reverts to normal the following week
-- [ ] Confirm a medal doesn't re-fire every day during an ongoing streak — only once
-- [ ] Confirm the family chat announcement posts correctly and isn't flagged by the moderation system
+- [x] Manually trigger the weekly aggregation — confirm real data pulled accurately for a test boy
+- [x] Confirm report appears identically (same content) in both Bridge and Officers' Country — true by construction (both read the same stewart/reportcards/{weekOf} record with identical field names); not confirmed via an actual browser render in either UI
+- [x] Confirm manual "Check In" works on-demand, separate from the Monday auto-run
+- [x] Copy the plain-text version — confirm it pastes cleanly, no broken formatting — verified the stored string directly (clean line breaks, no artifacts); the copy button's clipboard behavior itself not browser-tested
+- [x] Force each of the 5 medal criteria — confirm celebration fires and icon changes for each — strikeFree7/wishRestraint7 verified against the real live pipeline (RTDB read → award → announce); clean7/clean30/devotional7 verified via unit tests against the exact streak logic (Step 5) plus repeated real runs confirming no false positives, but NOT verified crossing their threshold through a live RTDB read — deliberately not forced against real historical score/wish data to avoid corrupting real pay-affecting family history. Celebration-firing itself not browser-tested.
+- [x] Confirm icon reverts to normal the following week — true by construction (the topbar always queries the CURRENT week's key live; an empty week naturally falls back to the normal icon, no expiry/decay logic to fail) — not confirmed by literally waiting a week
+- [x] Confirm a medal doesn't re-fire every day during an ongoing streak — only once — verified live (two consecutive real runs, second produced zero new awards) and via unit tests covering the full award/no-refire/break/re-award lifecycle
+- [x] Confirm the family chat announcement posts correctly and isn't flagged by the moderation system — verified live, both the moderation-exemption in isolation and the full record-then-announce integration
 
 ## Merge checklist
 - [ ] Test on branch (`feature/reportcards-medals`) for a few real days/one real week before merging

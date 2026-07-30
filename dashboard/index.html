@@ -1636,15 +1636,17 @@ function renderThreadMessages(msgs, targetId){
     el.innerHTML = '<div class="empty-state">No messages yet. Start the conversation.</div>';
     return;
   }
-  const AGENT_ICONS = {samuel:'&#129413;',johnjr:'&#129409;',stephen:'&#129430;',daniel:'&#128024;'};
+  const AGENT_ICONS = {samuel:'&#129413;',johnjr:'&#129409;',stephen:'&#129430;',daniel:'&#128024;',tom:'&#9875;'};
   const HANS_ICON = '&#129441;';
   el.innerHTML = items.map(m => {
     const isHeinz = m.isHeinz || m.agentId==='heinz';
     const isHans = m.isHans || m.agentId==='hans';
+    const isTom = m.agentId==='tom';
     const isParent = isHeinz || isHans || m.from==='Dad'||m.from==='Mom'||m.from==='HQ';
     let icon;
     if(isHeinz) icon = '\u{1F9D1}\u200D\u{1F52C}\u26A1';
     else if(isHans) icon = '\u{1F9D1}\u200D\u{1F52C}';
+    else if(isTom) icon = AGENT_ICONS.tom;
     else if(isParent) icon = HANS_ICON;
     else icon = (AGENT_ICONS[m.agentId] || '&#128100;');
     const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
