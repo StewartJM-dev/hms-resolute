@@ -896,6 +896,14 @@ async function classifyChatMessage(text) {
 
 const TOM_MODERATION_NUDGE_GIBBERISH = "That's outside my orders, sailor — pulled that one, didn't look like real words. Keep it plain talk out there and you're squared away.";
 const TOM_MODERATION_NUDGE_UNKIND = "That's not how we treat each other, sailor — pull it back. I let Mom and Dad know so they've got the full picture.";
+const TOM_MODERATION_NUDGE_BANNED_TERM = "That number's off-limits in the chat, sailor — Dad's orders. Spell it out (\"sixty seven\") if you need it, and you're clear.";
+
+// A hard, deterministic ban — not an AI judgment call. "67" as digits is
+// blocked outright, even inside an otherwise real, coherent sentence
+// (unlike gibberish_spam, which only catches messages with no real content
+// at all). Word-bounded so it doesn't false-positive on "1967" or "167".
+// Spelling it out ("sixty seven") is explicitly the sanctioned way through.
+const BANNED_67_PATTERN = /\b67\b/;
 
 // stewart/strikes/{agentId}/{date}/count is transaction-incremented (same
 // pattern as the wishes economy); each incident is also logged in full
@@ -974,6 +982,14 @@ exports.moderateGroupChatMessage = functions
     // agentId is 'parent' for parent-sent messages — only boys get moderated.
     if (!m || !m.text || !ALLOWED_AGENT_IDS.includes(m.agentId)) return null;
 
+    if (BANNED_67_PATTERN.test(m.text)) {
+      await snap.ref.remove();
+      const count = await recordStrike(m.agentId, formatDateStr(new Date()), 'banned_term', 'groupchat', m.text);
+      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_BANNED_TERM);
+      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
+      return null;
+    }
+
     const category = await classifyChatMessage(m.text);
 
     if (category === 'gibberish_spam') {
@@ -1009,6 +1025,14 @@ exports.moderatePrivateMessage = functions
     // both fall through here untouched. Tom's own nudges also lack an
     // agentId field, so this same check keeps them from re-triggering.
     if (!ALLOWED_AGENT_IDS.includes(agentId) || m.agentId !== agentId) return null;
+
+    if (BANNED_67_PATTERN.test(m.text)) {
+      await snap.ref.remove();
+      const count = await recordStrike(agentId, formatDateStr(new Date()), 'banned_term', 'private', m.text);
+      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_BANNED_TERM);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      return null;
+    }
 
     const category = await classifyChatMessage(m.text);
 
