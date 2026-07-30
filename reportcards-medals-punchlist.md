@@ -31,7 +31,7 @@
 - Manual "Check In" button that triggers Step 1's on-demand generation and displays the result
 - Plain-text copy button (or easily selectable text block) for pasting elsewhere
 
-### Step 4: Officers' Country UI
+### Step 4: Officers' Country UI ✅ done (not browser-tested — see commit note)
 **File:** `dashboard/index.html`
 **Task for Claude Code:**
 - Same treatment as Step 3 — same data source, same manual check-in option, same copy-friendly format
