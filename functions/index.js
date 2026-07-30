@@ -636,7 +636,7 @@ T.O.M. reveal: if a boy directly asks what "Tom" or "T.O.M." stands for, or who/
 What actually exists in HMS Resolute today, for app-help questions — never invent functionality beyond this:
 - Daily missions/chores, weekdays only. Completing them earns points, which become pay and game time.
 - Wishes: completing 1/3 of a day's chores earns 1 wish, 2/3 earns 2, all of it earns 3. Wishes earned today can be spent starting TOMORROW, not the same day — and unused wishes stack up.
-- A wish buys one question to you that's an interest/discovery question, a learning question, or a devotional question. Questions about how the app itself works (like this one) are always free, no wish needed.
+- A wish buys one question to you that's an interest/discovery question, a learning question, or a devotional question. Questions about how the app itself works (like this one) are always free, no wish needed — and so is asking you to find or locate a specific real Bible verse.
 - White Glove: Mom's room inspections — that's hers to run, not yours to explain in detail.
 - War Room: submit a prayer request, or pray for someone else's.
 - Crow's Nest: add a praise, or see what someone else is grateful for.
@@ -647,7 +647,8 @@ Classify every message into exactly one category:
 - "reveal": the boy directly asks what Tom/T.O.M. is or who you are.
 - "interest": exploring a hobby or interest, or asking to be pointed to a website or resource.
 - "learning": wanting to learn or understand something that isn't devotional and isn't app navigation.
-- "devotional": about faith, Scripture, God, prayer, or right-and-wrong seeking spiritual guidance.
+- "verse_lookup": a direct request to find or locate a specific real Bible verse or passage — "where does the Bible talk about X," "find me a verse about Y," "what verse says...". Free, not a wish-spend. Only literal verse-finding — if the boy is actually asking what something MEANS or wanting help understanding/applying it, that's "devotional" below, not this.
+- "devotional": faith, Scripture, God, prayer, or right-and-wrong seeking spiritual reflection or understanding — e.g. "what does courage mean," "help me understand this Grace Dare." Costs a wish (unlike "verse_lookup" above).
 - "declined_sibling": tattling on, complaining about, or asking you to referee a brother.
 - "declined_discipline": consequences, punishment, or getting out of trouble — not yours to weigh in on.
 - "declined_rulebypass": asking you to help get around a house rule or a parent's decision.
@@ -656,7 +657,7 @@ Classify every message into exactly one category:
 
 Rules for the "message" field:
 - 2-4 sentences, in voice, talking directly to the boy.
-- For "devotional": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to exactly ONE verse (never a range like "5:43-44" — pick the single verse that matters most) in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
+- For "devotional" and "verse_lookup": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to exactly ONE verse (never a range like "5:43-44" — pick the single verse that matters most) in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
 - For "interest": you may suggest exactly one real, well-known, kid-appropriate website or resource by name in "suggestedWebsite" (e.g. "NASA Kids' Club" or "khanacademy.org"), and mention it naturally in your message too.
 - For every other category, leave "verseRef" and "suggestedWebsite" as empty strings.
 - For "declined_*": firm but warm, brief, in voice — redirect, don't lecture, and never actually help with the sibling/discipline/rule-bypass ask itself.
@@ -668,7 +669,7 @@ const TOM_RESPONSE_SCHEMA = {
   properties: {
     category: {
       type: 'string',
-      enum: ['app_help', 'reveal', 'interest', 'learning', 'devotional', 'declined_sibling', 'declined_discipline', 'declined_rulebypass', 'declined_parentspace', 'declined_offtopic']
+      enum: ['app_help', 'reveal', 'interest', 'learning', 'devotional', 'verse_lookup', 'declined_sibling', 'declined_discipline', 'declined_rulebypass', 'declined_parentspace', 'declined_offtopic']
     },
     message: { type: 'string' },
     verseRef: { type: 'string' },
@@ -681,6 +682,7 @@ const TOM_RESPONSE_SCHEMA = {
 const TOM_CATEGORY_TO_TYPE = {
   app_help: 'app_help',
   reveal: 'app_help',
+  verse_lookup: 'app_help',
   interest: 'wish_spend',
   learning: 'wish_spend',
   devotional: 'wish_spend',
@@ -770,7 +772,7 @@ exports.askTom = functions
       type = 'declined';
       category = 'declined_budget';
       message = "Budget's tapped for this month, sailor — that one's on hold till next month. Ask me something in the app-help lane, though, anytime.";
-    } else if (category === 'devotional') {
+    } else if (category === 'devotional' || category === 'verse_lookup') {
       const verse = lookupVerse(parsed.verseRef);
       if (verse) {
         message += `\n\n"${verse.text}" — ${verse.book} ${verse.chapter}:${verse.verse} (KJV)\n\nThe Word's the true north — ask your father, I could be wrong.`;
