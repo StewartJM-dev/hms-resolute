@@ -83,7 +83,12 @@ exports.notifyPrivateThread = functions.database
     if (!m || !m.text) return null;
     if (await alreadyNotified('privatemsg_' + agentId + '_' + context.params.msgId)) return null;
 
-    const isParentSender = (m.from === 'Dad' || m.from === 'Mom' || m.from === 'HQ');
+    // Tom's own moderation nudges land in this same thread — route them to
+    // the boy like a parent message, not to John/Dawn like a boy message.
+    // Category B's separate, explicit parent notification (Step 3) is what
+    // actually alerts John/Dawn; this path must not double up on that for
+    // every Category A nudge too.
+    const isParentSender = (m.from === 'Dad' || m.from === 'Mom' || m.from === 'HQ' || m.from === 'Tom');
     const title = 'Private Message — ' + (m.from || 'Someone');
     const body = m.text.length > 100 ? m.text.slice(0, 100) + '…' : m.text;
 
@@ -837,4 +842,233 @@ exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
   }
 
   return { spent: true, remaining: earned - used };
+});
+
+// ════════════════════════════════════════════════════
+// TOM — chat moderation
+// Fires on the same paths notifyGroupChat/notifyPrivateThread already
+// listen to. Classifies each boy-authored message; clean messages are
+// left alone (stamped for visibility), gibberish/spam is deleted with a
+// strike and a private in-voice nudge (Step 2). Unkindness (Step 3) and
+// the strike-threshold auto-pause (Step 4) come next.
+// ════════════════════════════════════════════════════
+const MODERATION_MODEL = 'claude-haiku-4-5-20251001';
+
+const MODERATION_SYSTEM_PROMPT = `You are a message classifier moderating chat messages sent by boys ages 6-11 in a family chore-tracking app. You see exactly one message at a time, with no surrounding conversation context. Classify it into exactly one category:
+
+- "clean": a normal message — chat, jokes, questions, chore talk, harmless nonsense that's still a real attempt to communicate, etc. Default here when in doubt.
+- "gibberish_spam": no real content — keyboard mashing, emoji-only strings, meaningless repeated characters, or a bare "67" (a kids' meme, meaningless here). Short real messages ("k", "lol", "ok", "sup") are NOT this category — only flag when there's no discernible communication attempt at all.
+- "unkind": put-downs, name-calling, mocking, or hostile language directed at a sibling or anyone else. Real disagreement or venting that stays respectful is NOT this category — only flag actual unkindness.
+
+Be conservative: when genuinely uncertain between "clean" and a flagged category, choose "clean." This classification drives automatic action (deleting messages, notifying parents), so false positives have a real cost.`;
+
+const MODERATION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    category: { type: 'string', enum: ['clean', 'gibberish_spam', 'unkind'] }
+  },
+  required: ['category'],
+  additionalProperties: false
+};
+
+// Fails open to "clean" on any API/parse error — an automated system that
+// deletes messages and pages parents should never do either on a hiccup.
+async function classifyChatMessage(text) {
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model: MODERATION_MODEL,
+      max_tokens: 20,
+      system: MODERATION_SYSTEM_PROMPT,
+      output_config: { format: { type: 'json_schema', schema: MODERATION_RESPONSE_SCHEMA } },
+      messages: [{ role: 'user', content: text }]
+    });
+    const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const parsed = JSON.parse(raw);
+    return MODERATION_RESPONSE_SCHEMA.properties.category.enum.includes(parsed.category) ? parsed.category : 'clean';
+  } catch (err) {
+    console.error('Chat moderation classification failed, defaulting to clean:', err);
+    return 'clean';
+  }
+}
+
+const TOM_MODERATION_NUDGE_GIBBERISH = "That's outside my orders, sailor — pulled that one, didn't look like real words. Keep it plain talk out there and you're squared away.";
+const TOM_MODERATION_NUDGE_UNKIND = "That's not how we treat each other, sailor — pull it back. I let Mom and Dad know so they've got the full picture.";
+
+// stewart/strikes/{agentId}/{date}/count is transaction-incremented (same
+// pattern as the wishes economy); each incident is also logged in full
+// under .../incidents so the Step 6 weekly report card can show real
+// per-day detail, not just a number. Returns the new count for callers
+// (Step 4's auto-pause threshold check) to use without a second read.
+async function recordStrike(agentId, date, category, source, text) {
+  await db.ref(`stewart/strikes/${agentId}/${date}/incidents`).push({
+    category,
+    source,
+    text: String(text).slice(0, 300),
+    timestamp: Date.now()
+  });
+  const result = await db.ref(`stewart/strikes/${agentId}/${date}/count`).transaction(current => (current || 0) + 1);
+  return result.snapshot.val();
+}
+
+// Lands in the same private thread parents use (stewart/messages/{agentId})
+// rather than Tom's own separate Compass chat, so John/Dawn naturally see
+// it too without a dedicated notification for every Category A incident.
+// No `agentId` field on purpose — that's what tells moderatePrivateMessage
+// to skip re-classifying Tom's own nudge when this write re-triggers it.
+async function pushTomModerationNudge(agentId, text) {
+  await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text, timestamp: Date.now() });
+}
+
+// Unlike gibberish/spam, unkindness is never deleted — it stays visible in
+// context. This fires on EVERY unkind instance regardless of strike count
+// (the 3-strike auto-pause in Step 4 is a separate, additional escalation),
+// with enough detail for John/Dawn to see what was said and by whom.
+async function notifyParentsOfUnkindMessage(agentId, agentName, text, source, msgId) {
+  if (await alreadyNotified('unkind_' + agentId + '_' + msgId)) return;
+  const where = source === 'groupchat' ? 'Group Chat' : 'Private Thread';
+  const title = `Tom flagged unkindness — ${agentName} (${where})`;
+  const body = text.length > 100 ? text.slice(0, 100) + '…' : text;
+  await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+}
+
+// Matches the strike counter's own UTC-date key (formatDateStr uses
+// toISOString), so the auto-pause lifts at exactly the moment the strike
+// count itself resets — no separate clock to drift out of sync.
+function endOfUtcDayMs() {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);
+}
+
+// Reuses the existing manual-pause data path (stewart/chatmutes/{agentId})
+// so unmuteBoy() in dashboard/index.html and bridge/index.html needs no
+// changes to lift an auto-pause — it's indistinguishable from a manual one.
+// Values there are either `true` (an indefinite "Hold") or a numeric
+// mutedUntil timestamp (1hr/1day toggles). The transaction only ever
+// strengthens the existing pause, never weakens one a parent already set.
+async function autoPauseForStrikes(agentId, agentName) {
+  const untilMs = endOfUtcDayMs();
+  const muteRef = db.ref(`stewart/chatmutes/${agentId}`);
+  const result = await muteRef.transaction(current => {
+    // Returning undefined aborts the transaction (no write) — used here,
+    // not a same-value return, since Firebase still commits (and writes)
+    // when the update function returns the value unchanged.
+    if (current === true) return undefined;
+    if (typeof current === 'number' && current >= untilMs) return undefined;
+    return untilMs;
+  });
+  if (!result.committed) return; // already paused at least this strong — no notification needed
+
+  const title = 'Chat Auto-Paused — ' + agentName;
+  const body = agentName + " hit 3 strikes today from Tom's chat moderation — group chat is paused for the rest of the day.";
+  await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+}
+
+exports.moderateGroupChatMessage = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .database.ref('/stewart/groupchat/{msgId}')
+  .onCreate(async (snap, context) => {
+    const m = snap.val();
+    // agentId is 'parent' for parent-sent messages — only boys get moderated.
+    if (!m || !m.text || !ALLOWED_AGENT_IDS.includes(m.agentId)) return null;
+
+    const category = await classifyChatMessage(m.text);
+
+    if (category === 'gibberish_spam') {
+      await snap.ref.remove();
+      const count = await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
+      return null;
+    }
+
+    if (category === 'unkind') {
+      const count = await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_UNKIND);
+      await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
+      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
+      await snap.ref.update({ moderation: category });
+      return null;
+    }
+
+    await snap.ref.update({ moderation: category });
+    return null;
+  });
+
+exports.moderatePrivateMessage = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .database.ref('/stewart/messages/{agentId}/{msgId}')
+  .onCreate(async (snap, context) => {
+    const agentId = context.params.agentId;
+    const m = snap.val();
+    if (!m || !m.text) return null;
+    // Parent-authored pushes into a boy's thread never carry an agentId
+    // field, and the 'family' broadcast pseudo-thread isn't a real boy —
+    // both fall through here untouched. Tom's own nudges also lack an
+    // agentId field, so this same check keeps them from re-triggering.
+    if (!ALLOWED_AGENT_IDS.includes(agentId) || m.agentId !== agentId) return null;
+
+    const category = await classifyChatMessage(m.text);
+
+    if (category === 'gibberish_spam') {
+      await snap.ref.remove();
+      const count = await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      return null;
+    }
+
+    if (category === 'unkind') {
+      const count = await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_UNKIND);
+      await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      await snap.ref.update({ moderation: category });
+      return null;
+    }
+
+    await snap.ref.update({ moderation: category });
+    return null;
+  });
+
+// Step 6: weekly report card — pulls the FULL, unfiltered incident history
+// across 7 days (the daily strike counter's own date-scoped reset never
+// applies here; this reads every date node directly), so John/Dawn see
+// real per-day patterns rather than one flattened number. Reuses the same
+// date-range utilities Tink's grounded lookups already use.
+exports.getWeeklyStrikeReport = functions.https.onCall(async (data, callableContext) => {
+  const { agentId, weekEnd } = data || {};
+  if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
+  }
+  const endDate = (typeof weekEnd === 'string' && DATE_RE.test(weekEnd)) ? weekEnd : formatDateStr(new Date());
+  const startDate = formatDateStr(new Date(parseDateStr(endDate).getTime() - 6 * 24 * 60 * 60 * 1000));
+  const dates = dateRange(startDate, endDate, 7);
+
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value')));
+
+  let totalStrikes = 0;
+  let unkindDays = 0;
+  const days = dates.map((date, i) => {
+    const rec = snaps[i].val() || {};
+    const count = rec.count || 0;
+    const incidents = Object.values(rec.incidents || {}).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const categories = [...new Set(incidents.map(inc => inc.category))];
+    const hadUnkindness = categories.includes('unkind');
+
+    totalStrikes += count;
+    if (hadUnkindness) unkindDays++;
+
+    return { date, count, categories, hadUnkindness, incidents };
+  });
+
+  return {
+    agentId,
+    agentName: AGENT_DISPLAY_NAMES[agentId] || agentId,
+    weekStart: startDate,
+    weekEnd: endDate,
+    totalStrikes,
+    unkindDays,
+    days
+  };
 });
