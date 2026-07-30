@@ -65,16 +65,16 @@
 ---
 
 ## Testing checklist
-- [ ] App-help question — free, no wish confirmation, accurate answer
-- [ ] Interest/discovery question — triggers wish confirmation, generates a website suggestion, queues parent approval notification
-- [ ] Learning question — triggers wish confirmation, reasonable answer
-- [ ] Devotional question — triggers wish confirmation, cites a real KJV verse, includes "ask your father" framing
-- [ ] Off-topic/sibling/rule-bypass question — declined, no wish spent, in-voice redirect
-- [ ] Follow-up question referencing prior message — confirms conversation memory works (same fix pattern as Tink)
-- [ ] Zero wishes remaining — graceful in-voice decline, no error
-- [ ] Ask Tom "what are you" — confirms the T.O.M. reveal line
-- [ ] Force an API failure — confirms fallback line, never silent
-- [ ] Check budget tracking after a day of testing — confirm real cost tracks near estimate
+- [x] App-help question — free, no wish confirmation, accurate answer
+- [x] Interest/discovery question — triggers wish confirmation, generates a website suggestion, queues parent approval notification
+- [x] Learning question — triggers wish confirmation, reasonable answer
+- [x] Devotional question — triggers wish confirmation, cites a real KJV verse, includes "ask your father" framing (found + fixed a bug: model occasionally returned a verse range like "5:43-44" which the lookup rejected — regex now tolerates a range and prompt asks for exactly one verse)
+- [x] Off-topic/sibling/rule-bypass question — declined, no wish spent, in-voice redirect
+- [x] Follow-up question referencing prior message — confirms conversation memory works (same fix pattern as Tink)
+- [x] Zero wishes remaining — graceful in-voice decline, no error
+- [x] Ask Tom "what are you" — confirms the T.O.M. reveal line
+- [x] Force an API failure — confirms fallback line, never silent
+- [x] Check budget tracking after a day of testing — confirm real cost tracks near estimate (verified real per-boy accumulation in `stewart/budget`, and confirmed the $1 cap produces a graceful `declined_budget` response while `app_help` stays free even over budget)
 
 ## Merge checklist
 - [ ] Test on branch (`feature/tom-core`) for a few real days before merging
