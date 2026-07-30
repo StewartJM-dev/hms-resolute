@@ -11,7 +11,7 @@
 - **Also a manual "check in" trigger** — John or Dawn can generate/view a real-time snapshot any day, not just wait for Monday
 - Must be **easy to copy as plain text** — John wants to paste it directly into a Claude.ai conversation for weekly review
 
-### Step 1: Data aggregation function
+### Step 1: Data aggregation function ✅ done
 **Task for Claude Code:**
 - New Cloud Function (or scheduled function) that pulls a full week's data per boy: `stewart/scores`, `stewart/deductions`, `stewart/wishes`, `stewart/strikes` (unfiltered by daily reset — full week visibility, per the moderation punch list's existing requirement), devotional/Courage Dare completion, White Glove results
 - Also pulls Dawn-side data: Tink usage patterns, any relevant household notes
