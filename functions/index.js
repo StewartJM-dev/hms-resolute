@@ -1102,18 +1102,47 @@ function previousWeekMonday(dateStr) {
   return formatDateStr(new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000));
 }
 
+// stewart/tomchat/{agentId} is a flat push-list (a boy's question, then
+// Tom's response as a separate node immediately after), not date-keyed —
+// filtered into the week's timestamp range, same approach as Courage Dare
+// below. category/type only live on the response node, so each question is
+// paired with the response entry right after it to recover them. Skips any
+// exchange that never got a real answer (a dropped request, or a
+// wish-spend question the boy never confirmed AND has no realText) — no
+// category means nothing coherent to summarize.
+async function fetchTomChatWeekData(agentId, weekStartMs, weekEndMs) {
+  const snap = await db.ref(`stewart/tomchat/${agentId}`).once('value');
+  const all = snap.val() || {};
+  const entries = Object.values(all)
+    .filter(e => e && typeof e.timestamp === 'number' && e.timestamp >= weekStartMs && e.timestamp < weekEndMs)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  const conversations = [];
+  for (let i = 0; i < entries.length; i++) {
+    const q = entries[i];
+    if (q.agentId === 'tom') continue; // response nodes are consumed via their preceding question
+    const r = entries[i + 1];
+    if (!r || r.agentId !== 'tom' || !r.category) continue;
+    const response = r.realText || r.text; // realText covers an unconfirmed wish-spend answer
+    if (!response) continue;
+    conversations.push({ question: q.text, category: r.category, type: r.type, response });
+  }
+  return conversations;
+}
+
 async function fetchBoyWeekData(agentId, dates) {
-  const [scoreSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap] = await Promise.all([
+  const weekStartMs = parseDateStr(dates[0]).getTime();
+  const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
+
+  const [scoreSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations] = await Promise.all([
     Promise.all(dates.map(date => db.ref(`stewart/scores/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/deductions/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/wishes/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value'))),
     db.ref(`stewart/couragedare/progress/${agentId}`).once('value'),
-    db.ref(`stewart/growth/boynotes/${agentId}`).once('value')
+    db.ref(`stewart/growth/boynotes/${agentId}`).once('value'),
+    fetchTomChatWeekData(agentId, weekStartMs, weekEndMs)
   ]);
-
-  const weekStartMs = parseDateStr(dates[0]).getTime();
-  const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
 
   const days = dates.map((date, i) => {
     const score = scoreSnaps[i].val();
@@ -1158,7 +1187,8 @@ async function fetchBoyWeekData(agentId, dates) {
     days,
     totals,
     couragedareCompletedThisWeek: couragedareThisWeek.length,
-    growthNote: growthNoteSnap.val() || null
+    growthNote: growthNoteSnap.val() || null,
+    tomConversations
   };
 }
 
@@ -1264,9 +1294,11 @@ async function aggregateWeeklyReportData(weekOf) {
 // ════════════════════════════════════════════════════
 const REPORT_WRITEUP_MODEL = 'claude-sonnet-4-6';
 
-const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, and White Glove room-inspection results.
+const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, White Glove room-inspection results, and each boy's conversations with Tom (his AI companion) that week.
 
 Write like a sharp, honest coach's report, not a form letter. Be specific: cite real days, real numbers, real patterns ("completed every morning round, missed evening three times" — not "did well overall"). Note trends across the week (improving, slipping, consistent) where the data actually shows one. If a category has no data for the week (e.g. zero strikes, zero Courage Dare entries), say so plainly and briefly rather than padding — absence of a problem is itself useful information, but don't manufacture insight where there isn't any.
+
+Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
 
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
