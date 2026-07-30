@@ -993,6 +993,28 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
       </div>
     </div>
 
+    <!-- TAB: COMPASS (Tom) -->
+    <div class="tab" id="tab-compass">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">Compass</div>
+        <div class="sec-head-line"></div>
+      </div>
+      <div id="tom-wish-counter" style="display:flex;gap:8px;margin-bottom:16px;">
+        <div class="empty">Loading wishes...</div>
+      </div>
+
+      <div style="background:var(--black);border:1px solid var(--gold);border-radius:10px;overflow:hidden;">
+        <div style="font-size:9px;color:rgba(255,255,255,.4);padding:8px 13px 0;">Ask Tom anything. App questions are always free.</div>
+        <div style="padding:10px 13px;max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:8px;" id="tom-messages"></div>
+        <div style="display:flex;gap:8px;padding:10px 13px;border-top:2px solid var(--gold);background:var(--black);">
+          <input type="text" id="tom-input" placeholder="Ask Tom..." maxlength="280" autocomplete="off" name="msg-tom-nofill"
+            style="flex:1;padding:9px 12px;border-radius:20px;border:1px solid rgba(200,146,42,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;">
+          <button onclick="askTomChat()" style="width:38px;height:38px;border-radius:50%;background:var(--gold);border:none;cursor:pointer;color:var(--black);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&#10148;</button>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 
   <!-- BOTTOM NAV -->
@@ -1025,6 +1047,10 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
     <button class="bnb" onclick="showTab('xbox',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M7 12h.01"/><path d="M17 12h.01"/><path d="M12 8v8"/></svg>
       Xbox
+    </button>
+    <button class="bnb" onclick="showTab('compass',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Compass
     </button>
   </nav>
 
@@ -1269,6 +1295,7 @@ function showTab(name, btn){
   if(name === 'xbox'){ renderGameTime(); renderReadingLog(); }
   if(name === 'transmissions'){ renderTransmissions(); initGroupThreadInline(); initPrivateThreadInline(); }
   if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
+  if(name === 'compass'){ initTomChat(); renderTomWishCounter(); }
 }
 
 // ══════════════════════════════════════════════════════
@@ -2942,6 +2969,187 @@ function runHansEngine(){
 }
 
 
+// ══════════════════════════════════════════════════════
+// TOM — Compass tab companion (T.O.M. = Today's On-Call Mate)
+// Persisted per-boy at stewart/tomchat/{agentId}. A wish-spend answer is
+// written to Firebase immediately (so it survives a reload mid-confirm)
+// but flagged pendingWish:true and not shown until the boy confirms —
+// cancelling never spends anything. The actual balance write only ever
+// happens server-side via spendTomWish, same trust boundary as scoring.
+// ══════════════════════════════════════════════════════
+let _tomListenerAttached = false;
+let _tomMessageCache = [];
+let _tomSendLock = false;
+const MAX_TOM_HISTORY = 10;
+
+function initTomChat(){
+  if(!_db || !currentAgent || _tomListenerAttached) return;
+  _tomListenerAttached = true;
+  _db.ref(`stewart/tomchat/${currentAgent.id}`).limitToLast(60).on('value', snap => {
+    renderTomMessages(snap.val() || {});
+  });
+}
+
+function renderTomMessages(msgs){
+  const entries = Object.entries(msgs || {}).sort((a,b) => (a[1].timestamp||0) - (b[1].timestamp||0));
+  _tomMessageCache = entries.map(([key, m]) => ({ key, ...m }));
+  const el = document.getElementById('tom-messages');
+  if(!el) return;
+  if(!entries.length){
+    el.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.3);">Ask Tom anything, sailor.</div>';
+    return;
+  }
+  const AGENT_ICONS = {samuel:'&#129413;',johnjr:'&#129409;',stephen:'&#129430;',daniel:'&#128024;'};
+  el.innerHTML = entries.map(([key, m]) => {
+    const isTom = m.agentId === 'tom';
+    const icon = isTom ? '&#9875;' : (AGENT_ICONS[currentAgent.id] || '&#128100;');
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+    const bubbleBg = isTom
+      ? 'background:rgba(200,146,42,.16);border:1px solid rgba(200,146,42,.35);border-bottom-left-radius:4px;'
+      : 'background:var(--teal);color:var(--black);border-bottom-right-radius:4px;';
+    const nameColor = isTom ? 'color:var(--gold);' : '';
+
+    let bodyHtml;
+    if(m.pendingWish){
+      bodyHtml = `<div>${linkify(m.text||'')}</div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="confirmTomWish('${key}')" style="flex:1;padding:7px;border-radius:16px;border:none;background:var(--gold);color:var(--black);font-size:11px;font-weight:700;cursor:pointer;">Use a wish</button>
+          <button onclick="cancelTomWish('${key}')" style="flex:1;padding:7px;border-radius:16px;border:1px solid rgba(255,255,255,.3);background:none;color:inherit;font-size:11px;cursor:pointer;">Never mind</button>
+        </div>`;
+    } else {
+      bodyHtml = linkify(m.text||'');
+    }
+
+    return `<div style="display:flex;flex-direction:column;align-items:${isTom?'flex-start':'flex-end'};">
+      <div style="display:flex;align-items:flex-end;gap:6px;${isTom?'':'flex-direction:row-reverse;'}">
+        <div style="font-size:18px;flex-shrink:0;">${icon}</div>
+        <div style="max-width:78%;padding:9px 12px;border-radius:12px;${bubbleBg}line-height:1.4;font-size:13px;overflow-wrap:break-word;word-break:break-word;">
+          <div style="font-size:9px;opacity:.7;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;${nameColor}">${isTom?'Tom':'You'}</div>
+          ${bodyHtml}
+          <div style="font-size:9px;opacity:.5;margin-top:4px;text-align:${isTom?'left':'right'};">${time}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// Last few real exchanges as {role, content}, for follow-up continuity —
+// same pattern that fixed Tink's memory gap. Excludes placeholders and
+// still-pending wish-spend prompts (the boy hasn't actually seen those yet).
+function tomHistoryForApi(){
+  return _tomMessageCache
+    .filter(m => m.text && !m.pendingWish && m.text !== 'Thinking…')
+    .slice(-MAX_TOM_HISTORY)
+    .map(m => ({ role: m.agentId==='tom' ? 'assistant' : 'user', content: m.text }));
+}
+
+async function renderTomWishCounter(){
+  const el = document.getElementById('tom-wish-counter');
+  if(!el || !currentAgent) return;
+  if(!_db){ el.innerHTML = '<div class="empty">Connect to WiFi to see your wishes.</div>'; return; }
+
+  const today = localDateStr();
+  const [available, todaySnap] = await Promise.all([
+    getAvailableWishes(currentAgent.id),
+    _db.ref(`stewart/wishes/${currentAgent.id}/${today}/earned`).once('value')
+  ]);
+  const earnedToday = todaySnap.val() || 0;
+
+  el.innerHTML = `
+    <div style="flex:1;background:rgba(232,184,74,.12);border:1px solid rgba(232,184,74,.35);border-radius:10px;padding:12px;text-align:center;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:22px;color:var(--gold);">${available}</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,.5);margin-top:2px;">WISH${available===1?'':'ES'} AVAILABLE</div>
+    </div>
+    ${earnedToday > 0 ? `<div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px;text-align:center;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:22px;color:rgba(255,255,255,.6);">+${earnedToday}</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,.4);margin-top:2px;">UNLOCK TOMORROW</div>
+    </div>` : ''}
+  `;
+}
+
+async function askTomChat(){
+  if(_tomSendLock || !_db || !currentAgent) return;
+  const input = document.getElementById('tom-input');
+  const question = input ? input.value.trim() : '';
+  if(!question) return;
+
+  const history = tomHistoryForApi(); // capture before pushing the new question
+  input.value = '';
+  _tomSendLock = true;
+
+  await _db.ref(`stewart/tomchat/${currentAgent.id}`).push({
+    text: question, timestamp: Date.now()
+  });
+  const thinkingRef = _db.ref(`stewart/tomchat/${currentAgent.id}`).push();
+  await thinkingRef.set({ text: 'Thinking…', agentId:'tom', timestamp: Date.now() });
+
+  // Retries once on failure before giving up — mobile connections can drop
+  // mid-request even when askTom succeeds server-side.
+  let result = null;
+  for(let attempt = 1; attempt <= 2 && !result; attempt++){
+    try{
+      if(!_functions) throw new Error('Firebase Functions not initialized');
+      const call = _functions.httpsCallable('askTom');
+      const res = await call({ agentId: currentAgent.id, question, history });
+      if(!res || !res.data || !res.data.message) throw new Error('Empty response from askTom');
+      result = res.data;
+    }catch(e){
+      // one silent retry before falling back
+    }
+  }
+
+  if(!result){
+    await thinkingRef.update({ text: "Compass isn't reading clear right now, sailor — try me again in a minute." });
+  } else if(result.type === 'wish_spend'){
+    const available = await getAvailableWishes(currentAgent.id);
+    if(available > 0){
+      await thinkingRef.update({
+        text: 'Spend it wisely, sailor — use a wish?',
+        pendingWish: true,
+        realText: result.message
+      });
+    } else {
+      await thinkingRef.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more." });
+    }
+  } else {
+    await thinkingRef.update({ text: result.message });
+  }
+
+  _tomSendLock = false;
+}
+
+async function confirmTomWish(key){
+  if(!_db || !currentAgent) return;
+  const msg = _tomMessageCache.find(m => m.key === key);
+  if(!msg || !msg.pendingWish) return;
+
+  const ref = _db.ref(`stewart/tomchat/${currentAgent.id}/${key}`);
+  try{
+    if(!_functions) throw new Error('Firebase Functions not initialized');
+    const call = _functions.httpsCallable('spendTomWish');
+    const res = await call({ agentId: currentAgent.id, today: localDateStr() });
+    if(res && res.data && res.data.spent){
+      await ref.update({ text: msg.realText, pendingWish: null, realText: null });
+    } else {
+      await ref.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.", pendingWish: null, realText: null });
+    }
+  }catch(e){
+    await ref.update({ text: "Couldn't confirm that just now, sailor — try again in a moment.", pendingWish: null, realText: null });
+  }
+  renderTomWishCounter();
+}
+
+function cancelTomWish(key){
+  if(!_db || !currentAgent) return;
+  _db.ref(`stewart/tomchat/${currentAgent.id}/${key}`).update({
+    text: 'No worries — ask me something else anytime.',
+    pendingWish: null,
+    realText: null
+  });
+}
+
+
 function loadPrivatePreview(){
   if(!currentAgent||!_db) return;
   _db.ref(`stewart/messages/${currentAgent.id}`).limitToLast(1).once('value', snap => {
@@ -4492,6 +4700,9 @@ function renderFamilyDevotionalDisplay(){
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
   if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) sendPrivateMessage(); });
+
+  const ti = document.getElementById('tom-input');
+  if(ti) ti.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) askTomChat(); });
 
   // ── Sign-out reminder: triggers once per visit when the mouse nears the
   //    bottom-right corner of the page (where they head to sign out / close up). ──
