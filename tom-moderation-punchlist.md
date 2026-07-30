@@ -48,7 +48,7 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 - Fire a parent notification explaining the auto-pause happened and why (reuse existing notification pattern)
 - Confirm `unmuteBoy()` still works normally on an auto-paused boy, same as a manually paused one — no special-casing needed there
 
-## Step 5: Midnight reset
+## Step 5: Midnight reset ✅ done (verification only, no code changes)
 **Task for Claude Code:**
 - Daily strike counter at `stewart/strikes/{agentId}/{date}` naturally resets by virtue of being date-keyed — confirm no code anywhere carries a running total across dates
 - Confirm the auto-pause itself doesn't persist past the day it was set (should lift automatically at midnight, same as if manually set for "today only" — check how the existing pause stores its duration)
