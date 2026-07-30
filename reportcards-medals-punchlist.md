@@ -24,7 +24,7 @@
 - Include real specifics: chore completion trends, strike incidents (with category and day), wish usage patterns, devotional consistency
 - Also generate a plain-text version alongside any styled version — this is the copy-paste-friendly format John wants
 
-### Step 3: Bridge UI
+### Step 3: Bridge UI ✅ done (not browser-tested — see commit note)
 **File:** `bridge/index.html`
 **Task for Claude Code:**
 - New section displaying the current week's report card, pulling from `stewart/reportcards/{weekOf}`
