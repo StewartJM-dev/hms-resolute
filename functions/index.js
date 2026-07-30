@@ -887,8 +887,8 @@ const MODERATION_MODEL = 'claude-haiku-4-5-20251001';
 const MODERATION_SYSTEM_PROMPT = `You are a message classifier moderating chat messages sent by boys ages 6-11 in a family chore-tracking app. You see exactly one message at a time, with no surrounding conversation context. Classify it into exactly one category:
 
 - "clean": a normal message — chat, jokes, questions, chore talk, harmless nonsense that's still a real attempt to communicate, etc. Default here when in doubt.
-- "gibberish_spam": no real content — keyboard mashing, emoji-only strings, meaningless repeated characters, or a bare "67" (a kids' meme, meaningless here). Short real messages ("k", "lol", "ok", "sup") are NOT this category — only flag when there's no discernible communication attempt at all.
-- "unkind": put-downs, name-calling, mocking, or hostile language directed at a sibling or anyone else. Real disagreement or venting that stays respectful is NOT this category — only flag actual unkindness.
+- "gibberish_spam": no real content — keyboard mashing, meaningless repeated characters, or a bare "67" (a kids' meme, meaningless here). This includes emoji-only messages that are just noise/filler (random strings of unrelated emoji), but NOT a single deliberate rude gesture emoji, which is "unkind" below, not this. Short real messages ("k", "lol", "ok", "sup") are NOT this category — only flag when there's no discernible communication attempt at all.
+- "unkind": put-downs, name-calling, mocking, or hostile language OR GESTURES directed at a sibling, at Tom, or at anyone else — this explicitly includes a rude/offensive gesture emoji (e.g. 🖕) even with no accompanying text, since that's a deliberate hostile message, not meaningless spam. Real disagreement or venting that stays respectful is NOT this category — only flag actual unkindness or disrespect.
 
 Be conservative: when genuinely uncertain between "clean" and a flagged category, choose "clean." This classification drives automatic action (deleting messages, notifying parents), so false positives have a real cost.`;
 
@@ -964,7 +964,7 @@ async function pushTomModerationNudge(agentId, text) {
 // with enough detail for John/Dawn to see what was said and by whom.
 async function notifyParentsOfUnkindMessage(agentId, agentName, text, source, msgId) {
   if (await alreadyNotified('unkind_' + agentId + '_' + msgId)) return;
-  const where = source === 'groupchat' ? 'Group Chat' : 'Private Thread';
+  const where = source === 'groupchat' ? 'Group Chat' : source === 'tomchat' ? 'Tom Chat' : 'Private Thread';
   const title = `Tom flagged unkindness — ${agentName} (${where})`;
   const body = text.length > 100 ? text.slice(0, 100) + '…' : text;
   await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
@@ -1103,6 +1103,51 @@ exports.moderatePrivateMessage = functions
 
     await snap.ref.update({ moderation: category });
     return null;
+  });
+
+// Tom's own chat (stewart/tomchat/{agentId}) was never moderated at all —
+// a real gap, since it's a live 1:1 conversation with an AI and a boy can
+// send it anything. Deliberately leaner than group/private moderation:
+// never deletes. A gibberish/rude message to Tom still gets a real,
+// in-voice reply from askTom in the moment (already visible in the
+// thread — that IS the natural "nudge" here, no need to inject a second
+// Tom message on top of it), so this only needs to record the strike (and
+// notify parents immediately for unkindness, same as everywhere else) —
+// deleting the boy's side would leave Tom's already-generated reply
+// looking like a non-sequitur, and there's no lightweight way to safely
+// find-and-remove its paired response given the two are written
+// independently and asynchronously by the client.
+exports.moderateTomChatMessage = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .database.ref('/stewart/tomchat/{agentId}/{msgId}')
+  .onCreate(async (snap, context) => {
+    const agentId = context.params.agentId;
+    const m = snap.val();
+    if (!m || !m.text || !ALLOWED_AGENT_IDS.includes(agentId)) return null;
+    if (m.agentId === 'tom') return null; // only the boy's own questions get classified
+
+    if (BANNED_67_PATTERN.test(m.text)) {
+      const count = await recordStrike(agentId, easternDateStr(), 'banned_term', 'tomchat', m.text);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      return null;
+    }
+
+    const category = await classifyChatMessage(m.text);
+
+    if (category === 'gibberish_spam') {
+      const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', m.text);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      return null;
+    }
+
+    if (category === 'unkind') {
+      const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', m.text);
+      await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'tomchat', context.params.msgId);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      return null;
+    }
+
+    return null; // 'clean' — nothing to do; Tom chat doesn't read a moderation field
   });
 
 // Step 6: weekly report card — pulls the FULL, unfiltered incident history
