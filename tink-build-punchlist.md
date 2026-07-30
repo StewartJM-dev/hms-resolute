@@ -65,9 +65,9 @@
 - [ ] Check Console usage/cost after a day of real use
 
 ## Merge checklist
-- [ ] Test on a branch (`feature/shipscounselor`) for a few real days before merging
-- [ ] `firebase deploy --only functions` once confident
-- [ ] Merge to `main`, push to GitHub (GitHub Pages rebuilds automatically, same as Hans)
+- [~] Test on a branch for a few real days before merging — skipped in favor of thorough synthetic testing against the live deployed function (all 5 testing-checklist scenarios + both post-testing gap fixes verified with real RTDB data); merged same-day, deliberately, per explicit call
+- [x] `firebase deploy --only functions` once confident
+- [x] Merge to `main`, push to GitHub (GitHub Pages rebuilds automatically, same as Hans)
 
 ---
 
