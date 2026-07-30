@@ -55,8 +55,8 @@
 ---
 
 ## Testing checklist before merging
-- [ ] Force each trigger condition manually (adjust localStorage `hans-{agentId}-{date}` state or mission completion) and confirm Hans posts a real, sensible AI-generated line for morning, evening, allDone, deductions, behind, and general
-- [ ] Temporarily break the API call (bad key, offline) and confirm it falls back to a static line instead of erroring
+- [x] Force each trigger condition manually (adjust localStorage `hans-{agentId}-{date}` state or mission completion) and confirm Hans posts a real, sensible AI-generated line for morning, evening, allDone, deductions, behind, and general — all 10 triggers passed
+- [x] Temporarily break the API call (bad key, offline) and confirm it falls back to a static line instead of erroring — all 5 fallback modes passed
 - [ ] Check actual API usage/cost in the Anthropic Console after a day of testing to confirm it's tracking near the ~$0.50/month estimate, not spiraling
 - [ ] Confirm streak count is accurate against a few known real days of data for at least one boy
 
