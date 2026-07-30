@@ -153,11 +153,53 @@ function detectDishTransfer(myDoneToday, partnerDoneToday, myExpectedToday){
   return dishMissionsToday.every(m => myDoneToday[m.id]);
 }
 
-// Recalculate and store a boy's score for a given date. Weekends never
-// score (chores still happen Sat/Sun, they just don't count toward pay
-// or game time — tracked separately as "Damage Control").
-// Relies on a global `_db` (Firebase ref) already existing on the page —
-// same as the original, so existing call sites don't need to change.
+// ══════════════════════════════════════════════════════
+// WISHES — Tom's wish economy (stewart/wishes/{agentId}/{date}).
+// A wish is earned from a day's raw chore-completion % (calculateDayScore's
+// `pct`, before transfer adjustments or behavior deductions) — same tiers
+// as the family's original design: 1/3 complete = 1 wish, 2/3 = 2, full = 3.
+// Like scoring, wishes only accrue on weekdays; weekend chores are tracked
+// separately as Damage Control and don't earn wishes either.
+//
+// Earning is written here (see recalculateScore below); SPENDING a wish is
+// deliberately NOT done here — that's a trust boundary enforced server-side
+// by askTom (functions/index.js), same reasoning as why the boys' client
+// code never writes its own score. getAvailableWishes() below is read-only,
+// for UI display.
+// ══════════════════════════════════════════════════════
+function wishesForPct(pct){
+  if(pct >= 1) return 3;
+  if(pct >= 2/3) return 2;
+  if(pct >= 1/3) return 1;
+  return 0;
+}
+
+// Current spendable wish balance: every PRIOR day's earned wishes, minus
+// everything used (including today's own usage), floored at 0. Today's own
+// earned wishes are excluded on purpose — per the original design, wishes
+// earned today don't unlock until tomorrow.
+function getAvailableWishes(agentId){
+  if(!_db) return Promise.resolve(0);
+  const today = localDateStr();
+  return _db.ref(`stewart/wishes/${agentId}`).once('value').then(snap => {
+    const days = snap.val() || {};
+    let earned = 0, used = 0;
+    Object.keys(days).forEach(dateStr => {
+      const rec = days[dateStr] || {};
+      if(dateStr < today) earned += (rec.earned || 0);
+      used += (rec.used || 0);
+    });
+    return Math.max(0, earned - used);
+  });
+}
+
+// Recalculate and store a boy's score AND wishes-earned for a given date in
+// one pass — they're both derived from the same mission-completion data, so
+// computing them together keeps them from ever drifting out of sync. Weekends
+// never score or earn wishes (chores still happen Sat/Sun, they just don't
+// count toward pay, game time, or wishes — tracked separately as "Damage
+// Control"). Relies on a global `_db` (Firebase ref) already existing on the
+// page — same as the original, so existing call sites don't need to change.
 function recalculateScore(agentId, dateStr){
   if(!_db) return Promise.resolve();
   return Promise.all([
@@ -172,7 +214,10 @@ function recalculateScore(agentId, dateStr){
     const dayDate = parseLocalDate(dateStr);
     const dayOfWeek = dayDate.getDay();
     if(dayOfWeek===0||dayOfWeek===6){
-      return _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null);
+      return Promise.all([
+        _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null),
+        _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(0)
+      ]);
     }
 
     const missions = buildMissions(agentId, dayDate);
@@ -184,7 +229,10 @@ function recalculateScore(agentId, dateStr){
     score -= totalDeductions;
     score = Math.max(0, Math.min(100, score));
 
-    return _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(score);
+    return Promise.all([
+      _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(score),
+      _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(wishesForPct(base.pct))
+    ]);
   });
 }
 

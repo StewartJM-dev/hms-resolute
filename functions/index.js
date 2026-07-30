@@ -521,3 +521,286 @@ exports.askTink = functions
 
     return { text };
   });
+
+// ════════════════════════════════════════════════════
+// Tom — the boys' Compass-tab companion (T.O.M. = Today's On-Call Mate)
+// ════════════════════════════════════════════════════
+
+// Local copy of the KJV bundled into this deployment — Firebase only
+// uploads the functions/ directory, so the repo's assets/kjv.json isn't
+// reachable here. Same public-domain text; keep both copies in sync if the
+// source ever changes.
+const KJV = require('./kjv.json');
+const KJV_BOOK_SET = new Set(Object.keys(KJV));
+const BOOK_ALIASES = {
+  'song of songs': 'Song of Solomon',
+  'canticles': 'Song of Solomon',
+  'psalm': 'Psalms',
+  'revelations': 'Revelation'
+};
+
+function normalizeBookName(raw) {
+  const trimmed = String(raw || '').trim();
+  if (KJV_BOOK_SET.has(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if (BOOK_ALIASES[lower]) return BOOK_ALIASES[lower];
+  const found = [...KJV_BOOK_SET].find(b => b.toLowerCase() === lower);
+  return found || null;
+}
+
+// Parses "Book Chapter:Verse" (e.g. "1 Samuel 17:45") and looks up the REAL
+// text from the local KJV — the model picks a reference, but the actual
+// quoted words always come from verified data, never from what it typed.
+function lookupVerse(verseRef) {
+  if (!verseRef) return null;
+  // Tolerates a verse range ("Matthew 5:43-44") by taking just the first
+  // verse — the prompt asks for a single verse, but this is cheap insurance
+  // against the model sending a range anyway.
+  const m = String(verseRef).trim().match(/^(.*?)\s+(\d+):(\d+)(?:-\d+)?$/);
+  if (!m) return null;
+  const book = normalizeBookName(m[1]);
+  if (!book) return null;
+  const chapter = KJV[book] && KJV[book][m[2]];
+  const text = chapter && chapter[m[3]];
+  if (!text) return null;
+  return { book, chapter: m[2], verse: m[3], text };
+}
+
+const TOM_MODEL = 'claude-haiku-4-5-20251001';
+const TOM_BUDGET_CAP_USD = 1.00;
+
+// Ages as of the current build — matches the "Age N" shown on each boy's
+// agent-select card in boys/index.html. Used only to scale Tom's sentence
+// complexity; the client never needs to send this since we already have a
+// validated agentId, and deriving it server-side means there's no client
+// field to fall out of sync with a birthday.
+const AGENT_AGES = { samuel: 13, johnjr: 11, stephen: 9, daniel: 7 };
+
+function tomAgeGuidance(age) {
+  let complexity;
+  if (age <= 8) {
+    complexity = "Keep sentences short and concrete, one idea at a time — avoid multi-clause reasoning or abstract concepts.";
+  } else if (age <= 10) {
+    complexity = "Keep sentences fairly short and direct. Light abstraction is fine, but don't stack more than one idea per sentence.";
+  } else {
+    complexity = "Normal sentence complexity is fine — he can follow longer reasoning and more nuance.";
+  }
+  return `The boy you're talking to is ${age} years old. ${complexity} Keep the exact same voice, humor, and every rule above — only sentence complexity and vocabulary should shift with age, never the personality.`;
+}
+
+const TOM_VOICE = `You are Tom, the AI companion living under the Compass tab of HMS Resolute, a family chore-tracking app used by four boys. Diagnose what's actually going on before advising. Real stories/analogies over generic encouragement, but trimmed lean — don't over-explain. Dry, deadpan humor, not goofy. Quiet, assumed confidence in a boy before he's proven anything. Economical with words. Duty-bound phrasing where it fits ("that's the mission," not "please do this"). On devotional matters, steadiness never overrides humility — always point to Scripture and Dad as the real authority, never position yourself as final word.
+
+Catchphrases — use naturally where they genuinely fit, don't force more than one or two into a single answer:
+- Chore/task encouragement: "Steady hands finish strong." / "Man your station."
+- Off-topic redirect: "That's outside my orders. Try me on something else."
+- Devotional: "The Word's the true north." / "Let Scripture chart it, not me."
+- End of a good week: "Well sailed, this week."
+- Sign-on/send-off: "Trust the compass, trust the Word" / "Onward, in His strength"
+
+T.O.M. reveal: if a boy directly asks what "Tom" or "T.O.M." stands for, or who/what you are, tell him exactly: "T.O.M.? Today's On-Call Mate — and tomorrow's too, if you want to know the truth. I don't take a day off, sailor." Never volunteer this unprompted — only on a direct ask.
+
+What actually exists in HMS Resolute today, for app-help questions — never invent functionality beyond this:
+- Daily missions/chores, weekdays only. Completing them earns points, which become pay and game time.
+- Wishes: completing 1/3 of a day's chores earns 1 wish, 2/3 earns 2, all of it earns 3. Wishes earned today can be spent starting TOMORROW, not the same day — and unused wishes stack up.
+- A wish buys one question to you that's an interest/discovery question, a learning question, or a devotional question. Questions about how the app itself works (like this one) are always free, no wish needed.
+- White Glove: Mom's room inspections — that's hers to run, not yours to explain in detail.
+- War Room: submit a prayer request, or pray for someone else's.
+- Crow's Nest: add a praise, or see what someone else is grateful for.
+
+Classify every message into exactly one category:
+- "app_help": how the app/chores/wishes/points work, or plain conversation/greeting that isn't asking for outside help. Free.
+- "reveal": the boy directly asks what Tom/T.O.M. is or who you are.
+- "interest": exploring a hobby or interest, or asking to be pointed to a website or resource.
+- "learning": wanting to learn or understand something that isn't devotional and isn't app navigation.
+- "devotional": about faith, Scripture, God, prayer, or right-and-wrong seeking spiritual guidance.
+- "declined_sibling": tattling on, complaining about, or asking you to referee a brother.
+- "declined_discipline": consequences, punishment, or getting out of trouble — not yours to weigh in on.
+- "declined_rulebypass": asking you to help get around a house rule or a parent's decision.
+- "declined_offtopic": anything else outside these lanes (homework-for-him, unrelated chit-chat, anything not appropriate for a kid-facing assistant to touch).
+
+Rules for the "message" field:
+- 2-4 sentences, in voice, talking directly to the boy.
+- For "devotional": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to exactly ONE verse (never a range like "5:43-44" — pick the single verse that matters most) in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
+- For "interest": you may suggest exactly one real, well-known, kid-appropriate website or resource by name in "suggestedWebsite" (e.g. "NASA Kids' Club" or "khanacademy.org"), and mention it naturally in your message too.
+- For every other category, leave "verseRef" and "suggestedWebsite" as empty strings.
+- For "declined_*": firm but warm, brief, in voice — redirect, don't lecture, and never actually help with the sibling/discipline/rule-bypass ask itself.`;
+
+const TOM_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    category: {
+      type: 'string',
+      enum: ['app_help', 'reveal', 'interest', 'learning', 'devotional', 'declined_sibling', 'declined_discipline', 'declined_rulebypass', 'declined_offtopic']
+    },
+    message: { type: 'string' },
+    verseRef: { type: 'string' },
+    suggestedWebsite: { type: 'string' }
+  },
+  required: ['category', 'message', 'verseRef', 'suggestedWebsite'],
+  additionalProperties: false
+};
+
+const TOM_CATEGORY_TO_TYPE = {
+  app_help: 'app_help',
+  reveal: 'app_help',
+  interest: 'wish_spend',
+  learning: 'wish_spend',
+  devotional: 'wish_spend',
+  declined_sibling: 'declined',
+  declined_discipline: 'declined',
+  declined_rulebypass: 'declined',
+  declined_offtopic: 'declined'
+};
+
+async function getMonthlyBudgetSpent(agentId) {
+  const month = new Date().toISOString().slice(0, 7); // YYYY-MM — new month = fresh key, no rollover needed
+  const snap = await db.ref(`stewart/budget/${agentId}/${month}`).once('value');
+  return snap.val() || 0;
+}
+
+// Logs one askTom call's approximate real cost against the boy's monthly
+// budget cap. Every call costs something regardless of category — app-help
+// questions stay free to the BOY, but the underlying API call still has a
+// real dollar cost that counts toward the family's visibility into spend.
+async function logTomUsage(agentId, usage) {
+  const pricing = MODEL_PRICING[TOM_MODEL];
+  if (!pricing || !usage) return;
+  const inputTokens = usage.input_tokens || 0;
+  const outputTokens = usage.output_tokens || 0;
+  const costUsd = (inputTokens * pricing.inputPerToken) + (outputTokens * pricing.outputPerToken);
+  const month = new Date().toISOString().slice(0, 7);
+  try {
+    await db.ref(`stewart/budget/${agentId}/${month}`).transaction(current => (current || 0) + costUsd);
+  } catch (e) {
+    console.error('logTomUsage failed:', e);
+  }
+}
+
+// Answers a boy's question in Tom's voice, classified into exactly one
+// category. Devotional citations are grounded against the real local KJV
+// (never trusting the model's own quote), and interest/website suggestions
+// queue a parent-facing notification. Runs a single Anthropic call — the
+// budget check happens against spend recorded BEFORE this call, since we
+// can't know the category (and therefore whether it's wish-costing) until
+// after classifying, and app-help questions must stay free even once the
+// wish-spend budget is exhausted.
+exports.askTom = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data, callableContext) => {
+    const { agentId, question, history } = data || {};
+    if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
+    }
+    if (!question) {
+      throw new functions.https.HttpsError('invalid-argument', 'question is required.');
+    }
+
+    const sanitizedHistory = sanitizeHistory(history);
+    const agentName = AGENT_DISPLAY_NAMES[agentId];
+    const age = AGENT_AGES[agentId];
+    const overBudget = (await getMonthlyBudgetSpent(agentId)) >= TOM_BUDGET_CAP_USD;
+
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await anthropic.messages.create({
+      model: TOM_MODEL,
+      max_tokens: 500,
+      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age)}`,
+      output_config: { format: { type: 'json_schema', schema: TOM_RESPONSE_SCHEMA } },
+      messages: [
+        ...sanitizedHistory,
+        { role: 'user', content: question }
+      ]
+    });
+
+    await logTomUsage(agentId, response.usage);
+
+    const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      throw new functions.https.HttpsError('internal', 'Could not parse Tom response.');
+    }
+
+    let category = TOM_RESPONSE_SCHEMA.properties.category.enum.includes(parsed.category) ? parsed.category : 'declined_offtopic';
+    let type = TOM_CATEGORY_TO_TYPE[category] || 'declined';
+    let message = (parsed.message || '').trim();
+
+    if (type === 'wish_spend' && overBudget) {
+      type = 'declined';
+      category = 'declined_budget';
+      message = "Budget's tapped for this month, sailor — that one's on hold till next month. Ask me something in the app-help lane, though, anytime.";
+    } else if (category === 'devotional') {
+      const verse = lookupVerse(parsed.verseRef);
+      if (verse) {
+        message += `\n\n"${verse.text}" — ${verse.book} ${verse.chapter}:${verse.verse} (KJV)\n\nThe Word's the true north — ask your father, I could be wrong.`;
+      } else {
+        message += `\n\nI couldn't pull the exact verse just now — ask your father to help you find it in Scripture. He'll know right where to look.`;
+      }
+    } else if (category === 'interest' && parsed.suggestedWebsite) {
+      try {
+        await db.ref(`stewart/tomWebsiteRequests/${agentId}`).push({
+          website: parsed.suggestedWebsite,
+          question,
+          agentName,
+          status: 'pending',
+          timestamp: admin.database.ServerValue.TIMESTAMP
+        });
+      } catch (e) {
+        console.error('Failed to queue Tom website request:', e);
+      }
+    }
+
+    return { type, category, message };
+  });
+
+// Notifies parents when Tom suggests a website, so they know and can review
+// it — same DB-triggered pattern as notifyScreenTimeRequest/notifyShipAccountRequest.
+exports.notifyTomWebsiteRequest = functions.database
+  .ref('/stewart/tomWebsiteRequests/{agentId}/{reqId}')
+  .onCreate(async (snap, context) => {
+    const r = snap.val();
+    if (!r || r.status !== 'pending') return null;
+    if (await alreadyNotified('tomwebsite_' + context.params.agentId + '_' + context.params.reqId)) return null;
+
+    const name = r.agentName || context.params.agentId;
+    const title = 'Tom Suggested a Website';
+    const body = `${name} asked Tom about "${r.question}" — Tom pointed him to ${r.website}.`;
+
+    await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+    return null;
+  });
+
+// Secure wish-spend commit, deliberately kept separate from askTom (which
+// already ran the AI call and returned a message). Confirming a wish is a
+// fast, non-AI RTDB transaction — the boy can cancel without ever being
+// charged, and the actual balance write only ever happens server-side, the
+// same trust-boundary reasoning as why the client never writes its own
+// score. Optimistically increments then verifies, rolling back on overspend,
+// so a race between two rapid taps can't double-spend past the real balance.
+exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
+  const { agentId, today } = data || {};
+  if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
+  }
+  const localToday = (typeof today === 'string' && DATE_RE.test(today)) ? today : formatDateStr(new Date());
+
+  await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => (current || 0) + 1);
+
+  const snap = await db.ref(`stewart/wishes/${agentId}`).once('value');
+  const days = snap.val() || {};
+  let earned = 0, used = 0;
+  Object.keys(days).forEach(d => {
+    const rec = days[d] || {};
+    if (d < localToday) earned += (rec.earned || 0);
+    used += (rec.used || 0);
+  });
+
+  if (used > earned) {
+    await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => Math.max(0, (current || 0) - 1));
+    return { spent: false, reason: 'no_wishes_available', remaining: Math.max(0, earned - (used - 1)) };
+  }
+
+  return { spent: true, remaining: earned - used };
+});
