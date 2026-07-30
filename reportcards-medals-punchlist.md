@@ -64,7 +64,7 @@
 - Temporarily override the boy's displayed `icon` (wherever `currentAgent.icon` / `s.icon` is rendered) with a medal graphic for the duration of that week, then revert to normal on the following week's reset
 - Confirm this applies consistently everywhere the icon shows (`wt-icon`, activity displays, etc.), not just one spot
 
-### Step 7: Family group chat announcement (public, to everyone)
+### Step 7: Family group chat announcement (public, to everyone) ✅ done
 **Task for Claude Code:**
 - On the same medal-earning event, post a message to `stewart/groupchat` announcing it to the whole family — e.g. "Stephen has earned [Medal Name] for [reason] — let's all congratulate him!"
 - Decide a consistent voice for this announcement (could be system-style/neutral, or routed through Tom's voice for the boys' side — John's call; default to a simple neutral announcement if no strong preference)

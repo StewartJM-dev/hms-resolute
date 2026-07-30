@@ -2470,7 +2470,7 @@ function renderGroupMessages(msgs){
     el.innerHTML = '<div class="empty" style="color:rgba(255,255,255,.3);">No messages yet.<br>Say hi to the group!</div>';
     return;
   }
-  const AGENT_ICONS = {samuel:'\u{1F985}',johnjr:'\u{1F981}',stephen:'\u{1F996}',daniel:'\u{1F418}'};
+  const AGENT_ICONS = {samuel:'\u{1F985}',johnjr:'\u{1F981}',stephen:'\u{1F996}',daniel:'\u{1F418}',tom:'⚓'};
   const HANS_ICON = '\u{1F9D1}';
   el.innerHTML = items.map(m => {
     const isMe = m.agentId === currentAgent.id;

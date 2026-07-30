@@ -1489,6 +1489,27 @@ function evaluateMedalStreaks(dates, data) {
 // qualifying event happened in, not the streak's own span. Internal
 // dedup bookkeeping lives separately at stewart/medalState/{agentId}/{key}
 // so re-earning after a streak breaks and restarts works naturally.
+// Step 7: family group chat announcement — Tom's voice, agentId:'tom' so
+// moderateGroupChatMessage's own guard (only ALLOWED_AGENT_IDS get
+// classified) exempts it structurally rather than relying on the AI
+// classifier to judge a templated announcement as clean every time.
+// 'tom' also isn't in ALL_PEOPLE, so notifyGroupChat's recipient filter
+// excludes no one — the push notification correctly reaches every parent
+// AND every boy, matching "public, to everyone."
+const MEDAL_ANNOUNCEMENT_TEMPLATES = {
+  clean7: name => `${name} just logged a 7-Day Clean Streak, crew — steady hands finish strong. Let's hear it for him.`,
+  clean30: name => `${name} just hit a 30-Day Clean Streak. That's Officer-grade steadiness, sailors — well sailed.`,
+  strikeFree7: name => `${name} sailed a full week clean of conduct — not a single strike. Well done, sailor.`,
+  wishRestraint7: name => `${name} showed real restraint with his wishes this week instead of burning through them. That's discipline worth noticing, crew.`,
+  devotional7: name => `${name} kept the Word in view seven days running. The Word's the true north — well sailed, sailor.`
+};
+
+async function postMedalAnnouncement(agentName, medalKey) {
+  const template = MEDAL_ANNOUNCEMENT_TEMPLATES[medalKey];
+  const text = template ? template(agentName) : `${agentName} just earned a medal, crew — let's all congratulate him!`;
+  await db.ref('stewart/groupchat').push({ text, from: 'Tom', agentId: 'tom', timestamp: Date.now() });
+}
+
 async function checkAndRecordMedals(agentId, weekOf) {
   const today = new Date();
   const dates = [];
@@ -1513,6 +1534,7 @@ async function checkAndRecordMedals(agentId, weekOf) {
     const medalRecord = { key: crit.key, label: crit.label, streakLength: streak.length, awardedAt: Date.now() };
     await db.ref(`stewart/medals/${agentId}/${weekOf}`).push(medalRecord);
     newlyAwarded.push({ agentId, ...medalRecord });
+    await postMedalAnnouncement(AGENT_DISPLAY_NAMES[agentId] || agentId, crit.key);
   }
   return newlyAwarded;
 }
