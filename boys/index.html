@@ -16,6 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
 <script src="../mission-engine.js?v=20260728"></script>
@@ -1079,6 +1080,7 @@ const FB_CONFIG = {
 };
 
 let _db = null;
+let _functions = null;
 let currentAgent = null; // {id, codename, name, rank, theme, icon}
 let currentLunchDay = 'monday';
 let lunchWeekData = {};
@@ -1096,6 +1098,7 @@ function initFirebase(){
     }
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
+    _functions = firebase.functions();
     if(typeof initPush === 'function') initPush();
     if(typeof syncHomeScreenBadgeOnOpen === 'function') syncHomeScreenBadgeOnOpen();
     setSyncStatus('live');
@@ -2722,6 +2725,79 @@ function hansHeinzPath(completed, total, deductionTotal, hour){
   return 'good';
 }
 
+// ══════════════════════════════════════════════════════
+// STREAK TRACKING — consecutive "good days" leading up to today
+// A "good day" mirrors the inverse of hadBadDay above: score >= 60
+// and no behavior deductions that day. Weekends don't score (see
+// recalculateScore), so they're skipped over rather than breaking
+// the streak. Counts backward starting from YESTERDAY, since today
+// isn't finished yet and its score is still in flux. Capped at 30
+// days checked (weekends included in the cap) to avoid unbounded
+// reads for an agent with a long history.
+// ══════════════════════════════════════════════════════
+function calculateStreak(agentId){
+  if(!_db) return Promise.resolve(0);
+
+  function checkDay(dayDate, streak, daysChecked){
+    if(daysChecked >= 30) return Promise.resolve(streak);
+
+    const dayOfWeek = dayDate.getDay();
+    if(dayOfWeek === 0 || dayOfWeek === 6){
+      const prev = new Date(dayDate); prev.setDate(prev.getDate()-1);
+      return checkDay(prev, streak, daysChecked+1);
+    }
+
+    const dateStr = localDateStr(dayDate);
+    return Promise.all([
+      _db.ref(`stewart/scores/${agentId}/${dateStr}`).once('value'),
+      _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value')
+    ]).then(([scoreSnap, dedSnap]) => {
+      const score = scoreSnap.val();
+      const deductions = dedSnap.val() || {};
+      const deductionTotal = Object.values(deductions).reduce((a,b)=>a+b, 0);
+      const wasGoodDay = (score !== null && score !== undefined && score >= 60 && deductionTotal === 0);
+      if(!wasGoodDay) return streak;
+      const prev = new Date(dayDate); prev.setDate(prev.getDate()-1);
+      return checkDay(prev, streak+1, daysChecked+1);
+    });
+  }
+
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  return checkDay(yesterday, 0, 0);
+}
+
+// Maps a trigger type to its static fallback line pool. 'bounceback' lives
+// in its own HANS_BOUNCEBACK array rather than under HANS_LINES.
+function hansFallbackPool(triggerType){
+  return triggerType === 'bounceback' ? HANS_BOUNCEBACK : HANS_LINES[triggerType];
+}
+
+// Fetches a fresh AI-generated Hans line from the generateHansLine Cloud
+// Function for the given trigger. On ANY failure (network, timeout, error
+// response, empty text) falls back to the existing static line pools —
+// Hans must never go silent or error out visibly.
+async function getHansLine(triggerType, name, completed, total, extra){
+  extra = extra || {};
+  try {
+    if(!_functions) throw new Error('Firebase Functions not initialized');
+    const call = _functions.httpsCallable('generateHansLine');
+    const result = await call({
+      triggerType,
+      agentName: name,
+      completed,
+      total,
+      missionNames: extra.missionNames || [],
+      deductionReason: extra.deductionReason || null,
+      streak: typeof extra.streak === 'number' ? extra.streak : null
+    });
+    const text = result && result.data && result.data.text;
+    if(!text) throw new Error('Empty response from generateHansLine');
+    return text;
+  } catch(e){
+    return hansFill(hansPick(hansFallbackPool(triggerType) || HANS_LINES.general), name, completed, total);
+  }
+}
+
 
 // Main: run the Hans/Heinz engine for the current agent
 function runHansEngine(){
@@ -2740,8 +2816,9 @@ function runHansEngine(){
     _db.ref(`stewart/deductions/${agentId}/${today}`).once('value'),
     _db.ref(`stewart/scores/${agentId}/${yesterday}`).once('value'),
     _db.ref(`stewart/deductions/${agentId}/${yesterday}`).once('value'),
-    _db.ref(`stewart/missions/${agentId}/${yesterday}`).once('value')
-  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap]) => {
+    _db.ref(`stewart/missions/${agentId}/${yesterday}`).once('value'),
+    calculateStreak(agentId)
+  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap, streak]) => {
     const done = mSnap.val() || {};
     const missions = buildMissions(agentId);
     const total = missions.length;
@@ -2749,6 +2826,8 @@ function runHansEngine(){
 
     const deductions = dSnap.val() || {};
     const deductionTotal = Object.values(deductions).reduce((a,b)=>a+b,0);
+    const deductionReason = Object.keys(deductions)[0] || null;
+    const missionNames = missions.filter(m => !done[m.id]).map(m => m.text);
 
     // Determine yesterday's "bad day": low score, or had deductions, or finished little
     const yScore = yScoreSnap.val();
@@ -2775,31 +2854,31 @@ function runHansEngine(){
 
     // 0. BOUNCE-BACK: first message of the day after a bad day (Hans, encouraging)
     if(hadBadDay && !state.bounceback && !state.morning){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_BOUNCEBACK), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'bounceback'});
       state.bounceback = true;
     }
 
     // 1. MORNING (before noon, once per day)
     if(hour < 12 && !state.morning){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.morning), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'morning'});
       state.morning = true;
     }
 
     // 2. EVENING (after 5pm, once per day)
     if(hour >= 17 && !state.evening){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.evening), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'evening'});
       state.evening = true;
     }
 
     // 3. MILESTONE: all done (Hans, once per day) — always good
     if(completed >= total && total > 0 && !state.allDone){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.allDone), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'allDone'});
       state.allDone = true;
     }
 
     // 4. DEDUCTION NOTED (once per day) — fire if a deduction appeared
     if(deductionTotal > 0 && !state.deductionNoted && toPost.length === 0){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.deductions), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'deductions'});
       state.deductionNoted = true;
     }
 
@@ -2807,13 +2886,13 @@ function runHansEngine(){
     if(state.lastCompleted !== completed && !(completed >= total && state.allDone) && toPost.length === 0){
       const ctx = hansStatusContext(completed, total);
       if(ctx && ctx !== 'allDone'){
-        toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES[ctx]), name, completed, total)});
+        toPost.push({persona:'hans', triggerType:ctx});
       }
     }
 
     // 6. BEHIND nudge (afternoon, once per day)
     if(hour >= 14 && hour < 17 && completed < total/2 && total > 0 && !state.behind && toPost.length === 0){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.behind), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'behind'});
       state.behind = true;
     }
 
@@ -2821,7 +2900,7 @@ function runHansEngine(){
     // else was eligible to fire (already shown earlier today), give a
     // simple general greeting so he's never just absent.
     if(toPost.length === 0){
-      toPost.push({persona:'hans', text: hansFill(hansPick(HANS_LINES.general), name, completed, total)});
+      toPost.push({persona:'hans', triggerType:'general'});
     }
 
     state.lastCompleted = completed;
@@ -2830,8 +2909,10 @@ function runHansEngine(){
     // Show just the single highest-priority message in Ship's Orders
     // (no longer posted into the chat thread — keeps chats clean)
     const el = document.getElementById('hans-orders-section');
-    if(el && toPost.length){
-      const item = toPost[0];
+    if(!el || !toPost.length) return;
+    const item = toPost[0];
+
+    getHansLine(item.triggerType, name, completed, total, {missionNames, deductionReason, streak}).then(text => {
       const bg = 'rgba(200,146,42,.14)';
       const border = 'rgba(200,146,42,.4)';
       const nameColor = 'var(--gold)';
@@ -2839,7 +2920,7 @@ function runHansEngine(){
         <div style="border-top:1px solid rgba(255,255,255,.12);margin:4px 0 16px;padding-top:18px;display:flex;flex-direction:column;align-items:center;text-align:center;">
           <div style="position:relative;max-width:290px;background:${bg};border:1.5px solid ${border};border-radius:16px;padding:12px 16px;">
             <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;color:${nameColor};margin-bottom:5px;">HANS</div>
-            <div style="font-size:13px;color:rgba(255,255,255,.9);line-height:1.55;">${item.text}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.9);line-height:1.55;">${text}</div>
             <div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:12px solid ${border};"></div>
             <div style="position:absolute;left:50%;bottom:-8.5px;transform:translateX(-50%);width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:10px solid ${bg};"></div>
           </div>
@@ -2848,7 +2929,7 @@ function runHansEngine(){
             <img src="assets/hans.png" alt="Hans" style="width:100%;height:100%;object-fit:contain;">
           </div>
         </div>`;
-    }
+    });
   });
 }
 

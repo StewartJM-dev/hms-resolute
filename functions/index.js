@@ -6,6 +6,7 @@
 // ════════════════════════════════════════════════════
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const Anthropic = require('@anthropic-ai/sdk');
 admin.initializeApp();
 
 const db = admin.database();
@@ -171,4 +172,71 @@ exports.notifyShipAccountResolved = functions.database
 
     await sendToPerson(agentId, title, body, 'boys/');
     return null;
+  });
+
+// ════════════════════════════════════════════════════
+// Hans — AI-generated encouragement lines
+// ════════════════════════════════════════════════════
+const HANS_SYSTEM_PROMPT = `You are Hans, the good-hearted, self-deprecating "evil scientist" HQ handler for a family chore-tracking app used by kids. Your voice is Gimmelshtump/Doofenshmirtz-style: a failed, silly villain who is actually warm, encouraging, and rooting hard for the kid ("Agent") he's talking to.
+
+Rules for every line you write:
+- Always invent a FRESH, silly, self-deprecating backstory joke about your ridiculous villain past (Gimmelshtump, a failed evil scheme, an absurd childhood mishap, a doomed invention, etc.). Never reuse a joke you'd expect to have used before — invent something new each time.
+- NEVER mention the Agent's siblings, compare the Agent to anyone else, or reference discipline, punishment, grounding, or being "in trouble." Those topics are off-limits, full stop.
+- Tone is silly and theatrical but never actually mean, sarcastic AT the Agent, or discouraging. You are always on the Agent's side.
+- Address the Agent by name at least once.
+- Write exactly 2-3 sentences. No markdown, no lists, no emoji, no quotation marks around the whole thing.
+- Stay in character as Hans at all times.`;
+
+function buildHansUserPrompt({ triggerType, agentName, completed, total, missionNames, deductionReason, streak }) {
+  const lines = [`Trigger: ${triggerType}`, `Agent name: ${agentName}`];
+  if (typeof completed === 'number' && typeof total === 'number') {
+    lines.push(`Missions completed: ${completed} of ${total}`);
+  }
+  if (Array.isArray(missionNames) && missionNames.length) {
+    lines.push(`Missions still remaining: ${missionNames.join(', ')}`);
+  }
+  if (deductionReason) {
+    lines.push(`A behavior deduction was logged today: ${deductionReason}`);
+  }
+  if (typeof streak === 'number' && streak > 0) {
+    lines.push(`Current streak of good days in a row: ${streak}`);
+  }
+  lines.push('Write one Hans line for this exact moment.');
+  return lines.join('\n');
+}
+
+// Generates one fresh Hans line for the given moment in a boy's day.
+// Called from the client (boys/index.html) in place of the static
+// HANS_LINES pools — the client falls back to those pools on any error.
+exports.generateHansLine = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data, context) => {
+    const { triggerType, agentName, completed, total, missionNames, deductionReason, streak } = data || {};
+    if (!triggerType || !agentName) {
+      throw new functions.https.HttpsError('invalid-argument', 'triggerType and agentName are required.');
+    }
+
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      system: HANS_SYSTEM_PROMPT,
+      messages: [{
+        role: 'user',
+        content: buildHansUserPrompt({ triggerType, agentName, completed, total, missionNames, deductionReason, streak })
+      }]
+    });
+
+    const text = (response.content || [])
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('')
+      .trim();
+
+    if (!text) {
+      throw new functions.https.HttpsError('internal', 'No text returned from Anthropic.');
+    }
+
+    return { text };
   });
