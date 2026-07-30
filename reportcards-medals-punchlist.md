@@ -18,7 +18,7 @@
 - Auto-runs weekly (scheduled for Monday), and is also callable on-demand for the manual check-in
 - Output stored at `stewart/reportcards/{weekOf}` — shared, single source of truth for both surfaces
 
-### Step 2: Report generation (the actual write-up)
+### Step 2: Report generation (the actual write-up) ✅ done
 **Task for Claude Code:**
 - Use `claude-sonnet-4-6` (this needs real reasoning/pattern-noticing, not just data formatting) to turn the raw weekly data into an actual written summary per boy — specific, not generic ("completed every morning round, missed evening three times" style, matching what was originally envisioned for Hans's report card concept)
 - Include real specifics: chore completion trends, strike incidents (with category and day), wish usage patterns, devotional consistency
