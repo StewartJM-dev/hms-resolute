@@ -58,7 +58,7 @@
 - On qualifying: write to `stewart/medals/{agentId}/{weekOf}` recording which medal(s) were earned
 - Avoid re-triggering the same medal repeatedly for an already-ongoing streak — only fire once per qualifying event
 
-### Step 6: Celebration + icon change (private, to the boy)
+### Step 6: Celebration + icon change (private, to the boy) ✅ done (not browser-tested — see commit note)
 **Task for Claude Code:**
 - On a new medal being recorded, call the existing `showCelebration(emoji, title, msg)` function with medal-appropriate content for that boy's own screen
 - Temporarily override the boy's displayed `icon` (wherever `currentAgent.icon` / `s.icon` is rendered) with a medal graphic for the duration of that week, then revert to normal on the following week's reset
