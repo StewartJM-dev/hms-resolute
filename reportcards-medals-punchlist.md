@@ -1,9 +1,11 @@
 # HMS Resolute — Build Punch List: Weekly Report Cards + Medals
 *Hand this directly to Claude Code, in the hms-resolute repo.*
 
----
+## Prerequisites (do these first, separately, before Step 1)
+1. **Scripture lookup fix** ✅ done — Tom's classification needs a fourth free category: direct Bible verse lookup requests are free (like app_help), not wish_spend. Broader devotional reflection questions stay in wish_spend. This is a quick patch to the already-live `askTom` function, not part of this punch list's steps.
+2. **Family chat announcement voice** ✅ noted — confirmed: route through Tom's voice (see Step 7 below).
 
-## Part 1: Weekly Report Cards
+---
 
 ### Scope
 - One shared underlying report, viewable in **both** `bridge/index.html` (John) and `dashboard/index.html` (Dawn/Officers' Country) — same data, two surfaces, never drifting apart
@@ -11,27 +13,29 @@
 - **Also a manual "check in" trigger** — John or Dawn can generate/view a real-time snapshot any day, not just wait for Monday
 - Must be **easy to copy as plain text** — John wants to paste it directly into a Claude.ai conversation for weekly review
 
-### Step 1: Data aggregation function ✅ done
+### Step 1: Data aggregation function ✅ done (amended)
 **Task for Claude Code:**
 - New Cloud Function (or scheduled function) that pulls a full week's data per boy: `stewart/scores`, `stewart/deductions`, `stewart/wishes`, `stewart/strikes` (unfiltered by daily reset — full week visibility, per the moderation punch list's existing requirement), devotional/Courage Dare completion, White Glove results
+- **Also pull that boy's Tom conversation history for the week** (`stewart/messages/{agentId}` or wherever Compass conversations are logged) — topics asked about, categories used (app_help, wish_spend by type, declined), and any patterns worth surfacing (recurring interests, recurring questions, anything that stands out)
 - Also pulls Dawn-side data: Tink usage patterns, any relevant household notes
 - Auto-runs weekly (scheduled for Monday), and is also callable on-demand for the manual check-in
 - Output stored at `stewart/reportcards/{weekOf}` — shared, single source of truth for both surfaces
 
-### Step 2: Report generation (the actual write-up) ✅ done
+### Step 2: Report generation (the actual write-up) ✅ done (amended)
 **Task for Claude Code:**
 - Use `claude-sonnet-4-6` (this needs real reasoning/pattern-noticing, not just data formatting) to turn the raw weekly data into an actual written summary per boy — specific, not generic ("completed every morning round, missed evening three times" style, matching what was originally envisioned for Hans's report card concept)
-- Include real specifics: chore completion trends, strike incidents (with category and day), wish usage patterns, devotional consistency
+- Include real specifics: chore completion trends, strike incidents (with category and day), wish usage patterns, devotional consistency, White Glove performance
+- **Include a short section per boy on what he's been asking Tom about** — genuine interests, recurring topics, anything worth John/Dawn knowing about (age-appropriately summarized, not verbatim transcripts unless something's flagged as notable)
 - Also generate a plain-text version alongside any styled version — this is the copy-paste-friendly format John wants
 
-### Step 3: Bridge UI ✅ done (not browser-tested — see commit note)
+### Step 3: Bridge UI ✅ done (not browser-tested)
 **File:** `bridge/index.html`
 **Task for Claude Code:**
 - New section displaying the current week's report card, pulling from `stewart/reportcards/{weekOf}`
 - Manual "Check In" button that triggers Step 1's on-demand generation and displays the result
 - Plain-text copy button (or easily selectable text block) for pasting elsewhere
 
-### Step 4: Officers' Country UI ✅ done (not browser-tested — see commit note)
+### Step 4: Officers' Country UI ✅ done (not browser-tested)
 **File:** `dashboard/index.html`
 **Task for Claude Code:**
 - Same treatment as Step 3 — same data source, same manual check-in option, same copy-friendly format
@@ -63,7 +67,7 @@
 ### Step 7: Family group chat announcement (public, to everyone)
 **Task for Claude Code:**
 - On the same medal-earning event, post a message to `stewart/groupchat` announcing it to the whole family — e.g. "Stephen has earned [Medal Name] for [reason] — let's all congratulate him!"
-- Voice: routed through Tom's voice (John's call, confirmed) — the announcement should read like Tom himself is posting it, not a neutral system message
+- Decide a consistent voice for this announcement (could be system-style/neutral, or routed through Tom's voice for the boys' side — John's call; default to a simple neutral announcement if no strong preference)
 - Confirm this plays nicely with the existing chat moderation classifier — it should never itself get flagged as spam/gibberish, so make sure it's either exempt from classification or classifies cleanly
 
 ---

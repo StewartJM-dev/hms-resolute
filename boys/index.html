@@ -3107,13 +3107,22 @@ async function askTomChat(){
       await thinkingRef.update({
         text: 'Spend it wisely, sailor — use a wish?',
         pendingWish: true,
-        realText: result.message
+        realText: result.message,
+        category: result.category,
+        type: result.type
       });
     } else {
-      await thinkingRef.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more." });
+      await thinkingRef.update({
+        text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.",
+        category: result.category,
+        type: result.type
+      });
     }
   } else {
-    await thinkingRef.update({ text: result.message });
+    // category/type persisted here (not just used transiently) so the
+    // weekly report card can later summarize what a boy's actually been
+    // asking Tom about — that data didn't exist in stewart/tomchat before.
+    await thinkingRef.update({ text: result.message, category: result.category, type: result.type });
   }
 
   _tomSendLock = false;
