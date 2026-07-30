@@ -52,7 +52,7 @@
 - **The boy's profile icon changes to a medal graphic for that week** — temporary visual change, not permanent, reverts after the week
 - **A message posts in the family group chat** announcing it — e.g. "Stephen has earned [medal] for [reason] — let's all congratulate him!" — visible to the whole family, not just the boy
 
-### Step 5: Medal criteria checker
+### Step 5: Medal criteria checker ✅ done
 **Task for Claude Code:**
 - New function (client-side check on app load, or server-side scheduled check) that evaluates each boy against the 5 criteria using existing data (`stewart/scores`, `stewart/strikes`, `stewart/wishes`, devotional completion)
 - On qualifying: write to `stewart/medals/{agentId}/{weekOf}` recording which medal(s) were earned
