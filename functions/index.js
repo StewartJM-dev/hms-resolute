@@ -932,6 +932,38 @@ async function notifyParentsOfUnkindMessage(agentId, agentName, text, source, ms
   await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
 }
 
+// Matches the strike counter's own UTC-date key (formatDateStr uses
+// toISOString), so the auto-pause lifts at exactly the moment the strike
+// count itself resets — no separate clock to drift out of sync.
+function endOfUtcDayMs() {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);
+}
+
+// Reuses the existing manual-pause data path (stewart/chatmutes/{agentId})
+// so unmuteBoy() in dashboard/index.html and bridge/index.html needs no
+// changes to lift an auto-pause — it's indistinguishable from a manual one.
+// Values there are either `true` (an indefinite "Hold") or a numeric
+// mutedUntil timestamp (1hr/1day toggles). The transaction only ever
+// strengthens the existing pause, never weakens one a parent already set.
+async function autoPauseForStrikes(agentId, agentName) {
+  const untilMs = endOfUtcDayMs();
+  const muteRef = db.ref(`stewart/chatmutes/${agentId}`);
+  const result = await muteRef.transaction(current => {
+    // Returning undefined aborts the transaction (no write) — used here,
+    // not a same-value return, since Firebase still commits (and writes)
+    // when the update function returns the value unchanged.
+    if (current === true) return undefined;
+    if (typeof current === 'number' && current >= untilMs) return undefined;
+    return untilMs;
+  });
+  if (!result.committed) return; // already paused at least this strong — no notification needed
+
+  const title = 'Chat Auto-Paused — ' + agentName;
+  const body = agentName + " hit 3 strikes today from Tom's chat moderation — group chat is paused for the rest of the day.";
+  await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+}
+
 exports.moderateGroupChatMessage = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .database.ref('/stewart/groupchat/{msgId}')
@@ -944,15 +976,17 @@ exports.moderateGroupChatMessage = functions
 
     if (category === 'gibberish_spam') {
       await snap.ref.remove();
-      await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      const count = await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
       await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       return null;
     }
 
     if (category === 'unkind') {
-      await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      const count = await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
       await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_UNKIND);
       await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
+      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       await snap.ref.update({ moderation: category });
       return null;
     }
@@ -978,15 +1012,17 @@ exports.moderatePrivateMessage = functions
 
     if (category === 'gibberish_spam') {
       await snap.ref.remove();
-      await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      const count = await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
       await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       return null;
     }
 
     if (category === 'unkind') {
-      await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      const count = await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
       await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_UNKIND);
       await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
+      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       await snap.ref.update({ moderation: category });
       return null;
     }

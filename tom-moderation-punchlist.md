@@ -42,7 +42,7 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 - **Additionally**, immediately trigger a parent notification (reuse existing notification infrastructure) with enough detail for John/Dawn to see what was said and by whom
 - Do NOT wait for strike count — this notification fires on every single instance
 
-## Step 4: Strike threshold → auto-pause
+## Step 4: Strike threshold → auto-pause ✅ done
 **Task for Claude Code:**
 - When a boy's daily strike count hits 3, programmatically trigger the same pause logic already used by the manual toggle in `dashboard/index.html`
 - Fire a parent notification explaining the auto-pause happened and why (reuse existing notification pattern)
