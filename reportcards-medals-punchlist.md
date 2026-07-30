@@ -63,7 +63,7 @@
 ### Step 7: Family group chat announcement (public, to everyone)
 **Task for Claude Code:**
 - On the same medal-earning event, post a message to `stewart/groupchat` announcing it to the whole family — e.g. "Stephen has earned [Medal Name] for [reason] — let's all congratulate him!"
-- Decide a consistent voice for this announcement (could be system-style/neutral, or routed through Tom's voice for the boys' side — John's call; default to a simple neutral announcement if no strong preference)
+- Voice: routed through Tom's voice (John's call, confirmed) — the announcement should read like Tom himself is posting it, not a neutral system message
 - Confirm this plays nicely with the existing chat moderation classifier — it should never itself get flagged as spam/gibberish, so make sure it's either exempt from classification or classifies cleanly
 
 ---
