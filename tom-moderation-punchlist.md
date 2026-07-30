@@ -31,7 +31,7 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 - Use `claude-haiku-4-5-20251001` — this is a fast, cheap classification task, not a creative one
 - Age-appropriate context: these are boys 6–11, messages are short
 
-## Step 2: Handle Category A (gibberish/spam)
+## Step 2: Handle Category A (gibberish/spam) ✅ done
 **Task for Claude Code:**
 - On `gibberish_spam` classification: delete the message from `stewart/groupchat` (or the private thread), increment that boy's daily strike counter (`stewart/strikes/{agentId}/{date}`), and push a private Tom-voiced nudge to `stewart/messages/{agentId}` explaining the deletion
 - Tom's nudge should stay in his existing voice — firm but warm, matching his established catchphrase style (e.g., something like "That's outside my orders, sailor — let's keep it real words in here.")

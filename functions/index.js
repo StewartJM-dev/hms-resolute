@@ -83,7 +83,12 @@ exports.notifyPrivateThread = functions.database
     if (!m || !m.text) return null;
     if (await alreadyNotified('privatemsg_' + agentId + '_' + context.params.msgId)) return null;
 
-    const isParentSender = (m.from === 'Dad' || m.from === 'Mom' || m.from === 'HQ');
+    // Tom's own moderation nudges land in this same thread — route them to
+    // the boy like a parent message, not to John/Dawn like a boy message.
+    // Category B's separate, explicit parent notification (Step 3) is what
+    // actually alerts John/Dawn; this path must not double up on that for
+    // every Category A nudge too.
+    const isParentSender = (m.from === 'Dad' || m.from === 'Mom' || m.from === 'HQ' || m.from === 'Tom');
     const title = 'Private Message — ' + (m.from || 'Someone');
     const body = m.text.length > 100 ? m.text.slice(0, 100) + '…' : m.text;
 
@@ -840,11 +845,12 @@ exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
 });
 
 // ════════════════════════════════════════════════════
-// TOM — chat moderation (Step 1: classification only)
+// TOM — chat moderation
 // Fires on the same paths notifyGroupChat/notifyPrivateThread already
-// listen to. Classifies each boy-authored message and stamps the result
-// onto the message itself (`moderation` field) so later steps (delete,
-// nudge, strike, notify) can act on it without re-classifying.
+// listen to. Classifies each boy-authored message; clean messages are
+// left alone (stamped for visibility), gibberish/spam is deleted with a
+// strike and a private in-voice nudge (Step 2). Unkindness (Step 3) and
+// the strike-threshold auto-pause (Step 4) come next.
 // ════════════════════════════════════════════════════
 const MODERATION_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -886,6 +892,33 @@ async function classifyChatMessage(text) {
   }
 }
 
+const TOM_MODERATION_NUDGE_GIBBERISH = "That's outside my orders, sailor — pulled that one, didn't look like real words. Keep it plain talk out there and you're squared away.";
+
+// stewart/strikes/{agentId}/{date}/count is transaction-incremented (same
+// pattern as the wishes economy); each incident is also logged in full
+// under .../incidents so the Step 6 weekly report card can show real
+// per-day detail, not just a number. Returns the new count for callers
+// (Step 4's auto-pause threshold check) to use without a second read.
+async function recordStrike(agentId, date, category, source, text) {
+  await db.ref(`stewart/strikes/${agentId}/${date}/incidents`).push({
+    category,
+    source,
+    text: String(text).slice(0, 300),
+    timestamp: Date.now()
+  });
+  const result = await db.ref(`stewart/strikes/${agentId}/${date}/count`).transaction(current => (current || 0) + 1);
+  return result.snapshot.val();
+}
+
+// Lands in the same private thread parents use (stewart/messages/{agentId})
+// rather than Tom's own separate Compass chat, so John/Dawn naturally see
+// it too without a dedicated notification for every Category A incident.
+// No `agentId` field on purpose — that's what tells moderatePrivateMessage
+// to skip re-classifying Tom's own nudge when this write re-triggers it.
+async function pushTomModerationNudge(agentId, text) {
+  await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text, timestamp: Date.now() });
+}
+
 exports.moderateGroupChatMessage = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .database.ref('/stewart/groupchat/{msgId}')
@@ -895,6 +928,14 @@ exports.moderateGroupChatMessage = functions
     if (!m || !m.text || !ALLOWED_AGENT_IDS.includes(m.agentId)) return null;
 
     const category = await classifyChatMessage(m.text);
+
+    if (category === 'gibberish_spam') {
+      await snap.ref.remove();
+      await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      return null;
+    }
+
     await snap.ref.update({ moderation: category });
     return null;
   });
@@ -908,10 +949,19 @@ exports.moderatePrivateMessage = functions
     if (!m || !m.text) return null;
     // Parent-authored pushes into a boy's thread never carry an agentId
     // field, and the 'family' broadcast pseudo-thread isn't a real boy —
-    // both fall through here untouched.
+    // both fall through here untouched. Tom's own nudges also lack an
+    // agentId field, so this same check keeps them from re-triggering.
     if (!ALLOWED_AGENT_IDS.includes(agentId) || m.agentId !== agentId) return null;
 
     const category = await classifyChatMessage(m.text);
+
+    if (category === 'gibberish_spam') {
+      await snap.ref.remove();
+      await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      return null;
+    }
+
     await snap.ref.update({ moderation: category });
     return null;
   });
