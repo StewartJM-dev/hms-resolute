@@ -838,3 +838,80 @@ exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
 
   return { spent: true, remaining: earned - used };
 });
+
+// ════════════════════════════════════════════════════
+// TOM — chat moderation (Step 1: classification only)
+// Fires on the same paths notifyGroupChat/notifyPrivateThread already
+// listen to. Classifies each boy-authored message and stamps the result
+// onto the message itself (`moderation` field) so later steps (delete,
+// nudge, strike, notify) can act on it without re-classifying.
+// ════════════════════════════════════════════════════
+const MODERATION_MODEL = 'claude-haiku-4-5-20251001';
+
+const MODERATION_SYSTEM_PROMPT = `You are a message classifier moderating chat messages sent by boys ages 6-11 in a family chore-tracking app. You see exactly one message at a time, with no surrounding conversation context. Classify it into exactly one category:
+
+- "clean": a normal message — chat, jokes, questions, chore talk, harmless nonsense that's still a real attempt to communicate, etc. Default here when in doubt.
+- "gibberish_spam": no real content — keyboard mashing, emoji-only strings, meaningless repeated characters, or a bare "67" (a kids' meme, meaningless here). Short real messages ("k", "lol", "ok", "sup") are NOT this category — only flag when there's no discernible communication attempt at all.
+- "unkind": put-downs, name-calling, mocking, or hostile language directed at a sibling or anyone else. Real disagreement or venting that stays respectful is NOT this category — only flag actual unkindness.
+
+Be conservative: when genuinely uncertain between "clean" and a flagged category, choose "clean." This classification drives automatic action (deleting messages, notifying parents), so false positives have a real cost.`;
+
+const MODERATION_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    category: { type: 'string', enum: ['clean', 'gibberish_spam', 'unkind'] }
+  },
+  required: ['category'],
+  additionalProperties: false
+};
+
+// Fails open to "clean" on any API/parse error — an automated system that
+// deletes messages and pages parents should never do either on a hiccup.
+async function classifyChatMessage(text) {
+  try {
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model: MODERATION_MODEL,
+      max_tokens: 20,
+      system: MODERATION_SYSTEM_PROMPT,
+      output_config: { format: { type: 'json_schema', schema: MODERATION_RESPONSE_SCHEMA } },
+      messages: [{ role: 'user', content: text }]
+    });
+    const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const parsed = JSON.parse(raw);
+    return MODERATION_RESPONSE_SCHEMA.properties.category.enum.includes(parsed.category) ? parsed.category : 'clean';
+  } catch (err) {
+    console.error('Chat moderation classification failed, defaulting to clean:', err);
+    return 'clean';
+  }
+}
+
+exports.moderateGroupChatMessage = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .database.ref('/stewart/groupchat/{msgId}')
+  .onCreate(async (snap, context) => {
+    const m = snap.val();
+    // agentId is 'parent' for parent-sent messages — only boys get moderated.
+    if (!m || !m.text || !ALLOWED_AGENT_IDS.includes(m.agentId)) return null;
+
+    const category = await classifyChatMessage(m.text);
+    await snap.ref.update({ moderation: category });
+    return null;
+  });
+
+exports.moderatePrivateMessage = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .database.ref('/stewart/messages/{agentId}/{msgId}')
+  .onCreate(async (snap, context) => {
+    const agentId = context.params.agentId;
+    const m = snap.val();
+    if (!m || !m.text) return null;
+    // Parent-authored pushes into a boy's thread never carry an agentId
+    // field, and the 'family' broadcast pseudo-thread isn't a real boy —
+    // both fall through here untouched.
+    if (!ALLOWED_AGENT_IDS.includes(agentId) || m.agentId !== agentId) return null;
+
+    const category = await classifyChatMessage(m.text);
+    await snap.ref.update({ moderation: category });
+    return null;
+  });

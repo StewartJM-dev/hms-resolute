@@ -24,7 +24,7 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 
 ---
 
-## Step 1: Message classification
+## Step 1: Message classification ✅ done
 **Task for Claude Code:**
 - Add a Cloud Function trigger that fires on new writes to `stewart/groupchat` and `stewart/messages/{agentId}` (mirroring how `notifyGroupChat`/`notifyPrivateThread` already trigger on those paths)
 - Classify each new message into: `clean`, `gibberish_spam` (includes "67," emoji-only strings, keyboard mashing), or `unkind`
