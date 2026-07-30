@@ -1434,19 +1434,35 @@ function copyReportCardText(){
   }
 }
 
-function checkInReportCard(){
+// Retries once before showing any error — mobile connections can drop
+// mid-request even when the function would have succeeded server-side,
+// same reasoning as Hans's and Tom's retry-then-fallback pattern. This
+// call runs 17-29s server-side (a real Sonnet write-up), so a retry can
+// mean up to ~60s total — worth it to avoid a visible error on a plain
+// network blip, which is what's actually been happening.
+async function checkInReportCard(){
   if(!_functions) return;
   const btn = document.getElementById('rc-checkin-btn');
+  const orig = btn ? 'Check In — Generate Now' : null;
   if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
-  _functions.httpsCallable('generateWeeklyReportCard')({}).then(()=>{
-    if(btn){ btn.disabled = false; btn.textContent = 'Check In — Generate Now'; }
-    // renderReportCard's live listener picks up the write automatically.
-  }).catch(err=>{
-    console.error('Check In failed:', err);
-    if(btn){ btn.disabled = false; btn.textContent = 'Check In — Generate Now'; }
+
+  let ok = false;
+  for(let attempt = 1; attempt <= 2 && !ok; attempt++){
+    try{
+      await _functions.httpsCallable('generateWeeklyReportCard')({});
+      ok = true;
+      // renderReportCard's live listener picks up the write automatically.
+    }catch(err){
+      console.error('Check In attempt '+attempt+' failed:', err);
+      if(attempt === 1 && btn) btn.textContent = 'Generating… (retrying)';
+    }
+  }
+
+  if(btn){ btn.disabled = false; btn.textContent = orig || 'Check In — Generate Now'; }
+  if(!ok){
     const el = document.getElementById('rc-content');
     if(el) el.innerHTML = '<div class="rc-empty">Something went wrong generating the report. Try again.</div>';
-  });
+  }
 }
 
 function loadInstruments(){
