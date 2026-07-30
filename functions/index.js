@@ -553,7 +553,10 @@ function normalizeBookName(raw) {
 // quoted words always come from verified data, never from what it typed.
 function lookupVerse(verseRef) {
   if (!verseRef) return null;
-  const m = String(verseRef).trim().match(/^(.*?)\s+(\d+):(\d+)$/);
+  // Tolerates a verse range ("Matthew 5:43-44") by taking just the first
+  // verse — the prompt asks for a single verse, but this is cheap insurance
+  // against the model sending a range anyway.
+  const m = String(verseRef).trim().match(/^(.*?)\s+(\d+):(\d+)(?:-\d+)?$/);
   if (!m) return null;
   const book = normalizeBookName(m[1]);
   if (!book) return null;
@@ -617,7 +620,7 @@ Classify every message into exactly one category:
 
 Rules for the "message" field:
 - 2-4 sentences, in voice, talking directly to the boy.
-- For "devotional": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to the single most relevant real reference in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
+- For "devotional": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to exactly ONE verse (never a range like "5:43-44" — pick the single verse that matters most) in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
 - For "interest": you may suggest exactly one real, well-known, kid-appropriate website or resource by name in "suggestedWebsite" (e.g. "NASA Kids' Club" or "khanacademy.org"), and mention it naturally in your message too.
 - For every other category, leave "verseRef" and "suggestedWebsite" as empty strings.
 - For "declined_*": firm but warm, brief, in voice — redirect, don't lecture, and never actually help with the sibling/discipline/rule-bypass ask itself.`;
