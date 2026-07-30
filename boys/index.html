@@ -2010,11 +2010,13 @@ function renderPayScreen(){
 
   Promise.all([
     _db.ref(`stewart/scores/${currentAgent.id}`).once('value'),
+    _db.ref(`stewart/pay/${currentAgent.id}`).once('value'),
     _db.ref(`stewart/transfers`).once('value'),
     _db.ref(`stewart/weekly/${currentAgent.id}/${weekStart}`).once('value'),
     _db.ref(`stewart/deductions/${currentAgent.id}`).once('value')
-  ]).then(([sSnap, tSnap, wSnap, dSnap]) => {
+  ]).then(([sSnap, paySnap, tSnap, wSnap, dSnap]) => {
     const scores = sSnap.val() || {};
+    const pay = paySnap.val() || {};
     const transferData = tSnap.val() || {};
     const weeklyDone = wSnap.val() || {};
     const allDeductions = dSnap.val() || {};
@@ -2025,7 +2027,8 @@ function renderPayScreen(){
 
     let daysHtml = '<div style="display:flex;gap:8px;margin-bottom:16px;">';
     weekDays.forEach((dateStr, i) => {
-      const score = scores[dateStr]; // 0-100 or null/undefined
+      const score = scores[dateStr]; // 0-100 or null/undefined — still drives the color/icon
+      const payVal = pay[dateStr]; // raw $1.00-split fraction or null — the actual pay figure
       let bg, icon, label, dollars, displayVal;
 
       if(dateStr > todayStr){
@@ -2033,7 +2036,7 @@ function renderPayScreen(){
       } else if(score===null||score===undefined){
         bg='rgba(255,255,255,.05)';icon='&#9675;';label='color:rgba(255,255,255,.3)';dollars=0;displayVal='$0.00';
       } else {
-        dollars = score/100;
+        dollars = payVal || 0;
         if(score>=80){ bg='rgba(45,106,71,.2)';icon='&#10003;';label='color:#4aaa6a'; }
         else if(score>=50){ bg='rgba(232,184,74,.15)';icon='&#9679;';label='color:var(--gold)'; }
         else { bg='rgba(139,48,16,.2)';icon='&#10007;';label='color:#cc5533'; }
@@ -3986,7 +3989,7 @@ function renderStatusSummary(){
     const missions = buildMissions(currentAgent.id);
     const completed = missions.filter(m => done[m.id]).length;
     const total = missions.length;
-    const dollars = score!==null&&score!==undefined ? (score/100).toFixed(2) : '0.00';
+    const dollars = score!==null&&score!==undefined ? calculateDayScore(currentAgent.id, missions, done).dollars.toFixed(2) : '0.00';
     const minutes = score!==null&&score!==undefined ? Math.round((score/100)*6*10)/10 : 0;
 
     // Weekly completion for Family Night progress

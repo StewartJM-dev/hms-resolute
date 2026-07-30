@@ -1507,7 +1507,7 @@ function loadInstruments(){
       const total = expected.length;
       const dayScore = calculateDayScore(a.id, expected, done);
       const pct = dayScore.points100;
-      return {a, completed, total, score: dayScore.points100, pct};
+      return {a, completed, total, score: dayScore.points100, pct, dollars: dayScore.dollars};
     });
     renderGauges(crew);
     renderStatusBoard(crew);
@@ -1564,7 +1564,7 @@ function renderGauges(crew){
     '</div>';
   const crewCards = crew.map(c=>{
     const color = AGENT_COLORS[c.a.id] || '#4d9fff';
-    const scoreTxt = (c.score===null||c.score===undefined)?'—':('$'+(c.score/100).toFixed(2));
+    const scoreTxt = (c.score===null||c.score===undefined)?'—':('$'+c.dollars.toFixed(2));
     return '<div class="gauge-card">'+
       '<div class="gc-name">'+c.a.name+'</div>'+
       '<div class="gc-icon">'+c.a.icon+'</div>'+

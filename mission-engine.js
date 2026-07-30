@@ -117,21 +117,45 @@ function getMyDinnerSide(agentId, _d){
 }
 
 // ══════════════════════════════════════════════════════
-// POINTS SYSTEM — 100 points = $1.00 = 6 minutes per day (weekdays only)
+// POINTS SYSTEM — 100 points = 6 minutes of game time per day (weekdays only)
 // ══════════════════════════════════════════════════════
 // Computer Missions (typing, Scratch, Khan Academy, research) are bonus —
-// they're checkable and trackable but do NOT count toward pay or game time.
-// That's a deliberate family rule, not an oversight — don't "fix" this by
-// including them again.
+// they're checkable and trackable but do NOT count toward the score or game
+// time. That's a deliberate family rule, not an oversight — don't "fix"
+// this by including them again.
+//
+// IMPORTANT: points100/pct here is the permanent, unchanged basis for game
+// time, wishes, medals, AND every historical Ship Account balance (which
+// sums score/100 across real, already-partially-spent dollars going back
+// to SHIP_ACCOUNT_START_DATE in boys/index.html). Never change what this
+// represents or how it's computed — a change here retroactively alters
+// real money already on the books.
+//
+// `dollars` below is a SEPARATE, independently-computed figure — actual
+// cash pay follows its own rule (see below), not a derivative of the score.
 function calculateDayScore(agentId, missions, doneMap){
   const payMissions = missions.filter(m => m.category !== 'computer');
   const possible = payMissions.reduce((sum,m) => sum + (m.points||0), 0);
   const earned = payMissions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
   const pct = possible > 0 ? (earned / possible) : 0;
+
+  // CASH PAY — $1.00 total per weekday, split EVENLY (not point-weighted)
+  // across that day's payable missions, which excludes both Computer
+  // Missions and Officer of the Watch checks (points:0, oversight-only,
+  // never paid — they still count toward completion for other purposes,
+  // just not toward this split). Each completed payable mission is worth
+  // exactly $1.00 / (payable missions that day). Deliberately independent
+  // of transfer credits/behavior deductions, which only ever adjust the
+  // points100 score above, not this figure — matches the exact rule as
+  // given, with no adjustment factored in unless asked for separately.
+  const payableMissions = missions.filter(m => m.category !== 'computer' && m.category !== 'officer-of-the-watch');
+  const payableCompleted = payableMissions.filter(m => doneMap[m.id]).length;
+  const dollars = payableMissions.length > 0 ? (payableCompleted / payableMissions.length) : 0;
+
   return {
     earned, possible, pct,
     points100: Math.round(pct * 100),
-    dollars: Math.round(pct * 100) / 100,
+    dollars,
     minutes: pct * 6
   };
 }
@@ -216,7 +240,8 @@ function recalculateScore(agentId, dateStr){
     if(dayOfWeek===0||dayOfWeek===6){
       return Promise.all([
         _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null),
-        _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(0)
+        _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(0),
+        _db.ref(`stewart/pay/${agentId}/${dateStr}`).set(null)
       ]);
     }
 
@@ -231,7 +256,13 @@ function recalculateScore(agentId, dateStr){
 
     return Promise.all([
       _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(score),
-      _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(wishesForPct(base.pct))
+      _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(wishesForPct(base.pct)),
+      // Stored unrounded (a raw fraction of $1.00) so weekly totals summed
+      // from this path don't accumulate rounding error — round only at
+      // display time. Deliberately NOT adjusted by transferAdjust/
+      // deductions, matching calculateDayScore's own dollars — those only
+      // ever move the points100 score above.
+      _db.ref(`stewart/pay/${agentId}/${dateStr}`).set(base.dollars)
     ]);
   });
 }
