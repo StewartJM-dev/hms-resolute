@@ -1072,3 +1072,290 @@ exports.getWeeklyStrikeReport = functions.https.onCall(async (data, callableCont
     days
   };
 });
+
+// ════════════════════════════════════════════════════
+// WEEKLY REPORT CARDS — Step 1: data aggregation
+// Pulls a full week's real data per boy (scores, deductions, wishes,
+// strikes — unfiltered by the daily reset, same approach as
+// getWeeklyStrikeReport above), White Glove results, and Dawn-side
+// context (Tink usage, growth notes), writing the raw structured result
+// to stewart/reportcards/{weekOf}. Step 2 turns this into the actual
+// written summary — this step is data only, no AI call.
+// ════════════════════════════════════════════════════
+
+// Monday of the week containing dateStr (Monday's own answer is itself).
+function mostRecentMonday(dateStr) {
+  const d = parseDateStr(dateStr);
+  const dow = d.getUTCDay(); // 0=Sun,1=Mon,...6=Sat
+  const diff = (dow === 0) ? 6 : dow - 1;
+  return formatDateStr(new Date(d.getTime() - diff * 24 * 60 * 60 * 1000));
+}
+
+// Monday of the week strictly before the week containing dateStr — used by
+// the scheduled Monday auto-run to summarize the week that just completed
+// (on a Monday, mostRecentMonday resolves to today, which isn't useful for
+// "last week's" report).
+function previousWeekMonday(dateStr) {
+  const monday = parseDateStr(mostRecentMonday(dateStr));
+  return formatDateStr(new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000));
+}
+
+async function fetchBoyWeekData(agentId, dates) {
+  const [scoreSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap] = await Promise.all([
+    Promise.all(dates.map(date => db.ref(`stewart/scores/${agentId}/${date}`).once('value'))),
+    Promise.all(dates.map(date => db.ref(`stewart/deductions/${agentId}/${date}`).once('value'))),
+    Promise.all(dates.map(date => db.ref(`stewart/wishes/${agentId}/${date}`).once('value'))),
+    Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value'))),
+    db.ref(`stewart/couragedare/progress/${agentId}`).once('value'),
+    db.ref(`stewart/growth/boynotes/${agentId}`).once('value')
+  ]);
+
+  const weekStartMs = parseDateStr(dates[0]).getTime();
+  const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
+
+  const days = dates.map((date, i) => {
+    const score = scoreSnaps[i].val();
+    const deductions = deductionSnaps[i].val() || {};
+    const wishes = wishSnaps[i].val() || {};
+    const strikeRec = strikeSnaps[i].val() || {};
+    const strikeIncidents = Object.values(strikeRec.incidents || {}).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    return {
+      date,
+      score: (score === undefined || score === null) ? null : score,
+      deductionTotal: Object.values(deductions).reduce((a, b) => a + b, 0),
+      deductionReasons: Object.keys(deductions),
+      wishesEarned: wishes.earned || 0,
+      wishesUsed: wishes.used || 0,
+      strikeCount: strikeRec.count || 0,
+      strikeIncidents
+    };
+  });
+
+  const scoredDays = days.filter(d => d.score !== null);
+  const totals = {
+    daysScored: scoredDays.length,
+    avgScore: scoredDays.length ? Math.round(scoredDays.reduce((a, d) => a + d.score, 0) / scoredDays.length) : null,
+    totalDeductions: days.reduce((a, d) => a + d.deductionTotal, 0),
+    totalWishesEarned: days.reduce((a, d) => a + d.wishesEarned, 0),
+    totalWishesUsed: days.reduce((a, d) => a + d.wishesUsed, 0),
+    totalStrikes: days.reduce((a, d) => a + d.strikeCount, 0),
+    unkindDays: days.filter(d => d.strikeIncidents.some(inc => inc.category === 'unkind')).length
+  };
+
+  // Courage Dare is program-day-numbered, not calendar-date-keyed, so
+  // "this week's" completions are found by filtering completedAt into the
+  // week's timestamp range rather than reading a date-keyed path.
+  const couragedareProgress = couragedareSnap.val() || {};
+  const couragedareThisWeek = Object.values(couragedareProgress)
+    .filter(entry => entry && typeof entry.completedAt === 'number' && entry.completedAt >= weekStartMs && entry.completedAt < weekEndMs)
+    .sort((a, b) => a.completedAt - b.completedAt);
+
+  return {
+    agentId,
+    agentName: AGENT_DISPLAY_NAMES[agentId] || agentId,
+    days,
+    totals,
+    couragedareCompletedThisWeek: couragedareThisWeek.length,
+    growthNote: growthNoteSnap.val() || null
+  };
+}
+
+// Mirrors dashboard/index.html's WG_ROOMS labels — small, static, display-only.
+const WG_ROOM_LABELS = {
+  galley: 'The Galley (Kitchen)',
+  commondeck: 'The Common Deck (Living Room)',
+  head: 'The Head (Bathroom)',
+  berths: 'Berths (Bedrooms)'
+};
+
+async function fetchWhiteGloveWeekData(dates) {
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/whiteglove/${date}`).once('value')));
+  const byBoy = {};
+  ALLOWED_AGENT_IDS.forEach(id => { byBoy[id] = { assigned: 0, passed: 0 }; });
+  const byRoom = {};
+  Object.keys(WG_ROOM_LABELS).forEach(id => { byRoom[id] = { label: WG_ROOM_LABELS[id], assigned: 0, passed: 0 }; });
+
+  let totalInspections = 0;
+  let totalPassed = 0;
+  const days = {};
+
+  dates.forEach((date, i) => {
+    const windows = snaps[i].val() || {};
+    days[date] = windows;
+    Object.values(windows).forEach(win => {
+      Object.entries(win.rooms || {}).forEach(([roomId, room]) => {
+        totalInspections++;
+        if (room.metStandard) totalPassed++;
+        if (byRoom[roomId]) {
+          byRoom[roomId].assigned++;
+          if (room.metStandard) byRoom[roomId].passed++;
+        }
+        // 'all' ("All Hands") and unassigned rooms aren't attributed to one boy.
+        if (ALLOWED_AGENT_IDS.includes(room.officer)) {
+          byBoy[room.officer].assigned++;
+          if (room.metStandard) byBoy[room.officer].passed++;
+        }
+      });
+    });
+  });
+
+  // Pre-tallied so the report write-up (Step 2) cites these numbers
+  // directly instead of manually counting nested per-day/per-window JSON —
+  // that manual counting is exactly what produced a wrong "0 for 4" claim
+  // about the berths during testing.
+  return { days, summary: { totalInspections, totalPassed, byBoy, byRoom } };
+}
+
+async function fetchDawnWeekData(dates) {
+  const weekStartMs = parseDateStr(dates[0]).getTime();
+  const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000;
+
+  const [tinkSnap, growthWeeklySnap] = await Promise.all([
+    db.ref('dawn_usage/calls').orderByChild('timestamp').startAt(weekStartMs).endAt(weekEndMs).once('value'),
+    db.ref(`stewart/growth/weekly/${dates[0]}`).once('value')
+  ]);
+
+  const calls = Object.values(tinkSnap.val() || {});
+  const tinkUsage = {
+    callCount: calls.length,
+    totalCostUsd: calls.reduce((a, c) => a + (c.costUsd || 0), 0)
+  };
+
+  return { tinkUsage, growthWeekly: growthWeeklySnap.val() || null };
+}
+
+// Shared by both the scheduled Monday auto-run and the on-demand callable
+// check-in — same aggregation logic, different weekOf, same output
+// location, so Bridge and Officers' Country can never see different data.
+async function aggregateWeeklyReportData(weekOf) {
+  const weekEnd = formatDateStr(new Date(parseDateStr(weekOf).getTime() + 6 * 24 * 60 * 60 * 1000));
+  const dates = dateRange(weekOf, weekEnd, 7);
+  const todayStr = formatDateStr(new Date());
+
+  const [boys, whiteglove, dawn] = await Promise.all([
+    Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates))),
+    fetchWhiteGloveWeekData(dates),
+    fetchDawnWeekData(dates)
+  ]);
+
+  const boysById = {};
+  boys.forEach(b => { boysById[b.agentId] = b; });
+
+  const report = {
+    weekOf,
+    weekEnd,
+    generatedAt: Date.now(),
+    isPartialWeek: weekEnd > todayStr, // string comparison is valid for YYYY-MM-DD
+    boys: boysById,
+    whiteglove,
+    dawn
+  };
+
+  await db.ref(`stewart/reportcards/${weekOf}`).set(report);
+  return report;
+}
+
+// ════════════════════════════════════════════════════
+// WEEKLY REPORT CARDS — Step 2: the actual write-up
+// Turns Step 1's raw data into a real, specific, per-boy narrative —
+// this is where the reasoning/pattern-noticing happens, not the data pull.
+// ════════════════════════════════════════════════════
+const REPORT_WRITEUP_MODEL = 'claude-sonnet-4-6';
+
+const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, and White Glove room-inspection results.
+
+Write like a sharp, honest coach's report, not a form letter. Be specific: cite real days, real numbers, real patterns ("completed every morning round, missed evening three times" — not "did well overall"). Note trends across the week (improving, slipping, consistent) where the data actually shows one. If a category has no data for the week (e.g. zero strikes, zero Courage Dare entries), say so plainly and briefly rather than padding — absence of a problem is itself useful information, but don't manufacture insight where there isn't any.
+
+Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
+
+The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.`;
+
+const REPORT_WRITEUP_SCHEMA = {
+  type: 'object',
+  properties: {
+    boys: {
+      type: 'object',
+      properties: {
+        samuel: { type: 'string' },
+        johnjr: { type: 'string' },
+        stephen: { type: 'string' },
+        daniel: { type: 'string' }
+      },
+      required: ['samuel', 'johnjr', 'stephen', 'daniel'],
+      additionalProperties: false
+    },
+    household: { type: 'string' }
+  },
+  required: ['boys', 'household'],
+  additionalProperties: false
+};
+
+async function generateReportCardWriteup(reportData) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const response = await anthropic.messages.create({
+    model: REPORT_WRITEUP_MODEL,
+    max_tokens: 2000,
+    system: REPORT_WRITEUP_SYSTEM_PROMPT,
+    output_config: { format: { type: 'json_schema', schema: REPORT_WRITEUP_SCHEMA } },
+    messages: [{
+      role: 'user',
+      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn })}`
+    }]
+  });
+
+  await logTinkUsage(REPORT_WRITEUP_MODEL, response.usage);
+
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw);
+}
+
+// The copy-paste-friendly plain-text version John wants to paste into
+// Claude.ai — built from the same narrative content as the styled UI, not
+// a second independently-generated write-up, so the two can never diverge.
+function buildPlainTextReportCard(reportData, writeup) {
+  const lines = [`WEEKLY REPORT CARD — Week of ${reportData.weekOf}${reportData.isPartialWeek ? ' (in progress)' : ''}`, ''];
+  ALLOWED_AGENT_IDS.forEach(id => {
+    lines.push((AGENT_DISPLAY_NAMES[id] || id).toUpperCase());
+    lines.push(writeup.boys[id] || '');
+    lines.push('');
+  });
+  lines.push('HOUSEHOLD');
+  lines.push(writeup.household || '');
+  return lines.join('\n').trim();
+}
+
+// Runs Step 1's aggregation, then Step 2's write-up, and stores both
+// together at stewart/reportcards/{weekOf} — the one shared record both
+// the Check In button and the Monday auto-run produce and both UIs read.
+async function buildFullWeeklyReportCard(weekOf) {
+  const reportData = await aggregateWeeklyReportData(weekOf);
+  const writeup = await generateReportCardWriteup(reportData);
+  const plainText = buildPlainTextReportCard(reportData, writeup);
+
+  await db.ref(`stewart/reportcards/${weekOf}`).update({ writeup, plainText });
+
+  return { ...reportData, writeup, plainText };
+}
+
+// On-demand "Check In" — defaults to the CURRENT week (a live, possibly
+// partial snapshot), distinct from the auto-run's completed-week report.
+exports.generateWeeklyReportCard = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data, callableContext) => {
+    const { weekOf } = data || {};
+    const targetDate = (typeof weekOf === 'string' && DATE_RE.test(weekOf)) ? weekOf : formatDateStr(new Date());
+    return buildFullWeeklyReportCard(mostRecentMonday(targetDate));
+  });
+
+// Fires every Monday morning Eastern. That hour sits comfortably clear of
+// the UTC midnight boundary, so the existing UTC-keyed date helpers stay
+// correct here without needing a full timezone-conversion layer.
+exports.autoGenerateWeeklyReportCard = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .pubsub.schedule('0 6 * * 1')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    const weekOf = previousWeekMonday(formatDateStr(new Date()));
+    await buildFullWeeklyReportCard(weekOf);
+    return null;
+  });

@@ -637,6 +637,11 @@ body{
           <button onclick="saveReadingGoals()" class="btn-primary" style="margin-top:10px;">Save Goals</button>
         </div>
       </div>
+
+      <div class="sec-hd">Weekly Report Card</div>
+      <button onclick="checkInReportCard()" class="btn-primary" id="rc-checkin-btn">Check In — Generate Now</button>
+      <div id="rc-content"><div class="empty-state">Loading…</div></div>
+
       <div style="text-align:center;padding:20px 16px 6px;font-size:10.5px;color:var(--muted);opacity:.6;">
         Systems Seven, Version 2 · HMS Resolute — Officers' Country
       </div>
@@ -1443,6 +1448,7 @@ function renderOverview(){
   loadReadingGoals();
   renderDawnTab();
   renderWGOverviewNudge();
+  renderReportCard();
   const today = localDateStr();
   const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const dayName = dayNames[new Date().getDay()];
@@ -2520,6 +2526,81 @@ function saveReadingGoals(){
     btn.textContent = 'Saved!';
     btn.style.background = '#2d6a47';
     setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 2000);
+  });
+}
+
+// ════════════════════════════════════════════
+// WEEKLY REPORT CARD
+// Reads stewart/reportcards/{weekOf} — the same shared record Bridge
+// reads, written by either the Monday auto-run or the Check In button
+// below (generateWeeklyReportCard, which always targets the CURRENT
+// week via the server's mostRecentMonday logic, mirrored here).
+// ════════════════════════════════════════════
+function mostRecentMondayStr(){
+  const d = new Date();
+  const dow = d.getDay(); // 0=Sun,1=Mon,...6=Sat
+  const diff = (dow === 0) ? 6 : dow - 1;
+  return localDateStr(new Date(d.getTime() - diff*24*60*60*1000));
+}
+
+let rcListener = null;
+function renderReportCard(){
+  if(!_db) return;
+  const weekOf = mostRecentMondayStr();
+  if(rcListener) rcListener.off && rcListener.off();
+  const ref = _db.ref('stewart/reportcards/'+weekOf);
+  rcListener = ref;
+  ref.on('value', snap => {
+    const data = snap.val();
+    const el = document.getElementById('rc-content');
+    if(!el) return;
+    if(!data || !data.writeup){
+      el.innerHTML = '<div class="empty-state">No report yet for the week of '+weekOf+'. Tap Check In to generate one.</div>';
+      return;
+    }
+    const metaLine = 'Week of '+data.weekOf+(data.isPartialWeek ? ' — in progress' : ' — complete')
+      +' · generated '+new Date(data.generatedAt).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'});
+    let html = '<p style="text-align:center;font-size:11.5px;color:var(--muted);margin-bottom:10px;">'+metaLine+'</p>';
+    AGENTS.forEach(a=>{
+      const text = ((data.writeup.boys && data.writeup.boys[a.id]) || '').replace(/</g,'&lt;');
+      html += '<div class="card"><div class="card-hd"><span class="card-hd-icon">'+a.icon+'</span><span class="card-hd-title">'+a.name+'</span></div>'
+        +'<div class="card-bd" style="font-family:\'Lato\',sans-serif;font-size:13px;line-height:1.55;">'+text+'</div></div>';
+    });
+    const household = ((data.writeup.household)||'').replace(/</g,'&lt;');
+    html += '<div class="card"><div class="card-hd"><span class="card-hd-icon">🏠</span><span class="card-hd-title">Household</span></div>'
+      +'<div class="card-bd" style="font-family:\'Lato\',sans-serif;font-size:13px;line-height:1.55;">'+household+'</div></div>';
+    html += '<div class="sec-hd" style="margin-top:14px;">Copy as Plain Text</div>';
+    html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><button onclick="copyReportCardText()" class="btn-secondary" style="width:auto;padding:8px 14px;">📋 Copy</button><span id="rc-copy-status" style="font-size:12px;color:var(--muted);font-style:italic;"></span></div>';
+    html += '<textarea id="rc-plaintext" readonly onclick="this.select()" style="width:100%;min-height:160px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical;">'+(data.plainText||'').replace(/</g,'&lt;')+'</textarea>';
+    el.innerHTML = html;
+  });
+}
+
+function copyReportCardText(){
+  const ta = document.getElementById('rc-plaintext');
+  const status = document.getElementById('rc-copy-status');
+  if(!ta) return;
+  const done = ()=>{ if(status){ status.textContent = 'Copied!'; setTimeout(()=>{ if(status) status.textContent=''; }, 2500); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(done).catch(()=>{
+      ta.select(); document.execCommand('copy'); done();
+    });
+  }else{
+    ta.select(); document.execCommand('copy'); done();
+  }
+}
+
+function checkInReportCard(){
+  if(!_functions) return;
+  const btn = document.getElementById('rc-checkin-btn');
+  if(btn){ btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Generating…'; btn.dataset.orig = orig; }
+  _functions.httpsCallable('generateWeeklyReportCard')({}).then(()=>{
+    if(btn){ btn.disabled = false; btn.textContent = btn.dataset.orig || 'Check In — Generate Now'; }
+  }).catch(err=>{
+    console.error('Check In failed:', err);
+    if(btn){ btn.disabled = false; btn.textContent = btn.dataset.orig || 'Check In — Generate Now'; }
+    const el = document.getElementById('rc-content');
+    if(el) el.innerHTML = '<div class="empty-state">Something went wrong generating the report. Try again.</div>';
   });
 }
 

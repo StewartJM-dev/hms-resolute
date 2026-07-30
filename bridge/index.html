@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
@@ -307,6 +308,21 @@ body{
 .word-input-from .wf-votes{font-size:13px;opacity:.7;margin-left:6px;}
 .word-suggest-note{text-align:center;font-size:13px;opacity:.7;font-style:italic;line-height:1.5;padding:0 10px;}
 
+/* ===== Weekly Report Card ===== */
+.rc-meta{text-align:center;font-size:12px;opacity:.65;margin-bottom:12px;}
+.rc-checkin-btn{width:100%;padding:12px;border:1px solid rgba(200,146,42,.4);border-radius:9px;background:rgba(200,146,42,.08);color:var(--gold2,#e8b84a);font-family:'Cinzel',serif;font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer;margin-bottom:16px;}
+.rc-checkin-btn:active{transform:scale(.99);}
+.rc-checkin-btn:disabled{opacity:.55;cursor:default;}
+.rc-boy{background:rgba(255,255,255,.04);border:1px solid rgba(200,146,42,.2);border-radius:11px;padding:14px 15px;margin-bottom:11px;}
+.rc-boy-name{font-family:'Cinzel',serif;font-weight:700;font-size:13px;letter-spacing:1px;color:var(--gold2,#e8b84a);margin-bottom:7px;}
+.rc-boy-text{font-family:'Crimson Pro',serif;font-size:15px;line-height:1.55;color:var(--offwhite,#e8e3d8);}
+.rc-household{background:rgba(200,146,42,.06);border:1px dashed rgba(200,146,42,.3);border-radius:11px;padding:14px 15px;margin-bottom:16px;}
+.rc-empty{text-align:center;opacity:.55;font-style:italic;padding:20px 10px;font-size:14px;}
+.rc-copy-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.rc-copy-btn{padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:var(--white);font-family:'Lato',sans-serif;font-size:12px;cursor:pointer;}
+.rc-copy-status{font-size:12px;opacity:.7;font-style:italic;}
+.rc-plaintext{width:100%;min-height:160px;padding:11px 12px;border-radius:9px;background:rgba(0,0,0,.3);color:var(--offwhite,#e8e3d8);border:1px solid rgba(200,146,42,.2);font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical;}
+
 /* ===== Instrument gauges ===== */
 .gauge-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-bottom:8px;}
 .gauge-card{background:url('../assets/textures/black-satin.jpg');background-size:cover;background-position:center;border:1px solid rgba(90,130,190,.28);border-radius:10px;
@@ -468,6 +484,11 @@ body{
     <div class="shead">This Week — Chore Log</div>
     <div id="bridge-week-grid"></div>
     <div style="font-size:11px;opacity:.55;text-align:center;margin-top:6px;">Chores completed each day. Fills as the week goes.</div>
+
+    <!-- WEEKLY REPORT CARD -->
+    <div class="shead">Weekly Report Card</div>
+    <button class="rc-checkin-btn" id="rc-checkin-btn" onclick="checkInReportCard()">Check In — Generate Now</button>
+    <div id="rc-content"><div class="rc-empty">Loading…</div></div>
   </div>
 
   <!-- ===== SAGA TAB ===== -->
@@ -598,6 +619,7 @@ const FB_CONFIG = {
   appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
 };
 let _db = null;
+let _functions = null;
 
 const AGENTS = [
   {id:'samuel',  name:'Samuel',   icon:'🦅'},
@@ -615,6 +637,7 @@ function initFirebase(){
   try{
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
+    _functions = firebase.functions();
     if(typeof initPush === 'function') initPush();
     if(typeof syncHomeScreenBadgeOnOpen === 'function') syncHomeScreenBadgeOnOpen();
     const dot = document.getElementById('sync-dot');
@@ -952,7 +975,7 @@ function showBTab(name, btn){
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); renderShipPending(); }
-  if(name==='instruments'){ loadInstruments(); }
+  if(name==='instruments'){ loadInstruments(); renderReportCard(); }
   if(name==='word'){ loadWord(); }
   window.scrollTo(0,0);
 }
@@ -1351,6 +1374,79 @@ function gaugeSVG(pct, color){
     <circle class="gauge-fill" cx="${cx}" cy="${cy}" r="${r}" stroke="${color}"
       stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${offset}" transform="rotate(${rot} ${cx} ${cy})"/>
   </svg>`;
+}
+
+// ════════════════════════════════════════════
+// WEEKLY REPORT CARD
+// Reads stewart/reportcards/{weekOf} — same shared record Officers'
+// Country reads, written by either the Monday auto-run or the Check In
+// button below (generateWeeklyReportCard, which always targets the
+// CURRENT week, mirroring the server's mostRecentMonday logic).
+// ════════════════════════════════════════════
+function mostRecentMondayStr(){
+  const d = new Date();
+  const dow = d.getDay(); // 0=Sun,1=Mon,...6=Sat
+  const diff = (dow === 0) ? 6 : dow - 1;
+  return localDateStr(new Date(d.getTime() - diff*24*60*60*1000));
+}
+
+let rcListener = null;
+function renderReportCard(){
+  if(!_db) return;
+  const weekOf = mostRecentMondayStr();
+  if(rcListener) rcListener.off && rcListener.off();
+  const ref = _db.ref('stewart/reportcards/'+weekOf);
+  rcListener = ref;
+  ref.on('value', snap => {
+    const data = snap.val();
+    const el = document.getElementById('rc-content');
+    if(!el) return;
+    if(!data || !data.writeup){
+      el.innerHTML = '<div class="rc-empty">No report yet for the week of '+weekOf+'. Tap Check In to generate one.</div>';
+      return;
+    }
+    const metaLine = 'Week of '+data.weekOf+(data.isPartialWeek ? ' — in progress' : ' — complete')
+      +' · generated '+new Date(data.generatedAt).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'});
+    let html = '<div class="rc-meta">'+metaLine+'</div>';
+    AGENTS.forEach(a=>{
+      const text = (data.writeup.boys && data.writeup.boys[a.id]) || '';
+      html += '<div class="rc-boy"><div class="rc-boy-name">'+a.icon+' '+a.name+'</div><div class="rc-boy-text">'+text.replace(/</g,'&lt;')+'</div></div>';
+    });
+    html += '<div class="rc-household"><div class="rc-boy-name">Household</div><div class="rc-boy-text">'+(data.writeup.household||'').replace(/</g,'&lt;')+'</div></div>';
+    html += '<div class="shead" style="margin-top:18px;">Copy as Plain Text</div>';
+    html += '<div class="rc-copy-row"><button class="rc-copy-btn" onclick="copyReportCardText()">📋 Copy</button><span class="rc-copy-status" id="rc-copy-status"></span></div>';
+    html += '<textarea class="rc-plaintext" id="rc-plaintext" readonly onclick="this.select()">'+(data.plainText||'').replace(/</g,'&lt;')+'</textarea>';
+    el.innerHTML = html;
+  });
+}
+
+function copyReportCardText(){
+  const ta = document.getElementById('rc-plaintext');
+  const status = document.getElementById('rc-copy-status');
+  if(!ta) return;
+  const done = ()=>{ if(status){ status.textContent = 'Copied!'; setTimeout(()=>{ if(status) status.textContent=''; }, 2500); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(done).catch(()=>{
+      ta.select(); document.execCommand('copy'); done();
+    });
+  }else{
+    ta.select(); document.execCommand('copy'); done();
+  }
+}
+
+function checkInReportCard(){
+  if(!_functions) return;
+  const btn = document.getElementById('rc-checkin-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
+  _functions.httpsCallable('generateWeeklyReportCard')({}).then(()=>{
+    if(btn){ btn.disabled = false; btn.textContent = 'Check In — Generate Now'; }
+    // renderReportCard's live listener picks up the write automatically.
+  }).catch(err=>{
+    console.error('Check In failed:', err);
+    if(btn){ btn.disabled = false; btn.textContent = 'Check In — Generate Now'; }
+    const el = document.getElementById('rc-content');
+    if(el) el.innerHTML = '<div class="rc-empty">Something went wrong generating the report. Try again.</div>';
+  });
 }
 
 function loadInstruments(){
