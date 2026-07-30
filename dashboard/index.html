@@ -1755,16 +1755,23 @@ async function askTinkDashboard(){
   const thinkingRef = _db.ref('stewart/tinkchat').push();
   await thinkingRef.set({ text: 'Thinking…', from: 'Tink', agentId:'tink', timestamp: Date.now() });
 
-  try{
-    if(!_functions) throw new Error('Firebase Functions not initialized');
-    const call = _functions.httpsCallable('askTink');
-    const result = await call({ question, history, today: localDateStr() });
-    const text = result && result.data && result.data.text;
-    if(!text) throw new Error('Empty response from askTink');
-    await thinkingRef.update({ text });
-  }catch(e){
-    await thinkingRef.update({ text: "Tink couldn't answer right now — try again in a moment." });
+  // Retries once on failure before giving up — mobile connections can drop
+  // mid-request even when askTink succeeds server-side, and a silent retry
+  // masks that instead of showing a fallback for an answer that existed.
+  const payload = { question, history, today: localDateStr() };
+  let text = null;
+  for(let attempt = 1; attempt <= 2 && !text; attempt++){
+    try{
+      if(!_functions) throw new Error('Firebase Functions not initialized');
+      const call = _functions.httpsCallable('askTink');
+      const result = await call(payload);
+      text = result && result.data && result.data.text;
+      if(!text) throw new Error('Empty response from askTink');
+    }catch(e){
+      // one silent retry before falling back
+    }
   }
+  await thinkingRef.update({ text: text || "Tink couldn't answer right now — try again in a moment." });
 
   _tinkSendLock = false;
 }

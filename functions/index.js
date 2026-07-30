@@ -385,6 +385,20 @@ const LOOKUP_INTENT_SCHEMA = {
   additionalProperties: false
 };
 
+const BOY_NAME_PATTERN = /\b(samuel|sam|john\s*jr\.?|johnjr|j\.?j\.?|stephen|steve|daniel|dan|danny)\b/i;
+const LOOKUP_KEYWORD_PATTERN = /\b(score|scores|point|points|deduction|deductions|chore|chores|mission|missions|performance|doing|streak|pay|game\s*time|damage\s*control|this\s*week|last\s*week|today|yesterday)\b/i;
+
+// Cheap gate before spending a real API call on intent extraction — only
+// worth running when the question (or recent history, for short follow-ups
+// like "Stephen") plausibly references a boy or his performance. Skipping
+// it for the common case (app-help, recipes, drafting) roughly halves
+// askTink's typical latency, which matters on mobile where a longer round
+// trip has more chance of the connection dropping mid-request.
+function mightBeLookupQuestion(question, history) {
+  const recentText = [question, ...(history || []).slice(-4).map(h => h.content)].join(' ');
+  return BOY_NAME_PATTERN.test(recentText) || LOOKUP_KEYWORD_PATTERN.test(recentText);
+}
+
 function buildIntentExtractionPrompt({ question, history, today }) {
   const lines = [`Today's date is ${today}.`];
   if (history && history.length) {
@@ -446,11 +460,12 @@ exports.askTink = functions
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     // If the caller didn't already supply explicit context (e.g. the Recipe
-    // Builder hook always does, and should skip this), run a lightweight
-    // extraction pass to see if this is a boy-lookup question and, if so,
-    // resolve which boy and date range from the question + recent history.
+    // Builder hook always does, and should skip this), and the question
+    // plausibly needs it, run a lightweight extraction pass to see if this
+    // is a boy-lookup question and, if so, resolve which boy and date range
+    // from the question + recent history.
     let resolvedContext = context;
-    if (!resolvedContext) {
+    if (!resolvedContext && mightBeLookupQuestion(question, sanitizedHistory)) {
       const intent = await extractLookupIntent(anthropic, { question, history: sanitizedHistory, today: todayStr });
       if (intent.isBoyLookup && intent.agentId) {
         resolvedContext = {

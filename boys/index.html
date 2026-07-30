@@ -2773,28 +2773,36 @@ function hansFallbackPool(triggerType){
 }
 
 // Fetches a fresh AI-generated Hans line from the generateHansLine Cloud
-// Function for the given trigger. On ANY failure (network, timeout, error
-// response, empty text) falls back to the existing static line pools —
-// Hans must never go silent or error out visibly.
+// Function for the given trigger. Retries once on any failure before giving
+// up — mobile connections can drop mid-request even when the function
+// itself succeeds server-side, and a silent retry masks that. Only falls
+// back to the static line pools if BOTH attempts fail — Hans must never go
+// silent or error out visibly.
 async function getHansLine(triggerType, name, completed, total, extra){
   extra = extra || {};
-  try {
-    if(!_functions) throw new Error('Firebase Functions not initialized');
-    const call = _functions.httpsCallable('generateHansLine');
-    const result = await call({
-      triggerType,
-      agentName: name,
-      completed,
-      total,
-      missionNames: extra.missionNames || [],
-      deductionReason: extra.deductionReason || null,
-      streak: typeof extra.streak === 'number' ? extra.streak : null
-    });
-    const text = result && result.data && result.data.text;
-    if(!text) throw new Error('Empty response from generateHansLine');
-    return text;
-  } catch(e){
-    return hansFill(hansPick(hansFallbackPool(triggerType) || HANS_LINES.general), name, completed, total);
+  const payload = {
+    triggerType,
+    agentName: name,
+    completed,
+    total,
+    missionNames: extra.missionNames || [],
+    deductionReason: extra.deductionReason || null,
+    streak: typeof extra.streak === 'number' ? extra.streak : null
+  };
+  for(let attempt = 1; attempt <= 2; attempt++){
+    try {
+      if(!_functions) throw new Error('Firebase Functions not initialized');
+      const call = _functions.httpsCallable('generateHansLine');
+      const result = await call(payload);
+      const text = result && result.data && result.data.text;
+      if(!text) throw new Error('Empty response from generateHansLine');
+      return text;
+    } catch(e){
+      if(attempt === 2){
+        return hansFill(hansPick(hansFallbackPool(triggerType) || HANS_LINES.general), name, completed, total);
+      }
+      // one silent retry before falling back
+    }
   }
 }
 

@@ -1556,17 +1556,25 @@ async function askTinkForRecipe(){
     pantryInStock: inStockNames()
   };
 
-  try {
-    if(!_functions) throw new Error('Firebase Functions not initialized');
-    const call = _functions.httpsCallable('askTink');
-    const result = await call({ question, context });
-    const text = result && result.data && result.data.text;
-    if(!text) throw new Error('Empty response from askTink');
-    if(respEl){
-      respEl.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;color:var(--ink);white-space:pre-wrap;">${escapeHtml(text)}</div>`;
+  // Retries once on failure before giving up — mobile connections can drop
+  // mid-request even when askTink succeeds server-side, and a silent retry
+  // masks that instead of showing a fallback for an answer that existed.
+  let text = null;
+  for(let attempt = 1; attempt <= 2 && !text; attempt++){
+    try {
+      if(!_functions) throw new Error('Firebase Functions not initialized');
+      const call = _functions.httpsCallable('askTink');
+      const result = await call({ question, context });
+      text = result && result.data && result.data.text;
+      if(!text) throw new Error('Empty response from askTink');
+    } catch(e){
+      // one silent retry before falling back
     }
-  } catch(e){
-    if(respEl) respEl.innerHTML = '<div class="empty">Tink couldn\'t answer right now — try again in a moment.</div>';
+  }
+  if(respEl){
+    respEl.innerHTML = text
+      ? `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;color:var(--ink);white-space:pre-wrap;">${escapeHtml(text)}</div>`
+      : '<div class="empty">Tink couldn\'t answer right now — try again in a moment.</div>';
   }
 
   if(input) input.value = '';
