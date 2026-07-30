@@ -311,6 +311,34 @@ function formatDateStr(d) {
   return d.toISOString().slice(0, 10);
 }
 
+// The family's real timezone. Every boy-facing client already keys dates
+// by LOCAL time (mission-engine.js's localDateStr() uses the device's own
+// clock), but server-side "what day is it" checks used to go through
+// formatDateStr(new Date()), which is always UTC — a real mismatch near
+// midnight Eastern (a strike, a wish spend, a Courage Dare completion, or
+// a scheduled run near that boundary could land on what the server called
+// a different day than the boy's own app would show). formatDateStr
+// itself stays UTC-based on purpose — it's used for pure calendar-date
+// ARITHMETIC (dateRange, parseDateStr round-tripping) on strings that are
+// already correct, not for converting a real moment in time. Use
+// easternDateStr() specifically wherever "now" or "what day did this
+// timestamp happen on" is the actual question being asked.
+const FAMILY_TIMEZONE = 'America/New_York';
+function easternDateStr(date) {
+  const d = date || new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: FAMILY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(d);
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const da = parts.find(p => p.type === 'day').value;
+  return `${y}-${m}-${da}`;
+}
+// Same idea for a YYYY-MM month key (the budget cap's rollover unit).
+function easternMonthStr(date) {
+  return easternDateStr(date).slice(0, 7);
+}
+
 // Inclusive list of YYYY-MM-DD strings from startStr to endStr, capped at maxDays.
 function dateRange(startStr, endStr, maxDays) {
   const start = parseDateStr(startStr);
@@ -489,7 +517,7 @@ exports.askTink = functions
     }
 
     const sanitizedHistory = sanitizeHistory(history);
-    const todayStr = (typeof today === 'string' && DATE_RE.test(today)) ? today : formatDateStr(new Date());
+    const todayStr = (typeof today === 'string' && DATE_RE.test(today)) ? today : easternDateStr();
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -694,7 +722,7 @@ const TOM_CATEGORY_TO_TYPE = {
 };
 
 async function getMonthlyBudgetSpent(agentId) {
-  const month = new Date().toISOString().slice(0, 7); // YYYY-MM — new month = fresh key, no rollover needed
+  const month = easternMonthStr(); // new month (Eastern) = fresh key, no rollover needed
   const snap = await db.ref(`stewart/budget/${agentId}/${month}`).once('value');
   return snap.val() || 0;
 }
@@ -709,7 +737,7 @@ async function logTomUsage(agentId, usage) {
   const inputTokens = usage.input_tokens || 0;
   const outputTokens = usage.output_tokens || 0;
   const costUsd = (inputTokens * pricing.inputPerToken) + (outputTokens * pricing.outputPerToken);
-  const month = new Date().toISOString().slice(0, 7);
+  const month = easternMonthStr();
   try {
     await db.ref(`stewart/budget/${agentId}/${month}`).transaction(current => (current || 0) + costUsd);
   } catch (e) {
@@ -825,7 +853,7 @@ exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
   if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
     throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
   }
-  const localToday = (typeof today === 'string' && DATE_RE.test(today)) ? today : formatDateStr(new Date());
+  const localToday = (typeof today === 'string' && DATE_RE.test(today)) ? today : easternDateStr();
 
   await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => (current || 0) + 1);
 
@@ -942,12 +970,32 @@ async function notifyParentsOfUnkindMessage(agentId, agentName, text, source, ms
   await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
 }
 
-// Matches the strike counter's own UTC-date key (formatDateStr uses
-// toISOString), so the auto-pause lifts at exactly the moment the strike
-// count itself resets — no separate clock to drift out of sync.
-function endOfUtcDayMs() {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);
+// Converts a YYYY-MM-DD calendar date's LOCAL midnight in FAMILY_TIMEZONE
+// into the correct UTC timestamp (ms). No timezone library available, so
+// this uses the standard guess-and-correct trick: treat the date's
+// midnight as if it were already UTC, check what instant that guess
+// actually renders as when read back in FAMILY_TIMEZONE, and shift by the
+// difference. One pass is enough — US DST transitions are always exactly
+// ±1hr, never a fraction.
+function zonedMidnightMs(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const guessMs = Date.UTC(y, m - 1, d, 0, 0, 0);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: FAMILY_TIMEZONE, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).formatToParts(new Date(guessMs));
+  const get = t => { const v = parts.find(p => p.type === t).value; return v === '24' ? 0 : Number(v); };
+  const renderedAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return guessMs - (renderedAsUtc - guessMs);
+}
+
+// Matches the strike counter's own Eastern-date key (easternDateStr), so
+// the auto-pause lifts at exactly the moment the strike count itself
+// resets — no separate clock to drift out of sync.
+function endOfEasternDayMs() {
+  const today = easternDateStr();
+  const tomorrow = formatDateStr(new Date(parseDateStr(today).getTime() + 24 * 60 * 60 * 1000));
+  return zonedMidnightMs(tomorrow);
 }
 
 // Reuses the existing manual-pause data path (stewart/chatmutes/{agentId})
@@ -957,7 +1005,7 @@ function endOfUtcDayMs() {
 // mutedUntil timestamp (1hr/1day toggles). The transaction only ever
 // strengthens the existing pause, never weakens one a parent already set.
 async function autoPauseForStrikes(agentId, agentName) {
-  const untilMs = endOfUtcDayMs();
+  const untilMs = endOfEasternDayMs();
   const muteRef = db.ref(`stewart/chatmutes/${agentId}`);
   const result = await muteRef.transaction(current => {
     // Returning undefined aborts the transaction (no write) — used here,
@@ -984,7 +1032,7 @@ exports.moderateGroupChatMessage = functions
 
     if (BANNED_67_PATTERN.test(m.text)) {
       await snap.ref.remove();
-      const count = await recordStrike(m.agentId, formatDateStr(new Date()), 'banned_term', 'groupchat', m.text);
+      const count = await recordStrike(m.agentId, easternDateStr(), 'banned_term', 'groupchat', m.text);
       await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_BANNED_TERM);
       if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       return null;
@@ -994,14 +1042,14 @@ exports.moderateGroupChatMessage = functions
 
     if (category === 'gibberish_spam') {
       await snap.ref.remove();
-      const count = await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      const count = await recordStrike(m.agentId, easternDateStr(), category, 'groupchat', m.text);
       await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_GIBBERISH);
       if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       return null;
     }
 
     if (category === 'unkind') {
-      const count = await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      const count = await recordStrike(m.agentId, easternDateStr(), category, 'groupchat', m.text);
       await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_UNKIND);
       await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
       if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
@@ -1028,7 +1076,7 @@ exports.moderatePrivateMessage = functions
 
     if (BANNED_67_PATTERN.test(m.text)) {
       await snap.ref.remove();
-      const count = await recordStrike(agentId, formatDateStr(new Date()), 'banned_term', 'private', m.text);
+      const count = await recordStrike(agentId, easternDateStr(), 'banned_term', 'private', m.text);
       await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_BANNED_TERM);
       if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       return null;
@@ -1038,14 +1086,14 @@ exports.moderatePrivateMessage = functions
 
     if (category === 'gibberish_spam') {
       await snap.ref.remove();
-      const count = await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      const count = await recordStrike(agentId, easternDateStr(), category, 'private', m.text);
       await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_GIBBERISH);
       if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       return null;
     }
 
     if (category === 'unkind') {
-      const count = await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      const count = await recordStrike(agentId, easternDateStr(), category, 'private', m.text);
       await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_UNKIND);
       await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
       if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
@@ -1067,7 +1115,7 @@ exports.getWeeklyStrikeReport = functions.https.onCall(async (data, callableCont
   if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
     throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
   }
-  const endDate = (typeof weekEnd === 'string' && DATE_RE.test(weekEnd)) ? weekEnd : formatDateStr(new Date());
+  const endDate = (typeof weekEnd === 'string' && DATE_RE.test(weekEnd)) ? weekEnd : easternDateStr();
   const startDate = formatDateStr(new Date(parseDateStr(endDate).getTime() - 6 * 24 * 60 * 60 * 1000));
   const dates = dateRange(startDate, endDate, 7);
 
@@ -1286,7 +1334,7 @@ async function fetchDawnWeekData(dates) {
 async function aggregateWeeklyReportData(weekOf) {
   const weekEnd = formatDateStr(new Date(parseDateStr(weekOf).getTime() + 6 * 24 * 60 * 60 * 1000));
   const dates = dateRange(weekOf, weekEnd, 7);
-  const todayStr = formatDateStr(new Date());
+  const todayStr = easternDateStr();
 
   const [boys, whiteglove, dawn] = await Promise.all([
     Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates))),
@@ -1401,19 +1449,20 @@ exports.generateWeeklyReportCard = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
     const { weekOf } = data || {};
-    const targetDate = (typeof weekOf === 'string' && DATE_RE.test(weekOf)) ? weekOf : formatDateStr(new Date());
+    const targetDate = (typeof weekOf === 'string' && DATE_RE.test(weekOf)) ? weekOf : easternDateStr();
     return buildFullWeeklyReportCard(mostRecentMonday(targetDate));
   });
 
-// Fires every Monday morning Eastern. That hour sits comfortably clear of
-// the UTC midnight boundary, so the existing UTC-keyed date helpers stay
-// correct here without needing a full timezone-conversion layer.
+// Fires every Monday morning Eastern, and now also RESOLVES "today" in
+// Eastern time (easternDateStr), not just fires at an Eastern hour — so
+// this is correct right at the boundary too, not just "comfortably clear"
+// of it.
 exports.autoGenerateWeeklyReportCard = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .pubsub.schedule('0 6 * * 1')
   .timeZone('America/New_York')
   .onRun(async () => {
-    const weekOf = previousWeekMonday(formatDateStr(new Date()));
+    const weekOf = previousWeekMonday(easternDateStr());
     await buildFullWeeklyReportCard(weekOf);
     return null;
   });
@@ -1487,7 +1536,7 @@ async function fetchMedalCheckData(agentId, dates) {
   const couragedareDates = new Set();
   Object.values(couragedareSnap.val() || {}).forEach(entry => {
     if (entry && typeof entry.completedAt === 'number') {
-      couragedareDates.add(formatDateStr(new Date(entry.completedAt)));
+      couragedareDates.add(easternDateStr(new Date(entry.completedAt)));
     }
   });
 
@@ -1538,7 +1587,7 @@ async function checkAndRecordMedals(agentId, weekOf) {
   const today = new Date();
   const dates = [];
   for (let i = 0; i < MEDAL_LOOKBACK_DAYS; i++) {
-    dates.push(formatDateStr(new Date(today.getTime() - i * 24 * 60 * 60 * 1000)));
+    dates.push(easternDateStr(new Date(today.getTime() - i * 24 * 60 * 60 * 1000)));
   }
 
   const data = await fetchMedalCheckData(agentId, dates);
@@ -1566,7 +1615,7 @@ async function checkAndRecordMedals(agentId, weekOf) {
 // On-demand trigger — same shape as generateWeeklyReportCard's manual
 // Check In, useful for testing and for a future "check now" UI hook.
 exports.checkMedalsNow = functions.https.onCall(async () => {
-  const weekOf = mostRecentMonday(formatDateStr(new Date()));
+  const weekOf = mostRecentMonday(easternDateStr());
   const results = await Promise.all(ALLOWED_AGENT_IDS.map(id => checkAndRecordMedals(id, weekOf)));
   return { newlyAwarded: results.flat() };
 });
@@ -1578,7 +1627,7 @@ exports.checkMedalsDaily = functions.pubsub
   .schedule('0 21 * * *')
   .timeZone('America/New_York')
   .onRun(async () => {
-    const weekOf = mostRecentMonday(formatDateStr(new Date()));
+    const weekOf = mostRecentMonday(easternDateStr());
     await Promise.all(ALLOWED_AGENT_IDS.map(id => checkAndRecordMedals(id, weekOf)));
     return null;
   });
