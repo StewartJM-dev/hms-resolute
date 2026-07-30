@@ -36,7 +36,7 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 - On `gibberish_spam` classification: delete the message from `stewart/groupchat` (or the private thread), increment that boy's daily strike counter (`stewart/strikes/{agentId}/{date}`), and push a private Tom-voiced nudge to `stewart/messages/{agentId}` explaining the deletion
 - Tom's nudge should stay in his existing voice — firm but warm, matching his established catchphrase style (e.g., something like "That's outside my orders, sailor — let's keep it real words in here.")
 
-## Step 3: Handle Category B (unkindness)
+## Step 3: Handle Category B (unkindness) ✅ done
 **Task for Claude Code:**
 - On `unkind` classification: same private Tom nudge + strike increment as Category A
 - **Additionally**, immediately trigger a parent notification (reuse existing notification infrastructure) with enough detail for John/Dawn to see what was said and by whom

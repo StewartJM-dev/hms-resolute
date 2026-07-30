@@ -893,6 +893,7 @@ async function classifyChatMessage(text) {
 }
 
 const TOM_MODERATION_NUDGE_GIBBERISH = "That's outside my orders, sailor — pulled that one, didn't look like real words. Keep it plain talk out there and you're squared away.";
+const TOM_MODERATION_NUDGE_UNKIND = "That's not how we treat each other, sailor — pull it back. I let Mom and Dad know so they've got the full picture.";
 
 // stewart/strikes/{agentId}/{date}/count is transaction-incremented (same
 // pattern as the wishes economy); each incident is also logged in full
@@ -919,6 +920,18 @@ async function pushTomModerationNudge(agentId, text) {
   await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text, timestamp: Date.now() });
 }
 
+// Unlike gibberish/spam, unkindness is never deleted — it stays visible in
+// context. This fires on EVERY unkind instance regardless of strike count
+// (the 3-strike auto-pause in Step 4 is a separate, additional escalation),
+// with enough detail for John/Dawn to see what was said and by whom.
+async function notifyParentsOfUnkindMessage(agentId, agentName, text, source, msgId) {
+  if (await alreadyNotified('unkind_' + agentId + '_' + msgId)) return;
+  const where = source === 'groupchat' ? 'Group Chat' : 'Private Thread';
+  const title = `Tom flagged unkindness — ${agentName} (${where})`;
+  const body = text.length > 100 ? text.slice(0, 100) + '…' : text;
+  await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+}
+
 exports.moderateGroupChatMessage = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .database.ref('/stewart/groupchat/{msgId}')
@@ -933,6 +946,14 @@ exports.moderateGroupChatMessage = functions
       await snap.ref.remove();
       await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
       await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      return null;
+    }
+
+    if (category === 'unkind') {
+      await recordStrike(m.agentId, formatDateStr(new Date()), category, 'groupchat', m.text);
+      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_UNKIND);
+      await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
+      await snap.ref.update({ moderation: category });
       return null;
     }
 
@@ -959,6 +980,14 @@ exports.moderatePrivateMessage = functions
       await snap.ref.remove();
       await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
       await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_GIBBERISH);
+      return null;
+    }
+
+    if (category === 'unkind') {
+      await recordStrike(agentId, formatDateStr(new Date()), category, 'private', m.text);
+      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_UNKIND);
+      await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
+      await snap.ref.update({ moderation: category });
       return null;
     }
 
