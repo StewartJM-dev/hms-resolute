@@ -16,7 +16,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
 <script src="../mission-engine.js?v=20260728"></script>
@@ -1107,7 +1106,6 @@ const FB_CONFIG = {
 };
 
 let _db = null;
-let _functions = null;
 let currentAgent = null; // {id, codename, name, rank, theme, icon}
 let currentLunchDay = 'monday';
 let lunchWeekData = {};
@@ -1118,6 +1116,33 @@ let transmissionsData = [];
 // ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
+// Firebase's httpsCallable() SDK method has proven unreliable specifically
+// from iOS home-screen standalone web apps (confirmed live: Tink/Hans/
+// report-card calls consistently fail there — across multiple devices,
+// multiple networks, both cellular and WiFi — while an identical raw HTTPS
+// POST to the exact same endpoint always succeeds, including in plain
+// Safari on the same devices). None of these calls use Firebase Auth or App
+// Check (every server-side log shows both "MISSING"), so httpsCallable()
+// isn't giving us anything functional here that this can't replicate
+// directly — this bypasses the SDK's callable wrapper entirely and talks to
+// the same endpoint the same way, matching the Callable protocol's own
+// request/response shape ({data: payload} in, {result: ...} or
+// {error: ...} out).
+function callFunction(name, payload){
+  return fetch(`https://us-central1-stewart-family-3cece.cloudfunctions.net/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: payload || {} })
+  }).then(async res => {
+    const body = await res.json().catch(() => ({}));
+    if(!res.ok){
+      const message = (body && body.error && body.error.message) || ('Request failed with status ' + res.status);
+      throw new Error(message);
+    }
+    return { data: body.result };
+  });
+}
+
 function initFirebase(){
   try {
     if(typeof firebase === 'undefined'){
@@ -1125,7 +1150,6 @@ function initFirebase(){
     }
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
-    _functions = firebase.functions();
     if(typeof initPush === 'function') initPush();
     if(typeof syncHomeScreenBadgeOnOpen === 'function') syncHomeScreenBadgeOnOpen();
     setSyncStatus('live');
@@ -2820,9 +2844,7 @@ async function getHansLine(triggerType, name, completed, total, extra){
   };
   for(let attempt = 1; attempt <= 2; attempt++){
     try {
-      if(!_functions) throw new Error('Firebase Functions not initialized');
-      const call = _functions.httpsCallable('generateHansLine');
-      const result = await call(payload);
+      const result = await callFunction('generateHansLine', payload);
       const text = result && result.data && result.data.text;
       if(!text) throw new Error('Empty response from generateHansLine');
       return text;
@@ -3091,9 +3113,7 @@ async function askTomChat(){
   let result = null;
   for(let attempt = 1; attempt <= 2 && !result; attempt++){
     try{
-      if(!_functions) throw new Error('Firebase Functions not initialized');
-      const call = _functions.httpsCallable('askTom');
-      const res = await call({ agentId: currentAgent.id, question, history });
+      const res = await callFunction('askTom', { agentId: currentAgent.id, question, history });
       if(!res || !res.data || !res.data.message) throw new Error('Empty response from askTom');
       result = res.data;
     }catch(e){
@@ -3137,9 +3157,7 @@ async function confirmTomWish(key){
 
   const ref = _db.ref(`stewart/tomchat/${currentAgent.id}/${key}`);
   try{
-    if(!_functions) throw new Error('Firebase Functions not initialized');
-    const call = _functions.httpsCallable('spendTomWish');
-    const res = await call({ agentId: currentAgent.id, today: localDateStr() });
+    const res = await callFunction('spendTomWish', { agentId: currentAgent.id, today: localDateStr() });
     if(res && res.data && res.data.spent){
       await ref.update({ text: msg.realText, pendingWish: null, realText: null });
     } else {

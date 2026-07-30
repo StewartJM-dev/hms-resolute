@@ -16,7 +16,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
@@ -619,7 +618,6 @@ const FB_CONFIG = {
   appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
 };
 let _db = null;
-let _functions = null;
 
 const AGENTS = [
   {id:'samuel',  name:'Samuel',   icon:'🦅'},
@@ -633,11 +631,36 @@ function localDateStr(date){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+// Firebase's httpsCallable() SDK method has proven unreliable specifically
+// from iOS home-screen standalone web apps (confirmed live: report-card
+// calls consistently fail there — across multiple devices, multiple
+// networks, both cellular and WiFi — while an identical raw HTTPS POST to
+// the exact same endpoint always succeeds, including in plain Safari on the
+// same devices). None of these calls use Firebase Auth or App Check (every
+// server-side log shows both "MISSING"), so httpsCallable() isn't giving us
+// anything functional here that this can't replicate directly — this
+// bypasses the SDK's callable wrapper entirely and talks to the same
+// endpoint the same way, matching the Callable protocol's own request/
+// response shape ({data: payload} in, {result: ...} or {error: ...} out).
+function callFunction(name, payload){
+  return fetch(`https://us-central1-stewart-family-3cece.cloudfunctions.net/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: payload || {} })
+  }).then(async res => {
+    const body = await res.json().catch(() => ({}));
+    if(!res.ok){
+      const message = (body && body.error && body.error.message) || ('Request failed with status ' + res.status);
+      throw new Error(message);
+    }
+    return { data: body.result };
+  });
+}
+
 function initFirebase(){
   try{
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
-    _functions = firebase.functions();
     if(typeof initPush === 'function') initPush();
     if(typeof syncHomeScreenBadgeOnOpen === 'function') syncHomeScreenBadgeOnOpen();
     const dot = document.getElementById('sync-dot');
@@ -1441,7 +1464,6 @@ function copyReportCardText(){
 // mean up to ~60s total — worth it to avoid a visible error on a plain
 // network blip, which is what's actually been happening.
 async function checkInReportCard(){
-  if(!_functions) return;
   const btn = document.getElementById('rc-checkin-btn');
   const orig = btn ? 'Check In — Generate Now' : null;
   if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
@@ -1449,7 +1471,7 @@ async function checkInReportCard(){
   let ok = false;
   for(let attempt = 1; attempt <= 2 && !ok; attempt++){
     try{
-      await _functions.httpsCallable('generateWeeklyReportCard')({});
+      await callFunction('generateWeeklyReportCard', {});
       ok = true;
       // renderReportCard's live listener picks up the write automatically.
     }catch(err){
