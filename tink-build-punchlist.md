@@ -17,7 +17,7 @@
 
 ---
 
-## Step 1: Cloud Function — `askTink`
+## Step 1: Cloud Function — `askTink` ✅ done
 **File:** `functions/index.js` (append, following existing style)
 
 **Task for Claude Code:**
@@ -28,19 +28,19 @@
 - Model: `claude-haiku-4-5-20251001` for simple app-help; consider `claude-sonnet-4-6` if `context` indicates a data-lookup or drafting task requiring more reasoning (Claude Code's call on complexity threshold)
 - Returns `{ text: "..." }`
 
-## Step 2: Data-lookup capability
+## Step 2: Data-lookup capability ✅ done
 **Task for Claude Code:**
 - Before calling the model for a lookup-type question, fetch real data server-side: `stewart/scores/{agentId}/{date}` and `stewart/deductions/{agentId}/{date}` for the relevant boy/date range
 - Pass that real data into the prompt as context so the answer is grounded in fact, not generated from nothing
 - If Dawn's question doesn't clearly specify which boy, ask for clarification rather than guessing
 
-## Step 3: Recipe Builder hook-in
+## Step 3: Recipe Builder hook-in ✅ done
 **Task for Claude Code:**
 - Reuse `mealReadiness()` and the existing meal database from `kitchen/index.html` — call this logic first
 - Only invoke the AI function when: (a) nothing scores well as "ready" or "close," or (b) Dawn asks for a modification/substitution to an existing suggested meal
 - Keep this unlimited/no-token, per what's already decided
 
-## Step 4: UI — new tab or section in Officers' Country
+## Step 4: UI — new tab or section in Officers' Country ✅ done
 **File:** `dashboard/index.html`
 
 **Task for Claude Code:**
@@ -49,7 +49,7 @@
 - Simple text input, call `askTink`, display response in the existing chat-bubble style
 - No wish counter, no confirmation step — just ask and answer
 
-## Step 5: Cost tracking (soft, not hard-blocking)
+## Step 5: Cost tracking (soft, not hard-blocking) ✅ done
 **Task for Claude Code:**
 - Log each call's approximate cost to a `dawn_usage` path in Realtime Database, similar in spirit to what we'll eventually build for the boys, but Dawn's version doesn't need to block her at $2 — just track for visibility
 - This is lower priority than Steps 1–4; can be a fast-follow
@@ -57,11 +57,11 @@
 ---
 
 ## Testing checklist
-- [ ] Ask a basic app-help question ("how do I run White Glove") — confirm accurate, grounded answer
-- [ ] Ask a boy-lookup question ("how did Stephen do this week") — confirm it pulls real data, doesn't fabricate
-- [ ] Ask a recipe question when pantry has a ready match — confirm it either defers to the existing engine's answer or complements it sensibly
-- [ ] Ask a recipe question when nothing matches — confirm AI generates something reasonable using real pantry contents
-- [ ] Ask something outside scope — confirm it says so rather than guessing or hallucinating a feature
+- [x] Ask a basic app-help question ("how do I run White Glove") — confirm accurate, grounded answer
+- [x] Ask a boy-lookup question ("how did Stephen do this week") — server-side extraction now resolves boy + date range from the question itself (with conversation history for follow-ups like "Stephen" alone), confirmed pulling real data with no fabrication
+- [x] Ask a recipe question when pantry has a ready match — confirm it either defers to the existing engine's answer or complements it sensibly
+- [x] Ask a recipe question when nothing matches — confirm AI generates something reasonable using real pantry contents
+- [x] Ask something outside scope — confirm it says so rather than guessing or hallucinating a feature
 - [ ] Check Console usage/cost after a day of real use
 
 ## Merge checklist

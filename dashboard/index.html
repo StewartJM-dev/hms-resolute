@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
 <script src="../mission-engine.js?v=20260728"></script>
@@ -885,6 +886,19 @@ body{
 
     </div>
 
+    <!-- TAB: TINK (Dawn's plain-spoken AI assistant) -->
+    <div class="tab" id="tab-tink">
+      <div class="sec-hd">Tink</div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Ask about running Resolute, look up a boy's week, get recipe help, or draft something. No persona — just a straight answer.</p>
+      <div class="dash-chat-thread">
+        <div class="dash-chat-messages" id="tink-messages"></div>
+        <div class="dash-chat-compose">
+          <input type="text" id="tink-input" placeholder="Ask Tink…" maxlength="500" autocomplete="off" name="msg-tink-nofill">
+          <button onclick="askTinkDashboard()">&#10148;</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <nav class="botnav">
@@ -915,6 +929,10 @@ body{
     <button class="bnb" onclick="showTab('projects',this);renderProjectsTab();renderVoteManagement();renderSuperFNDashboard();">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Drydock
+    </button>
+    <button class="bnb" onclick="showTab('tink',this);initTinkChat();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+      Tink
     </button>
   </nav>
 </div>
@@ -961,11 +979,13 @@ const FB_CONFIG = {
   appId: "1:43602660041:web:0f3d567cc00e7fdf86db18"
 };
 let _db = null;
+let _functions = null;
 
 function initFirebase(){
   try{
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
+    _functions = firebase.functions();
     if(typeof initPush === 'function') initPush();
     if(typeof syncHomeScreenBadgeOnOpen === 'function') syncHomeScreenBadgeOnOpen();
     if(typeof clearHomeScreenBadge === 'function') clearHomeScreenBadge();
@@ -1669,6 +1689,86 @@ function sendDashGroupMessage(){
   }).finally(()=>{ _dashSendLock=false; });
 }
 
+// ══════════════════════════════════════════════════════
+// TINK — Dawn's plain-spoken AI assistant
+// Persisted to Firebase (stewart/tinkchat), shared across Officers'
+// Country like Family Channel — no wish counter, no confirmation step,
+// per the punch list.
+// ══════════════════════════════════════════════════════
+let _tinkSendLock = false;
+let _tinkListenerAttached = false;
+let _tinkMessageCache = []; // latest known thread, kept for building conversation history
+const MAX_TINK_HISTORY = 10; // last few exchanges — enough for a follow-up like "Stephen, this week" to connect
+
+function initTinkChat(){
+  if(!_db || _tinkListenerAttached) return;
+  _tinkListenerAttached = true;
+  _db.ref('stewart/tinkchat').limitToLast(60).on('value', snap => {
+    renderTinkMessages(snap.val() || {});
+  });
+}
+
+function renderTinkMessages(msgs){
+  const items = Object.values(msgs || {}).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  _tinkMessageCache = items;
+  const el = document.getElementById('tink-messages');
+  if(!el) return;
+  if(!items.length){
+    el.innerHTML = '<div class="empty-state">Ask Tink anything about running Resolute.</div>';
+    return;
+  }
+  el.innerHTML = items.map(m => {
+    const isTink = m.agentId === 'tink';
+    return `
+    <div class="msg-bubble ${isTink?'received':'sent'}">
+      <div class="msg-bubble-from">${escapeHtml(m.from || (isTink?'Tink':'Unknown'))}</div>
+      ${linkify(m.text||'')}
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+// Turns the cached thread into the {role, content} history askTink expects,
+// so a short follow-up ("Stephen, this week") can be resolved against what
+// was already asked. Excludes any stray "Thinking…" placeholder.
+function tinkHistoryForApi(){
+  return _tinkMessageCache
+    .filter(m => m.text && m.text !== 'Thinking…')
+    .slice(-MAX_TINK_HISTORY)
+    .map(m => ({ role: m.agentId==='tink' ? 'assistant' : 'user', content: m.text }));
+}
+
+async function askTinkDashboard(){
+  if(_tinkSendLock || !_db) return;
+  const input = document.getElementById('tink-input');
+  const question = input ? input.value.trim() : '';
+  if(!question) return;
+
+  const history = tinkHistoryForApi(); // capture before pushing the new question
+
+  input.value = '';
+  _tinkSendLock = true;
+
+  await _db.ref('stewart/tinkchat').push({
+    text: question, from: getSenderName(), agentId:'parent', timestamp: Date.now()
+  });
+  const thinkingRef = _db.ref('stewart/tinkchat').push();
+  await thinkingRef.set({ text: 'Thinking…', from: 'Tink', agentId:'tink', timestamp: Date.now() });
+
+  try{
+    if(!_functions) throw new Error('Firebase Functions not initialized');
+    const call = _functions.httpsCallable('askTink');
+    const result = await call({ question, history, today: localDateStr() });
+    const text = result && result.data && result.data.text;
+    if(!text) throw new Error('Empty response from askTink');
+    await thinkingRef.update({ text });
+  }catch(e){
+    await thinkingRef.update({ text: "Tink couldn't answer right now — try again in a moment." });
+  }
+
+  _tinkSendLock = false;
+}
+
 // Enter key sends
 document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('thread-input').addEventListener('keydown', e => {
@@ -1677,6 +1777,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const gi = document.getElementById('dash-group-input');
   if(gi) gi.addEventListener('keydown', e => {
     if(e.key==='Enter' && !e.repeat) sendDashGroupMessage();
+  });
+  const ti = document.getElementById('tink-input');
+  if(ti) ti.addEventListener('keydown', e => {
+    if(e.key==='Enter' && !e.repeat) askTinkDashboard();
   });
 });
 

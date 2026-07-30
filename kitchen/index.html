@@ -233,6 +233,7 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 </head>
 <body>
 <div id="lock">
@@ -284,6 +285,12 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
     <div id="meal-suggestions-wrap" style="display:none;margin-top:12px;">
       <div class="sc-sub" style="margin-bottom:8px;">Based on what's in your inventory right now</div>
       <div id="meal-suggestions"></div>
+      <div id="recipe-builder-wrap" style="margin-top:14px;">
+        <div class="sc-sub" id="recipe-builder-prompt" style="margin-bottom:6px;">Want to tweak one of these, or ask for something different? Ask Tink.</div>
+        <input class="search-inp" type="text" id="recipe-builder-input" placeholder='e.g. "swap the chicken for beef" or "give me a dinner idea"'>
+        <button class="plan-btn sec" onclick="askTinkForRecipe()">Ask Tink</button>
+        <div id="recipe-builder-response" style="display:none;"></div>
+      </div>
     </div>
     <button class="plan-btn sec" onclick="sendToShopping()">&rarr; View Shopping List</button>
     <button class="plan-btn cal" id="cal-btn" style="display:none" onclick="sendToCalendar()">&#128197; Send to Home Calendar</button>
@@ -1093,6 +1100,7 @@ const FB_CONFIG = {
 
 // Firebase loaded via CDN in <head> — db reference
 let _db = null;
+let _functions = null;
 let _fbReady = false;
 let _syncStatus = 'connecting'; // connecting | live | offline
 
@@ -1100,6 +1108,7 @@ function initFirebase(){
   try {
     firebase.initializeApp(FB_CONFIG);
     _db = firebase.database();
+    _functions = firebase.functions();
     _fbReady = true;
     setSyncStatus('live');
 
@@ -1497,6 +1506,70 @@ function renderMealSuggestions(){
   }
   if(!html) html = '<div class="empty">Update your inventory to see meal suggestions.</div>';
   el.innerHTML = html;
+
+  // Nudge toward the AI helper when the real engine came up empty — that's
+  // exactly the case it's meant to fill in for.
+  const prompt = document.getElementById('recipe-builder-prompt');
+  if(prompt){
+    prompt.textContent = (ready.length || close.length)
+      ? 'Want to tweak one of these, or ask for something different? Ask Tink.'
+      : "Nothing on hand matches your dinner list — ask Tink for an idea using what you've got.";
+  }
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Recipe Builder AI hook. Always tries the real mealReadiness() engine first
+// (above) — this only fires when Dawn explicitly asks Tink something, which
+// is exactly the two cases the punch list calls for: the engine came up
+// empty, or she wants a modification/substitution to a suggested meal.
+async function askTinkForRecipe(){
+  const input = document.getElementById('recipe-builder-input');
+  const question = input ? input.value.trim() : '';
+  if(!question) return;
+
+  const respEl = document.getElementById('recipe-builder-response');
+  if(respEl){
+    respEl.style.display = 'block';
+    respEl.innerHTML = '<div class="sc-sub" style="margin:0;">Tink is thinking&hellip;</div>';
+  }
+
+  // Ground the question in what the existing engine already found, so Tink
+  // complements it rather than guessing at the pantry independently.
+  const dinnerCats = ['Comfort','Italian','Mexican','Chinese','Grill','Soups'];
+  const scored = MEALS
+    .filter(m => dinnerCats.includes(m.cat) && m.ingredients)
+    .map(m => ({ meal:m, r:mealReadiness(m) }))
+    .sort((a,b) => b.r.pct - a.r.pct);
+  const readyNames = scored.filter(s => s.r.pct >= 80).slice(0,8).map(s => s.meal.name);
+  const closeNames = scored.filter(s => s.r.pct >= 50 && s.r.pct < 80).slice(0,6)
+    .map(s => `${s.meal.name} (missing: ${s.r.missing.slice(0,3).join(', ')})`);
+
+  const context = {
+    kind: 'recipe',
+    readyToMakeTonight: readyNames,
+    aFewIngredientsAway: closeNames,
+    pantryInStock: inStockNames()
+  };
+
+  try {
+    if(!_functions) throw new Error('Firebase Functions not initialized');
+    const call = _functions.httpsCallable('askTink');
+    const result = await call({ question, context });
+    const text = result && result.data && result.data.text;
+    if(!text) throw new Error('Empty response from askTink');
+    if(respEl){
+      respEl.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;color:var(--ink);white-space:pre-wrap;">${escapeHtml(text)}</div>`;
+    }
+  } catch(e){
+    if(respEl) respEl.innerHTML = '<div class="empty">Tink couldn\'t answer right now — try again in a moment.</div>';
+  }
+
+  if(input) input.value = '';
 }
 
 
