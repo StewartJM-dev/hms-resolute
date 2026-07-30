@@ -1030,3 +1030,45 @@ exports.moderatePrivateMessage = functions
     await snap.ref.update({ moderation: category });
     return null;
   });
+
+// Step 6: weekly report card — pulls the FULL, unfiltered incident history
+// across 7 days (the daily strike counter's own date-scoped reset never
+// applies here; this reads every date node directly), so John/Dawn see
+// real per-day patterns rather than one flattened number. Reuses the same
+// date-range utilities Tink's grounded lookups already use.
+exports.getWeeklyStrikeReport = functions.https.onCall(async (data, callableContext) => {
+  const { agentId, weekEnd } = data || {};
+  if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
+  }
+  const endDate = (typeof weekEnd === 'string' && DATE_RE.test(weekEnd)) ? weekEnd : formatDateStr(new Date());
+  const startDate = formatDateStr(new Date(parseDateStr(endDate).getTime() - 6 * 24 * 60 * 60 * 1000));
+  const dates = dateRange(startDate, endDate, 7);
+
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value')));
+
+  let totalStrikes = 0;
+  let unkindDays = 0;
+  const days = dates.map((date, i) => {
+    const rec = snaps[i].val() || {};
+    const count = rec.count || 0;
+    const incidents = Object.values(rec.incidents || {}).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const categories = [...new Set(incidents.map(inc => inc.category))];
+    const hadUnkindness = categories.includes('unkind');
+
+    totalStrikes += count;
+    if (hadUnkindness) unkindDays++;
+
+    return { date, count, categories, hadUnkindness, incidents };
+  });
+
+  return {
+    agentId,
+    agentName: AGENT_DISPLAY_NAMES[agentId] || agentId,
+    weekStart: startDate,
+    weekEnd: endDate,
+    totalStrikes,
+    unkindDays,
+    days
+  };
+});

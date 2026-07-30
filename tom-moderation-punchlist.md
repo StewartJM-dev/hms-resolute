@@ -53,7 +53,7 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 - Daily strike counter at `stewart/strikes/{agentId}/{date}` naturally resets by virtue of being date-keyed — confirm no code anywhere carries a running total across dates
 - Confirm the auto-pause itself doesn't persist past the day it was set (should lift automatically at midnight, same as if manually set for "today only" — check how the existing pause stores its duration)
 
-## Step 6: Weekly report card — full visibility
+## Step 6: Weekly report card — full visibility ✅ done
 **Task for Claude Code:**
 - The weekly report card generation should pull the full `stewart/strikes/{agentId}/*` history across all 7 days, unfiltered by the daily reset logic
 - Include real specifics: which days had strikes, what category, whether unkindness occurred (not just a count) — so John and Dawn can actually see patterns, not just a number
