@@ -61,13 +61,13 @@ Tom gains a second job: moderating the boys' group chat (`stewart/groupchat`) an
 ---
 
 ## Testing checklist
-- [ ] Send an emoji-spam message — confirm it's deleted, strike increments, Tom nudges privately
-- [ ] Send a "67" message — same as above
-- [ ] Send an unkind message between test accounts — confirm strike increments AND parent notification fires immediately
-- [ ] Trigger 3 strikes in one day — confirm auto-pause fires, notification explains why, `unmuteBoy()` still works
-- [ ] Confirm a clean, normal message is never flagged or deleted
-- [ ] Wait past midnight (or manually adjust date for testing) — confirm strike counter resets to 0
-- [ ] Generate a weekly report card after a week with mixed strike days — confirm it shows real per-day detail, not just a total
+- [x] Send an emoji-spam message — confirm it's deleted, strike increments, Tom nudges privately
+- [x] Send a "67" message — same as above
+- [x] Send an unkind message between test accounts — confirm strike increments AND parent notification fires immediately
+- [x] Trigger 3 strikes in one day — confirm auto-pause fires, notification explains why, `unmuteBoy()` still works
+- [x] Confirm a clean, normal message is never flagged or deleted
+- [x] Wait past midnight (or manually adjust date for testing) — confirm strike counter resets to 0
+- [x] Generate a weekly report card after a week with mixed strike days — confirm it shows real per-day detail, not just a total
 
 ## Merge checklist
 - [ ] Test on a branch (`feature/tom-moderation`) for a few real days before merging
