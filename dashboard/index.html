@@ -1750,8 +1750,11 @@ function sendDashGroupMessage(){
 // ══════════════════════════════════════════════════════
 // TINK — Dawn's plain-spoken AI assistant
 // Persisted to Firebase (stewart/tinkchat), shared across Officers'
-// Country like Family Channel — no wish counter, no confirmation step,
-// per the punch list.
+// Country like Family Channel — no wish counter, per the punch list.
+// The one exception is Tink's plan-write proposals (pendingPlanAction,
+// below): a real Confirm/Never mind step, same trust boundary as Tom's
+// wish-spend confirm on the boys' side — Tink never writes stewart/plan
+// on her own say-so.
 // ══════════════════════════════════════════════════════
 let _tinkSendLock = false;
 let _tinkListenerAttached = false;
@@ -1767,7 +1770,9 @@ function initTinkChat(){
 }
 
 function renderTinkMessages(msgs){
-  const items = Object.values(msgs || {}).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  const items = Object.entries(msgs || {})
+    .map(([key, m]) => ({ key, ...m }))
+    .sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
   _tinkMessageCache = items;
   const el = document.getElementById('tink-messages');
   if(!el) return;
@@ -1777,10 +1782,23 @@ function renderTinkMessages(msgs){
   }
   el.innerHTML = items.map(m => {
     const isTink = m.agentId === 'tink';
+    // pendingPlanAction (Tink's first write-capable action): the message
+    // text already IS Tink's real suggestion, unlike Tom's wish-spend
+    // flow which hides the real answer until confirmed — nothing here is
+    // hidden, the Confirm/Never mind buttons are just attached UI that
+    // performs (or discards) the actual stewart/plan write.
+    const pa = m.pendingPlanAction;
+    const confirmHtml = (isTink && pa && pa.day && pa.mealName && !m.planActionResolved)
+      ? `<div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="confirmTinkPlanAction('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:none;background:var(--gold);color:var(--black);font-size:11px;font-weight:700;cursor:pointer;">Add to the plan</button>
+          <button onclick="cancelTinkPlanAction('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:1px solid rgba(0,0,0,.3);background:none;color:inherit;font-size:11px;cursor:pointer;">Never mind</button>
+        </div>`
+      : '';
     return `
     <div class="msg-bubble ${isTink?'received':'sent'}">
       <div class="msg-bubble-from">${escapeHtml(m.from || (isTink?'Tink':'Unknown'))}</div>
       ${linkify(m.text||'')}
+      ${confirmHtml}
     </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
@@ -1818,18 +1836,99 @@ async function askTinkDashboard(){
   // masks that instead of showing a fallback for an answer that existed.
   const payload = { question, history, today: localDateStr() };
   let text = null;
+  let proposedPlanAction = null;
   for(let attempt = 1; attempt <= 2 && !text; attempt++){
     try{
       const result = await callFunction('askTink', payload);
       text = result && result.data && result.data.text;
+      proposedPlanAction = (result && result.data && result.data.proposedPlanAction) || null;
       if(!text) throw new Error('Empty response from askTink');
     }catch(e){
       // one silent retry before falling back
     }
   }
-  await thinkingRef.update({ text: text || "Tink couldn't answer right now — try again in a moment." });
+  await thinkingRef.update({
+    text: text || "Tink couldn't answer right now — try again in a moment.",
+    pendingPlanAction: proposedPlanAction
+  });
 
   _tinkSendLock = false;
+}
+
+// Tink's first write-capable action. She only ever PROPOSES
+// {day, type, mealName, sides} — this is the one place that actually
+// writes stewart/plan, and only once Dawn or John taps Confirm. Mirrors
+// Kitchen's own savePlan() format exactly (kitchen/index.html) and,
+// critically, its read-modify-write discipline: stewart/plan is one flat
+// array (not keyed by day), so writing it means reading the CURRENT
+// array fresh, changing only the one entry for this day, and writing the
+// whole array back untouched everywhere else — never a blind .set() of
+// a partial plan that would wipe out every other day.
+//
+// Matched by "day" ALONE, not day+type: the real data (confirmed live
+// against stewart/plan) has exactly one entry per day, but "type" isn't
+// a fixed Family/Boys-Cook enum — it's a per-day theme label ("Italian
+// Night", "Date Night", "Grill or Slow Cook", etc). Matching on type too
+// would miss the existing entry for a themed day and create a duplicate.
+// For the same reason, updating an existing day only ever touches the
+// meal itself (name/sides/mealId/chainName) — type, health, dessert,
+// bread, defrost, and every other field on that day are left exactly as
+// they were; Tink's proposal never carries information about them, so
+// there's nothing safe to change them to.
+async function confirmTinkPlanAction(key){
+  if(!_db) return;
+  const msg = _tinkMessageCache.find(m => m.key === key);
+  if(!msg || !msg.pendingPlanAction) return;
+  const action = msg.pendingPlanAction;
+  const ref = _db.ref('stewart/tinkchat/'+key);
+
+  try{
+    const planSnap = await _db.ref('stewart/plan').once('value');
+    const plan = Array.isArray(planSnap.val()) ? planSnap.val() : [];
+    const idx = plan.findIndex(p => p.day === action.day);
+
+    if(idx >= 0){
+      // mealId/chainName cleared since they'd otherwise point at
+      // whatever meal used to be here, disagreeing with the new name.
+      plan[idx] = {
+        ...plan[idx],
+        mealName: action.mealName,
+        sides: action.sides || plan[idx].sides || '',
+        mealId: null,
+        chainName: null,
+        noMeal: false
+      };
+    } else {
+      // No entry for this day at all yet (the current plan always has
+      // all seven, but doesn't assume that stays true forever) — create
+      // one using Tink's proposed type, defaulting to "Family".
+      plan.push({
+        day: action.day, type: action.type || 'Family', label: '',
+        mealName: action.mealName, sides: action.sides || '',
+        health: 'green', boysMeal: '', boysMealSides: '',
+        dessert: null, bread: null, defrost: null,
+        chainName: null, mealId: null, alert: null, noMeal: false
+      });
+    }
+
+    await _db.ref('stewart/plan').set(plan);
+    await ref.update({
+      pendingPlanAction: null,
+      planActionResolved: true,
+      text: msg.text + `\n\n✓ Added to the plan — ${action.mealName} for ${action.day}.`
+    });
+  }catch(e){
+    await ref.update({
+      pendingPlanAction: null,
+      planActionResolved: true,
+      text: msg.text + '\n\n⚠️ Something went wrong saving that — try again from the Galley.'
+    });
+  }
+}
+
+function cancelTinkPlanAction(key){
+  if(!_db) return;
+  _db.ref('stewart/tinkchat/'+key).update({ pendingPlanAction: null, planActionResolved: true });
 }
 
 // Enter key sends
