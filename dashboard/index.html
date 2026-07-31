@@ -619,6 +619,16 @@ body{
   </div>
 </div>
 
+<!-- ═══ WEEKLY STRIKE REPORT ═══ real per-day incident detail for one
+     boy, distinct from the general weekly report card's narrative
+     summary. getWeeklyStrikeReport (functions/index.js) already existed
+     and worked but had no caller anywhere; this is that caller. -->
+<div id="strike-report-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:480px;width:100%;max-height:85vh;overflow-y:auto;background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:22px;" id="strike-report-content">
+    <div style="text-align:center;padding:30px 0;color:var(--muted);">Loading…</div>
+  </div>
+</div>
+
 <!-- ═══ PIN SCREEN ═══ -->
 <div class="pin-screen" id="pin-screen">
   <div class="pin-logo">Stewart Family</div>
@@ -742,7 +752,7 @@ body{
       <div class="sec-hd" style="margin-top:22px;">Chat Moderation</div>
       <div class="card" style="margin-bottom:14px;">
         <div class="card-bd">
-          <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime.</div>
+          <div style="font-size:13px;opacity:.75;margin-bottom:10px;">Pause a boy's group chat if it's getting out of hand. Reversible anytime. Tap a boy's name for his full weekly strike history — real per-day incidents, not just the report card's summary.</div>
           <div id="mod-list"></div>
         </div>
       </div>
@@ -4906,7 +4916,8 @@ function renderModeration(){
         : 'Active';
       return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">'+
         '<div style="font-size:20px;">'+a.icon+'</div>'+
-        '<div style="flex:1;"><div style="font-weight:700;font-size:15px;">'+a.name+'</div>'+
+        '<div style="flex:1;cursor:pointer;" onclick="openStrikeReport(\''+a.id+'\')">'+
+        '<div style="font-weight:700;font-size:15px;color:var(--gold2);text-decoration:underline;text-decoration-color:rgba(232,184,74,.4);">'+a.name+'</div>'+
         '<div style="font-size:12px;opacity:.7;'+(active?'color:#c0504d;':'')+'">'+statusTxt+'</div></div>'+
         (active
           ? '<button onclick="unmuteBoy(\''+a.id+'\')" style="padding:7px 12px;border-radius:8px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Unpause</button>'
@@ -4930,6 +4941,65 @@ function muteBoy(id,hours){
   }
 }
 function unmuteBoy(id){ if(_db) _db.ref('stewart/chatmutes/'+id).set(null); }
+
+// ════════════════════════════════════════════
+// WEEKLY STRIKE REPORT — real per-day incident detail, on demand, for one
+// boy. Calls the existing getWeeklyStrikeReport callable (functions/index.js)
+// which pulls the full unfiltered 7-day history (not reset by the daily
+// strike counter) — a different view from the general weekly report card's
+// AI-written summary: this shows the actual incident text and timestamps.
+// ════════════════════════════════════════════
+async function openStrikeReport(agentId){
+  const overlay = document.getElementById('strike-report-overlay');
+  const content = document.getElementById('strike-report-content');
+  if(!overlay || !content) return;
+  overlay.style.display = 'flex';
+  content.innerHTML = '<div style="text-align:center;padding:30px 0;color:var(--muted);">Loading…</div>';
+
+  try{
+    const res = await callFunction('getWeeklyStrikeReport', { agentId });
+    const r = res && res.data;
+    if(!r) throw new Error('Empty response');
+    renderStrikeReport(r);
+  }catch(e){
+    content.innerHTML = '<div style="text-align:center;padding:30px 0;color:#c0504d;">Couldn\'t load the strike report — try again.</div>'+
+      '<button onclick="closeStrikeReport()" style="width:100%;margin-top:14px;padding:10px;border:none;border-radius:8px;background:var(--gold);color:var(--black);font-weight:700;cursor:pointer;">Close</button>';
+  }
+}
+function closeStrikeReport(){
+  const overlay = document.getElementById('strike-report-overlay');
+  if(overlay) overlay.style.display = 'none';
+}
+function renderStrikeReport(r){
+  const content = document.getElementById('strike-report-content');
+  if(!content) return;
+  const fmtDay = ds => new Date(ds+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const daysHtml = r.days.map(d => {
+    if(!d.count) return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><strong>'+fmtDay(d.date)+'</strong> — clean</div>';
+    const incidentsHtml = d.incidents.map(inc =>
+      '<div style="margin-top:4px;padding-left:10px;border-left:2px solid '+(inc.category==='unkind'?'#c0504d':'var(--gold)')+';font-size:11.5px;color:var(--muted);">'+
+      '<span style="text-transform:capitalize;font-weight:700;color:var(--ink);">'+String(inc.category||'').replace('_',' ')+'</span>'+
+      (inc.timestamp?' · '+new Date(inc.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'')+
+      (inc.text?'<br>"'+String(inc.text).slice(0,140)+'"':'')+
+      '</div>'
+    ).join('');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;">'+
+      '<strong>'+fmtDay(d.date)+'</strong> — '+d.count+' strike'+(d.count===1?'':'s')+
+      (d.hadUnkindness?' <span style="color:#c0504d;font-weight:700;">(unkindness)</span>':'')+
+      incidentsHtml+
+      '</div>';
+  }).join('');
+
+  content.innerHTML =
+    '<div style="font-family:\'Cinzel\',serif;font-size:16px;font-weight:700;color:var(--brown);margin-bottom:2px;">'+r.agentName+' — Weekly Strike History</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">'+r.weekStart+' through '+r.weekEnd+'</div>'+
+    '<div style="display:flex;gap:10px;margin-bottom:14px;">'+
+      '<div style="flex:1;background:rgba(232,184,74,.12);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--brown);">'+r.totalStrikes+'</div><div style="font-size:10px;color:var(--muted);">total strikes</div></div>'+
+      '<div style="flex:1;background:rgba(192,80,77,.08);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#c0504d;">'+r.unkindDays+'</div><div style="font-size:10px;color:var(--muted);">unkind day'+(r.unkindDays===1?'':'s')+'</div></div>'+
+    '</div>'+
+    daysHtml+
+    '<button onclick="closeStrikeReport()" style="width:100%;margin-top:14px;padding:10px;border:none;border-radius:8px;background:var(--gold);color:var(--black);font-weight:700;cursor:pointer;">Close</button>';
+}
 
 // ════════════════════════════════════════════
 // SCREEN TIME APPROVALS (same data as Bridge — either page can approve/deny)
