@@ -4827,6 +4827,149 @@ function renderFamilyDevotionalDisplay(){
   });
 }
 
+// ══════════════════════════════════════════════════════
+// THE WORD — Bible section data layer (Step 1 of the Word/Tutorial build)
+// Loads the same assets/kjv.json Tom's server-side lookupVerse already
+// uses for devotional grounding (functions/index.js) — one trusted
+// source, browsed here instead of duplicated. Structure is confirmed as
+// {book: {chapter: {verse: text}}}, string-keyed chapters/verses — direct
+// O(1) lookup for browsing and deep-linking, and flat enough that a
+// client-side keyword search (Step 2) can just linear-scan it; no
+// restructuring needed.
+//
+// Bookmarks and highlights are simple verse-reference-keyed entries under
+// stewart/bookmarks/{agentId} and stewart/highlights/{agentId}. The key
+// is a safe, reversible slug (spaces in a book name become underscores,
+// e.g. "1 Samuel" 17:45 -> "1_Samuel_17_45") rather than the raw
+// reference string — RTDB keys are fragile to build UI around when they
+// carry punctuation, and the human-readable book/chapter/verse are also
+// stored on the value itself so nothing ever needs to be reverse-parsed
+// from the key just to render a list.
+// ══════════════════════════════════════════════════════
+
+let _kjvData = null;
+let _kjvLoadPromise = null;
+function loadKJV(){
+  if(_kjvData) return Promise.resolve(_kjvData);
+  if(_kjvLoadPromise) return _kjvLoadPromise;
+  _kjvLoadPromise = fetch('../assets/kjv.json').then(r => r.json()).then(data => {
+    _kjvData = data;
+    return data;
+  });
+  return _kjvLoadPromise;
+}
+
+// Mirrors functions/index.js's normalizeBookName/BOOK_ALIASES exactly, so
+// a reference Tom cites server-side (Step 3 deep-link) resolves to the
+// same book here that it did there. Keep these two in sync if either
+// changes — there's no shared module between client and Cloud Functions
+// to enforce it automatically.
+const KJV_BOOK_ALIASES = {
+  'song of songs': 'Song of Solomon',
+  'canticles': 'Song of Solomon',
+  'psalm': 'Psalms',
+  'revelations': 'Revelation'
+};
+function normalizeBookName(raw, bookSet){
+  const trimmed = String(raw||'').trim();
+  if(bookSet.has(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if(KJV_BOOK_ALIASES[lower]) return KJV_BOOK_ALIASES[lower];
+  const found = [...bookSet].find(b => b.toLowerCase() === lower);
+  return found || null;
+}
+
+// "Book Chapter:Verse" (e.g. "1 Samuel 17:45"), tolerating a range
+// ("Matthew 5:43-44") by resolving just the first verse — same tolerance
+// as the server-side parser this mirrors.
+function parseVerseRef(ref){
+  const m = String(ref||'').trim().match(/^(.*?)\s+(\d+):(\d+)(?:-\d+)?$/);
+  if(!m) return null;
+  return { bookRaw: m[1], chapter: m[2], verse: m[3] };
+}
+
+function verseKey(book, chapter, verse){
+  return String(book).replace(/\s+/g,'_') + '_' + chapter + '_' + verse;
+}
+
+// Resolves a "Book Chapter:Verse" reference against the loaded KJV data —
+// returns {book, chapter, verse, text, key} or null if the reference
+// doesn't parse or the verse doesn't exist. One resolver used by
+// browsing, bookmarking, highlighting, and (Step 3) Tom's citation
+// deep-link, so all four always agree on what a given reference means.
+// Callers must await loadKJV() first — returns null rather than loading
+// on demand, so a resolve-in-a-loop (e.g. rendering a chapter) never
+// triggers redundant fetches.
+function resolveVerseRef(ref){
+  if(!_kjvData) return null;
+  const parsed = parseVerseRef(ref);
+  if(!parsed) return null;
+  const book = normalizeBookName(parsed.bookRaw, new Set(Object.keys(_kjvData)));
+  if(!book) return null;
+  const chapterData = _kjvData[book] && _kjvData[book][parsed.chapter];
+  const text = chapterData && chapterData[parsed.verse];
+  if(!text) return null;
+  return { book, chapter: parsed.chapter, verse: parsed.verse, text, key: verseKey(book, parsed.chapter, parsed.verse) };
+}
+
+// ─── Bookmarks (stewart/bookmarks/{agentId}/{verseKey}) ───
+
+function isVerseBookmarked(agentId, book, chapter, verse){
+  if(!_db) return Promise.resolve(false);
+  return _db.ref(`stewart/bookmarks/${agentId}/${verseKey(book,chapter,verse)}`).once('value').then(snap => snap.exists());
+}
+
+// Returns the new state (true = now bookmarked, false = now removed) so a
+// caller can update a button's appearance without a second read.
+function toggleBookmark(agentId, book, chapter, verse, text){
+  if(!_db) return Promise.resolve(false);
+  const ref = _db.ref(`stewart/bookmarks/${agentId}/${verseKey(book,chapter,verse)}`);
+  return ref.once('value').then(snap => {
+    if(snap.exists()) return ref.remove().then(() => false);
+    return ref.set({ book, chapter, verse, text, timestamp: Date.now() }).then(() => true);
+  });
+}
+
+function getBookmarks(agentId){
+  if(!_db) return Promise.resolve([]);
+  return _db.ref(`stewart/bookmarks/${agentId}`).once('value').then(snap => {
+    const all = snap.val() || {};
+    return Object.entries(all)
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+  });
+}
+
+// ─── Highlights (stewart/highlights/{agentId}/{verseKey}) ───
+// Same shape and mechanics as bookmarks, but a separate path rather than
+// a flag on the bookmark entry — a verse can be highlighted without being
+// bookmarked (and vice versa), and the Word tab (Step 2) needs to query/
+// style each independently while rendering a chapter.
+
+function isVerseHighlighted(agentId, book, chapter, verse){
+  if(!_db) return Promise.resolve(false);
+  return _db.ref(`stewart/highlights/${agentId}/${verseKey(book,chapter,verse)}`).once('value').then(snap => snap.exists());
+}
+
+function toggleHighlight(agentId, book, chapter, verse, text){
+  if(!_db) return Promise.resolve(false);
+  const ref = _db.ref(`stewart/highlights/${agentId}/${verseKey(book,chapter,verse)}`);
+  return ref.once('value').then(snap => {
+    if(snap.exists()) return ref.remove().then(() => false);
+    return ref.set({ book, chapter, verse, text, timestamp: Date.now() }).then(() => true);
+  });
+}
+
+function getHighlights(agentId){
+  if(!_db) return Promise.resolve([]);
+  return _db.ref(`stewart/highlights/${agentId}`).once('value').then(snap => {
+    const all = snap.val() || {};
+    return Object.entries(all)
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+  });
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
   if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) sendPrivateMessage(); });
