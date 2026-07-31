@@ -458,6 +458,14 @@ body{
   text-align:center;padding:24px;
   color:var(--muted);font-style:italic;font-size:13px;
 }
+.rc-status{text-align:center;font-size:12.5px;color:var(--muted);font-style:italic;margin:8px 0 12px;display:flex;align-items:center;justify-content:center;gap:7px;}
+.rc-status:empty{display:none;margin:0;}
+.rc-status.rc-status-error{color:#c0392b;opacity:1;font-style:normal;}
+.rc-status-dots{display:inline-flex;gap:3px;}
+.rc-status-dots span{width:4px;height:4px;border-radius:50%;background:currentColor;display:inline-block;animation:rc-dot-pulse 1.2s infinite ease-in-out;}
+.rc-status-dots span:nth-child(2){animation-delay:.2s;}
+.rc-status-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes rc-dot-pulse{0%,80%,100%{opacity:.25;transform:scale(.8);}40%{opacity:1;transform:scale(1);}}
 .badge{
   display:inline-flex;align-items:center;gap:3px;
   padding:2px 7px;border-radius:20px;
@@ -639,6 +647,7 @@ body{
 
       <div class="sec-hd">Weekly Report Card</div>
       <button onclick="checkInReportCard()" class="btn-primary" id="rc-checkin-btn">Check In — Generate Now</button>
+      <div id="rc-status" class="rc-status"></div>
       <div id="rc-content"><div class="empty-state">Loading…</div></div>
 
       <div style="text-align:center;padding:20px 16px 6px;font-size:10.5px;color:var(--muted);opacity:.6;">
@@ -995,11 +1004,21 @@ let _db = null;
 // bypasses the SDK's callable wrapper entirely and talks to the same
 // endpoint the same way, matching the Callable protocol's own request/
 // response shape ({data: payload} in, {result: ...} or {error: ...} out).
-function callFunction(name, payload){
+// timeoutMs guards against a fetch that never settles at all (observed on
+// iOS: the connection stalls silently — no error, no response — typically
+// when the app gets backgrounded mid-request). Without this, an awaiting
+// caller like checkInReportCard() hangs forever: the button stays stuck on
+// "Generating…" for the rest of that page's life even though the Cloud
+// Function finishes fine server-side. AbortController turns that silent
+// stall into an actual rejection the caller's retry/error logic can react to.
+function callFunction(name, payload, timeoutMs){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 45000);
   return fetch(`https://us-central1-stewart-family-3cece.cloudfunctions.net/${name}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: payload || {} })
+    body: JSON.stringify({ data: payload || {} }),
+    signal: controller.signal
   }).then(async res => {
     const body = await res.json().catch(() => ({}));
     if(!res.ok){
@@ -1007,7 +1026,10 @@ function callFunction(name, payload){
       throw new Error(message);
     }
     return { data: body.result };
-  });
+  }).catch(err => {
+    if(err && err.name === 'AbortError') throw new Error('Request timed out');
+    throw err;
+  }).finally(() => clearTimeout(timer));
 }
 
 function initFirebase(){
@@ -2631,13 +2653,29 @@ function copyReportCardText(){
 // mid-request even when the function would have succeeded server-side,
 // same reasoning as Hans's and Tom's retry-then-fallback pattern. This
 // call runs 17-29s server-side (a real Sonnet write-up), so a retry can
-// mean up to ~60s total — worth it to avoid a visible error on a plain
+// mean up to ~90s total — worth it to avoid a visible error on a plain
 // network blip, which is what's actually been happening.
+//
+// #rc-status (progress/error for THIS button click) is kept entirely
+// separate from #rc-content (the actual report, driven only by
+// renderReportCard's live DB listener). Previously a failed/timed-out
+// attempt overwrote #rc-content with an error — but callFunction() can
+// fail on THIS client's connection after the Cloud Function already
+// finished and wrote the report server-side, in which case the listener
+// fires moments later with the real content. Writing the error into a
+// separate status line means that success can never get clobbered by a
+// stale failure message, in either order.
 async function checkInReportCard(){
   const btn = document.getElementById('rc-checkin-btn');
+  const status = document.getElementById('rc-status');
   if(btn){ btn.dataset.orig = btn.dataset.orig || btn.textContent; }
   const orig = btn ? btn.dataset.orig : null;
   if(btn){ btn.disabled = true; btn.textContent = 'Generating…'; }
+  if(status){
+    status.className = 'rc-status';
+    status.innerHTML = 'Generating your report card — this can take up to 30 seconds'
+      + '<span class="rc-status-dots"><span></span><span></span><span></span></span>';
+  }
 
   let ok = false;
   for(let attempt = 1; attempt <= 2 && !ok; attempt++){
@@ -2651,9 +2689,14 @@ async function checkInReportCard(){
   }
 
   if(btn){ btn.disabled = false; btn.textContent = orig || 'Check In — Generate Now'; }
-  if(!ok){
-    const el = document.getElementById('rc-content');
-    if(el) el.innerHTML = '<div class="empty-state">Something went wrong generating the report. Try again.</div>';
+  if(status){
+    if(ok){
+      status.className = 'rc-status';
+      status.innerHTML = '';
+    }else{
+      status.className = 'rc-status rc-status-error';
+      status.textContent = "Lost the connection waiting for a response. If it finished on the server, the report below will update on its own — otherwise, tap Check In again.";
+    }
   }
 }
 
