@@ -537,6 +537,16 @@ body::before{
 .word-myverse-item{background:var(--dark2);border:1px solid rgba(12,200,200,.15);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
 .word-myverse-item .word-search-ref{color:var(--gold);}
 
+/* TOM'S VERSE CITATION CHIP (Word tab deep-link, Step 3) */
+.tom-verse-chip{
+  display:flex;align-items:center;gap:6px;width:100%;
+  margin-top:9px;padding:8px 11px;border-radius:16px;
+  border:1px solid rgba(200,146,42,.5);background:rgba(200,146,42,.14);
+  color:var(--gold2,var(--gold));font-family:'Exo 2',sans-serif;
+  font-size:11px;font-weight:700;cursor:pointer;text-align:left;
+}
+.tom-verse-chip:active{background:rgba(200,146,42,.28);}
+
 /* STATUS BADGE */
 .status-badge{
   display:inline-flex;align-items:center;gap:5px;
@@ -3167,6 +3177,13 @@ function renderTomMessages(msgs){
         </div>`;
     } else {
       bodyHtml = linkify(m.text||'');
+      // Tappable deep-link into the Word tab (Step 3) — only once the
+      // citation is actually visible (never on a still-pending wish
+      // prompt, which hasn't revealed the real message yet).
+      if(m.citedVerse && m.citedVerse.book){
+        const cv = m.citedVerse;
+        bodyHtml += `<button class="tom-verse-chip" onclick="openVerseFromTom('${cv.book}',${cv.chapter},${cv.verse})">&#128214; Open ${cv.book} ${cv.chapter}:${cv.verse} in The Word</button>`;
+      }
     }
 
     return `<div style="display:flex;flex-direction:column;align-items:${isTom?'flex-start':'flex-end'};">
@@ -3181,6 +3198,21 @@ function renderTomMessages(msgs){
     </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
+}
+
+// Deep-link from a Tom citation chip into the Word tab (Step 3). Switches
+// tabs immediately (same pattern as goToShipsOrderItem), then explicitly
+// awaits loadKJV() before opening the chapter — showTab('word',...) also
+// triggers its own KJV load, but that one's async and racing it would mean
+// openWordChapter() could run before the data (and the chapter's DOM) is
+// ready, silently failing the scroll-to-verse. loadKJV() dedupes concurrent
+// callers, so this doesn't cause a second fetch.
+function openVerseFromTom(book, chapter, verse){
+  const btn = document.querySelector('.bnb[onclick*="\'word\'"]');
+  showTab('word', btn);
+  loadKJV().then(() => {
+    openWordChapter(book, Number(chapter), { scrollToVerse: Number(verse) });
+  });
 }
 
 // Last few real exchanges as {role, content}, for follow-up continuity —
@@ -3255,6 +3287,10 @@ async function askTomChat(){
         text: 'Spend it wisely, sailor — use a wish?',
         pendingWish: true,
         realText: result.message,
+        // Held alongside realText until the wish is actually confirmed —
+        // confirmTomWish() promotes it into the visible message the same
+        // way it promotes realText into text.
+        citedVerse: result.citedVerse || null,
         category: result.category,
         type: result.type
       });
@@ -3269,7 +3305,9 @@ async function askTomChat(){
     // category/type persisted here (not just used transiently) so the
     // weekly report card can later summarize what a boy's actually been
     // asking Tom about — that data didn't exist in stewart/tomchat before.
-    await thinkingRef.update({ text: result.message, category: result.category, type: result.type });
+    // citedVerse (Step 3) lets the chat UI render a tappable deep-link
+    // into the Word tab instead of the citation being unreachable prose.
+    await thinkingRef.update({ text: result.message, citedVerse: result.citedVerse || null, category: result.category, type: result.type });
   }
 
   _tomSendLock = false;
@@ -3284,12 +3322,16 @@ async function confirmTomWish(key){
   try{
     const res = await callFunction('spendTomWish', { agentId: currentAgent.id, today: localDateStr() });
     if(res && res.data && res.data.spent){
+      // citedVerse (if any) was already sitting on this node from
+      // askTomChat() — left alone here so it survives into the revealed
+      // message; only cleared in the fallback branches below, where the
+      // real content (and any citation) never actually gets shown.
       await ref.update({ text: msg.realText, pendingWish: null, realText: null });
     } else {
-      await ref.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.", pendingWish: null, realText: null });
+      await ref.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.", pendingWish: null, realText: null, citedVerse: null });
     }
   }catch(e){
-    await ref.update({ text: "Couldn't confirm that just now, sailor — try again in a moment.", pendingWish: null, realText: null });
+    await ref.update({ text: "Couldn't confirm that just now, sailor — try again in a moment.", pendingWish: null, realText: null, citedVerse: null });
   }
   renderTomWishCounter();
 }
@@ -3299,7 +3341,8 @@ function cancelTomWish(key){
   _db.ref(`stewart/tomchat/${currentAgent.id}/${key}`).update({
     text: 'No worries — ask me something else anytime.',
     pendingWish: null,
-    realText: null
+    realText: null,
+    citedVerse: null
   });
 }
 

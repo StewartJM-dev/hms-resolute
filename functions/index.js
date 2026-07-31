@@ -854,6 +854,14 @@ exports.askTom = functions
     let category = TOM_RESPONSE_SCHEMA.properties.category.enum.includes(parsed.category) ? parsed.category : 'declined_offtopic';
     let type = TOM_CATEGORY_TO_TYPE[category] || 'declined';
     let message = (parsed.message || '').trim();
+    // Set only when a devotional/verse_lookup citation resolves against the
+    // real KJV — the client (Word tab, Step 3) uses this structured
+    // book/chapter/verse to render a tappable deep-link button, rather than
+    // trying to re-parse a reference back out of the prose in `message`.
+    // For a range ("Matthew 5:43-44"), lookupVerse already resolves to just
+    // the first verse — the deep-link lands on that verse, which is the
+    // right destination either way (single verse or the start of a range).
+    let citedVerse = null;
 
     if (type === 'wish_spend' && overBudget) {
       type = 'declined';
@@ -863,6 +871,7 @@ exports.askTom = functions
       const verse = lookupVerse(parsed.verseRef);
       if (verse) {
         message += `\n\n"${verse.text}" — ${verse.book} ${verse.chapter}:${verse.verse} (KJV)\n\nThe Word's the true north — ask your father, I could be wrong.`;
+        citedVerse = { book: verse.book, chapter: verse.chapter, verse: verse.verse };
       } else {
         message += `\n\nI couldn't pull the exact verse just now — ask your father to help you find it in Scripture. He'll know right where to look.`;
       }
@@ -880,7 +889,7 @@ exports.askTom = functions
       }
     }
 
-    return { type, category, message };
+    return { type, category, message, citedVerse };
   });
 
 // Notifies parents when Tom suggests a website, so they know and can review
