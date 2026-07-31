@@ -1326,7 +1326,13 @@ async function fetchBoyWeekData(agentId, dates) {
       eligibleCompleted: (eligible && typeof eligible.completed === 'number') ? eligible.completed : null,
       eligibleTotal: (eligible && typeof eligible.total === 'number') ? eligible.total : null,
       deductionTotal: Object.values(deductions).reduce((a, b) => a + b, 0),
-      deductionReasons: Object.keys(deductions),
+      // outOfTime is stored in the same stewart/deductions node (Bridge's
+      // "Ran out of time" flag) but carries 0 points and isn't a behavior
+      // reason — pulled out into its own field so it never gets read as a
+      // punitive deduction, and excluded from deductionReasons below so it
+      // doesn't get lumped in with attitude/fighting/etc.
+      ranOutOfTime: deductions.outOfTime !== undefined,
+      deductionReasons: Object.keys(deductions).filter(k => k !== 'outOfTime'),
       wishesEarned: wishes.earned || 0,
       wishesUsed: wishes.used || 0,
       strikeCount: strikeRec.count || 0,
@@ -1344,7 +1350,8 @@ async function fetchBoyWeekData(agentId, dates) {
     totalWishesEarned: days.reduce((a, d) => a + d.wishesEarned, 0),
     totalWishesUsed: days.reduce((a, d) => a + d.wishesUsed, 0),
     totalStrikes: days.reduce((a, d) => a + d.strikeCount, 0),
-    unkindDays: days.filter(d => d.strikeIncidents.some(inc => inc.category === 'unkind')).length
+    unkindDays: days.filter(d => d.strikeIncidents.some(inc => inc.category === 'unkind')).length,
+    daysOutOfTime: days.filter(d => d.ranOutOfTime).length
   };
 
   // Courage Dare is program-day-numbered, not calendar-date-keyed, so
@@ -1473,6 +1480,8 @@ const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summari
 Write like a sharp, honest coach's report, not a form letter. Be specific: cite real days, real numbers, real patterns ("completed every morning round, missed evening three times" — not "did well overall"). Note trends across the week (improving, slipping, consistent) where the data actually shows one. If a category has no data for the week (e.g. zero strikes, zero Courage Dare entries), say so plainly and briefly rather than padding — absence of a problem is itself useful information, but don't manufacture insight where there isn't any.
 
 Each day has BOTH a "score" (0-100%, weighted by how many points each chore is worth) and a raw "eligibleCompleted"/"eligibleTotal" count (how many actual chores he finished out of how many he had, excluding Computer Missions and Officer of the Watch checks — the same two things already excluded from score). These are genuinely different numbers and can diverge (a boy can finish most of his LOW-point chores and skip a big one, giving a lower score than his completed-count alone would suggest, or the reverse). Cite BOTH together at least once per boy's summary, e.g. "scored 73% — 11 of 15 eligible chores" — don't make the parent reconcile a percentage against what they see on the chore-log grid themselves. Use totalEligibleCompleted/totalEligibleAssigned the same way for the week-level pattern.
+
+Each day also carries a "ranOutOfTime" flag (true/false) — set from the Bridge tab when a boy ran out of time before finishing his chores that day. This is explicitly NOT a behavior issue or punishment (it carries no point penalty and is separate from deductionReasons) — it's pure pattern-tracking. Don't mention it at all if it happened zero or one day this week; that's normal and not worth a sentence. If totals.daysOutOfTime is 2+ for a boy, note it once, neutrally, as a scheduling/pacing pattern worth John/Dawn knowing about (e.g. "ran out of time before finishing chores twice this week") — never frame it as a fault or lump it in with deductions/strikes.
 
 Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
 

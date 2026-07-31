@@ -325,6 +325,14 @@ body{
 .rc-status-dots span:nth-child(2){animation-delay:.2s;}
 .rc-status-dots span:nth-child(3){animation-delay:.4s;}
 @keyframes rc-dot-pulse{0%,80%,100%{opacity:.25;transform:scale(.8);}40%{opacity:1;transform:scale(1);}}
+
+/* ===== Out-of-Time flag (pattern-tracking, not a punishment) ===== */
+.oot-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(200,146,42,.2);border-radius:9px;margin-bottom:6px;}
+.oot-name{font-family:'Cinzel',serif;font-size:12.5px;color:#f6efe0;}
+.oot-btn{font-size:11px;padding:6px 12px;border-radius:7px;border:1px solid rgba(200,146,42,.4);background:rgba(200,146,42,.08);color:var(--gold2,#e8b84a);cursor:pointer;font-family:'Lato',sans-serif;white-space:nowrap;}
+.oot-btn:active{transform:scale(.97);}
+.oot-btn.active{background:rgba(200,146,42,.35);color:#fff3d6;}
+
 .rc-copy-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
 .rc-copy-btn{padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:var(--white);font-family:'Lato',sans-serif;font-size:12px;cursor:pointer;}
 .rc-copy-status{font-size:12px;opacity:.7;font-style:italic;}
@@ -479,6 +487,10 @@ body{
     <div class="shead">Ship Accounts</div>
     <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Each boy's running savings balance.</div>
     <div id="ship-accounts-overview" style="margin-bottom:18px;"></div>
+
+    <div class="shead">Ran Out of Time — Today</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Flags a day a boy ran out of time before finishing chores. Pattern-tracking only — no point penalty.</div>
+    <div id="oot-flags" style="margin-bottom:18px;"></div>
 
     <div class="shead">Status Board</div>
     <div class="xmas-tree" id="xmas-tree"></div>
@@ -1556,10 +1568,47 @@ function loadInstruments(){
     renderStatusBoard(crew);
     renderBridgeWeekGrid();
     renderShipAccountsOverview();
+    renderOutOfTimeFlags();
   }).catch(err => {
     console.error('loadInstruments failed:', err);
     const gr = document.getElementById('gauge-row');
     if(gr) gr.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:rgba(255,255,255,.5);font-size:12px;">Could not load crew instruments — try reloading the page.</div>';
+  });
+}
+
+// "Ran out of time" flag — same stewart/deductions/{agentId}/{date} node
+// the Behavior deduction buttons use (dashboard/index.html), same key-per-
+// reason pattern, but stored with 0 points so it never touches score/pay.
+// Deliberately its own toggle rather than a BEHAVIOR_REASONS-style entry:
+// this isn't a behavior violation, it's pattern-tracking, and Step 1's
+// weekly report card aggregation (functions/index.js) reads it as a
+// distinct ranOutOfTime field rather than lumping it into deductionReasons.
+function renderOutOfTimeFlags(){
+  if(!_db) return;
+  const today = localDateStr();
+  Promise.all(AGENTS.map(a => _db.ref(`stewart/deductions/${a.id}/${today}/outOfTime`).once('value')))
+  .then(results => {
+    const el = document.getElementById('oot-flags');
+    if(!el) return;
+    el.innerHTML = AGENTS.map((a,i) => {
+      const flagged = results[i].val() !== null;
+      return `<div class="oot-row">
+        <span class="oot-name">${a.icon} ${a.name}</span>
+        <button class="oot-btn${flagged?' active':''}" onclick="toggleOutOfTime('${a.id}','${today}')">${flagged?'✓ Flagged today':'Ran out of time'}</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+function toggleOutOfTime(agentId, date){
+  if(!_db) return;
+  const ref = _db.ref(`stewart/deductions/${agentId}/${date}/outOfTime`);
+  ref.once('value', snap => {
+    const action = snap.val() !== null ? ref.remove() : ref.set(0);
+    action.then(() => {
+      if(typeof recalculateScore === 'function') recalculateScore(agentId, date);
+      renderOutOfTimeFlags();
+    });
   });
 }
 

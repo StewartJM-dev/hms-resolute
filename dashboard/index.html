@@ -2095,10 +2095,19 @@ function loadMissionsDetail(){
         </div>`;
       }).join('');
 
-      // Active deductions list
+      // Active deductions list. outOfTime (Bridge's "Ran out of time" flag)
+      // lives in this same node but is 0-point pattern-tracking, not a
+      // behavior violation — shown separately, without the punitive
+      // red styling or a "(-0pts)" label that would misrepresent it.
       const deductionEntries = Object.entries(deductions);
       const deductionRows = deductionEntries.length
         ? deductionEntries.map(([key,pts]) => {
+            if(key === 'outOfTime'){
+              return `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(232,184,74,.12);border-radius:6px;padding:6px 9px;margin-bottom:4px;">
+                <span style="font-size:11px;color:var(--muted);">Ran Out of Time (flag, no penalty)</span>
+                <button onclick="removeDeduction('${a.id}','${today}','${key}')" style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0 4px;">&times;</button>
+              </div>`;
+            }
             const reason = BEHAVIOR_REASONS.find(r=>r.key===key);
             return `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(181,69,27,.08);border-radius:6px;padding:6px 9px;margin-bottom:4px;">
               <span style="font-size:11px;color:#b5451b;">${reason?reason.label:key} (-${pts}pts)</span>
