@@ -18,6 +18,7 @@
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
 <script src="../mission-engine.js?v=20260728"></script>
+<script src="../bible-shared.js?v=20260731"></script>
 <style>
 :root{
   --green:#1a4a2e;--green2:#2d6a47;--green3:#3d8a5e;
@@ -348,6 +349,8 @@ body{
 }
 .msg-bubble-from{font-size:9px;opacity:.7;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
 .msg-bubble-time{font-size:9px;opacity:.6;margin-top:4px;text-align:right;}
+.tink-verse-chip{display:flex;align-items:center;gap:6px;margin-top:8px;padding:7px 11px;border-radius:16px;border:1px solid var(--green2);background:rgba(45,106,71,.1);color:var(--green2);font-size:11px;font-weight:700;cursor:pointer;width:100%;text-align:left;}
+.tink-verse-chip:active{background:rgba(45,106,71,.2);}
 .msg-compose{
   display:flex;gap:8px;padding:10px 13px;
   border-top:1px solid var(--border);background:var(--card);
@@ -458,6 +461,58 @@ body{
   text-align:center;padding:24px;
   color:var(--muted);font-style:italic;font-size:13px;
 }
+
+/* ===== The Bible (browse/search/highlight/notes) ===== */
+.bib-mode-row{display:flex;gap:6px;margin-bottom:14px;}
+.bib-mode-btn{flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Cinzel',serif;font-size:11px;letter-spacing:.5px;cursor:pointer;}
+.bib-mode-btn.active{background:var(--green2);border-color:var(--green2);color:var(--white);}
+
+.bib-crumb{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+.bib-crumb button{background:none;border:none;color:var(--green2);cursor:pointer;font-size:12px;padding:2px 0;font-family:'Lato',sans-serif;}
+.bib-crumb .sep{opacity:.4;}
+
+.bib-testament-label{font-family:'Cinzel',serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;}
+.bib-testament-label:first-child{margin-top:0;}
+.bib-book-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.bib-book-btn{padding:10px 6px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--ink);font-size:11px;text-align:center;cursor:pointer;}
+.bib-book-btn:active{background:rgba(45,106,71,.1);}
+
+.bib-chapter-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.bib-chapter-btn{aspect-ratio:1;border-radius:6px;background:var(--card);border:1px solid var(--border);color:var(--ink);font-size:12px;font-family:'Cinzel',serif;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.bib-chapter-btn:active{background:rgba(45,106,71,.1);}
+
+.bib-chapter-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;letter-spacing:1px;color:var(--ink);margin-bottom:10px;}
+.bib-verse{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+.bib-verse-num{font-family:'Cinzel',serif;font-size:10px;color:var(--green2);flex-shrink:0;width:20px;text-align:right;padding-top:3px;}
+.bib-verse-body{flex:1;min-width:0;}
+.bib-verse-text{font-size:14.5px;line-height:1.6;color:var(--ink);cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s;}
+.bib-verse-text.hl{background:rgba(232,184,74,.3);}
+.bib-verse.target{animation:bib-target-flash 2.2s ease-out;border-radius:6px;}
+@keyframes bib-target-flash{0%,35%{outline:2px solid var(--green2);outline-offset:3px;border-radius:6px;}100%{outline:2px solid transparent;outline-offset:3px;}}
+.bib-verse-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+.bib-bookmark-btn,.bib-note-btn{background:none;border:none;color:var(--border);font-size:15px;cursor:pointer;flex-shrink:0;padding:2px 4px;line-height:1;}
+.bib-bookmark-btn.active{color:var(--gold);}
+
+.bib-hl-dots{display:flex;gap:4px;margin:4px 4px 0;}
+.bib-hl-dots:empty{margin:0;}
+.bib-hl-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 1px rgba(0,0,0,.15);}
+.bib-note-list{margin:0 4px;}
+.bib-note-list:empty{margin:0;}
+.bib-note{font-size:12.5px;line-height:1.5;color:var(--ink);margin-top:5px;padding:6px 9px;background:rgba(200,146,42,.08);border-left:2px solid var(--gold);border-radius:0 6px 6px 0;}
+.bib-note-author{color:var(--rust);font-weight:700;}
+.bib-note-compose{margin:6px 4px 0;display:flex;flex-direction:column;gap:6px;}
+.bib-note-input{width:100%;min-height:54px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-family:'Lato',sans-serif;font-size:12.5px;resize:vertical;}
+.bib-note-submit{align-self:flex-end;padding:6px 14px;border-radius:14px;border:none;background:var(--green2);color:var(--white);font-family:'Cinzel',serif;font-size:11px;font-weight:700;cursor:pointer;}
+
+.bib-search-row{display:flex;gap:8px;margin-bottom:12px;}
+.bib-search-input{flex:1;padding:10px 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--ink);font-family:'Lato',sans-serif;font-size:13px;}
+.bib-search-go{width:38px;height:38px;border-radius:50%;background:var(--green2);border:none;cursor:pointer;color:var(--white);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.bib-search-meta{font-size:11px;color:var(--muted);margin-bottom:10px;font-style:italic;}
+.bib-search-result{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--green2);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
+.bib-search-ref{font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:var(--green2);margin-bottom:4px;}
+.bib-search-snippet{font-size:13px;color:var(--ink);line-height:1.5;}
+.bib-search-snippet mark{background:rgba(232,184,74,.5);color:var(--ink);border-radius:2px;}
+
 .rc-status{text-align:center;font-size:12.5px;color:var(--muted);font-style:italic;margin:8px 0 12px;display:flex;align-items:center;justify-content:center;gap:7px;}
 .rc-status:empty{display:none;margin:0;}
 .rc-status.rc-status-error{color:#c0392b;opacity:1;font-style:normal;}
@@ -900,6 +955,22 @@ body{
     </div>
 
     <!-- TAB: TINK (Dawn's plain-spoken AI assistant) -->
+    <div class="tab" id="tab-bible">
+      <div class="sec-hd">The Bible</div>
+      <div class="bib-mode-row">
+        <button class="bib-mode-btn active" id="bib-mode-btn-browse" onclick="setBibleMode('browse')">Browse</button>
+        <button class="bib-mode-btn" id="bib-mode-btn-search" onclick="setBibleMode('search')">Search</button>
+      </div>
+      <div id="bib-browse-view"><div class="empty-state">Loading Scripture…</div></div>
+      <div id="bib-search-view" style="display:none;">
+        <div class="bib-search-row">
+          <input type="text" id="bib-search-input" class="bib-search-input" placeholder="Search a word or phrase…" maxlength="60" autocomplete="off">
+          <button class="bib-search-go" onclick="runBibleSearch()">&#128269;</button>
+        </div>
+        <div id="bib-search-results"></div>
+      </div>
+    </div>
+
     <div class="tab" id="tab-tink">
       <div class="sec-hd">Tink</div>
       <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Ask about running Resolute, look up a boy's week, get recipe help, or draft something. No persona — just a straight answer.</p>
@@ -942,6 +1013,10 @@ body{
     <button class="bnb" onclick="showTab('projects',this);renderProjectsTab();renderVoteManagement();renderSuperFNDashboard();">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Drydock
+    </button>
+    <button class="bnb" onclick="showTab('bible',this);renderBibleTab();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Bible
     </button>
     <button class="bnb" onclick="showTab('tink',this);initTinkChat();">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
@@ -1722,6 +1797,20 @@ function getSenderName(){
   }catch(e){}
   return 'Dad';
 }
+
+// Officers' Country is reachable by either parent (the Gangway auto-
+// unlock only checks role==='parent', not which one) — this is how the
+// Bible section knows whether to attribute a highlight/note to John or
+// Dawn. Same resolute.session.person field getSenderName() above already
+// reads, just returning the personId bible-shared.js's functions need
+// instead of a display label.
+function currentPersonId(){
+  try{
+    const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
+    if(s && s.person === 'dawn') return 'dawn';
+  }catch(e){}
+  return 'john';
+}
 function sendThreadMessage(){
   if(!currentDashPrivateAgent||!_db||_dashSendLock) return;
   const input = document.getElementById('thread-input');
@@ -1745,6 +1834,317 @@ function sendDashGroupMessage(){
   _db.ref('stewart/groupchat').push({
     text, from:getSenderName(), agentId:'parent', timestamp:Date.now()
   }).finally(()=>{ _dashSendLock=false; });
+}
+
+// ══════════════════════════════════════════════════════
+// THE BIBLE — family-shared browse/search/highlight/notes
+// KJV loading, verse resolution, shared highlights, and family notes all
+// live in bible-shared.js (loaded above) — the exact same functions
+// boys/index.html's Word tab and bridge/index.html's Bible tab use, so a
+// highlight or note made here is immediately the same data everyone else
+// sees. Personal bookmarks are written directly here (same
+// stewart/bookmarks/{personId} shape boys/index.html uses) rather than
+// through a shared wrapper — a two-line toggle isn't worth extracting.
+// ══════════════════════════════════════════════════════
+let _bibMode = 'browse';
+let _bibNav = { book: null, chapter: null };
+const BIB_OT_BOOK_COUNT = 39; // Genesis..Malachi; the rest is New Testament
+
+function renderBibleTab(){
+  loadKJV().then(() => {
+    if(_bibMode === 'browse') renderBibleBrowse();
+  }).catch(() => {
+    const el = document.getElementById('bib-browse-view');
+    if(el) el.innerHTML = '<div class="empty-state">Could not load Scripture — check your connection and reopen this tab.</div>';
+  });
+}
+
+function setBibleMode(mode){
+  _bibMode = mode;
+  ['browse','search'].forEach(m => {
+    const btn = document.getElementById('bib-mode-btn-'+m);
+    const view = document.getElementById('bib-'+m+'-view');
+    if(btn) btn.classList.toggle('active', m===mode);
+    if(view) view.style.display = (m===mode) ? '' : 'none';
+  });
+  if(mode === 'browse') renderBibleBrowse();
+}
+
+// ── Browse: book grid -> chapter grid -> chapter verses ──
+
+function renderBibleBrowse(){
+  const el = document.getElementById('bib-browse-view');
+  if(!el || !_kjvData) return;
+  if(_bibNav.book && _bibNav.chapter) renderBibleChapterView(el, _bibNav.book, _bibNav.chapter);
+  else if(_bibNav.book) renderBibleChapterGrid(el, _bibNav.book);
+  else renderBibleBookGrid(el);
+}
+
+function renderBibleBookGrid(el){
+  const books = Object.keys(_kjvData);
+  const bookBtn = b => `<button class="bib-book-btn" onclick="openBibleBook('${b}')">${b}</button>`;
+  el.innerHTML = `
+    <div class="bib-testament-label">Old Testament</div>
+    <div class="bib-book-grid">${books.slice(0, BIB_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
+    <div class="bib-testament-label">New Testament</div>
+    <div class="bib-book-grid">${books.slice(BIB_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
+  `;
+}
+
+function openBibleBook(book){
+  _bibNav.book = book;
+  _bibNav.chapter = null;
+  renderBibleBrowse();
+}
+
+function backToBibleBooks(){
+  _bibNav.book = null;
+  _bibNav.chapter = null;
+  renderBibleBrowse();
+}
+
+function renderBibleChapterGrid(el, book){
+  const chapters = Object.keys(_kjvData[book]).map(Number).sort((a,b) => a-b);
+  el.innerHTML = `
+    <div class="bib-crumb"><button onclick="backToBibleBooks()">&larr; Books</button><span class="sep">/</span><span>${book}</span></div>
+    <div class="bib-chapter-grid">${chapters.map(c => `<button class="bib-chapter-btn" onclick="openBibleChapter('${book}',${c})">${c}</button>`).join('')}</div>
+  `;
+}
+
+// opts.scrollToVerse: used by search results to jump straight to a
+// specific verse and briefly highlight its position.
+function openBibleChapter(book, chapter, opts){
+  opts = opts || {};
+  _bibNav.book = book;
+  _bibNav.chapter = String(chapter);
+  if(_bibMode !== 'browse') setBibleMode('browse');
+  else renderBibleBrowse();
+  if(opts.scrollToVerse) setTimeout(() => scrollToBibleVerse(opts.scrollToVerse), 80);
+}
+
+// Bookmark state is personal (one read for this person); highlight and
+// note state is family-shared and fetched for the WHOLE chapter in one
+// round trip each via bible-shared.js's prefix-range bulk fetchers.
+function renderBibleChapterView(el, book, chapter){
+  const chapterData = _kjvData[book][chapter];
+  const verses = Object.keys(chapterData).map(Number).sort((a,b) => a-b);
+  const personId = currentPersonId();
+
+  el.innerHTML = `
+    <div class="bib-crumb">
+      <button onclick="backToBibleBooks()">&larr; Books</button><span class="sep">/</span>
+      <button onclick="openBibleBook('${book}')">${book}</button><span class="sep">/</span>
+      <span>Chapter ${chapter}</span>
+    </div>
+    <div class="bib-chapter-title">${book} ${chapter}</div>
+    <div id="bib-verse-list"><div class="empty-state">Loading verses...</div></div>
+  `;
+
+  Promise.all([
+    _db.ref(`stewart/bookmarks/${personId}`).once('value'),
+    getChapterHighlights(book, chapter),
+    getChapterNotes(book, chapter)
+  ]).then(([bmSnap, hlByVerse, notesByVerse]) => {
+    const bookmarkKeys = new Set(Object.keys(bmSnap.val() || {}));
+    const listEl = document.getElementById('bib-verse-list');
+    if(!listEl) return;
+    listEl.innerHTML = verses.map(v => {
+      const text = chapterData[v];
+      const key = verseKey(book, chapter, v);
+      const isBm = bookmarkKeys.has(key);
+      const highlights = hlByVerse[key] || [];
+      const notes = notesByVerse[key] || [];
+      const myHl = highlights.some(h => h.personId === personId);
+      return `<div class="bib-verse" data-vkey="${key}">
+        <span class="bib-verse-num">${v}</span>
+        <div class="bib-verse-body">
+          <div class="bib-verse-text${myHl?' hl':''}" onclick="onBibleVerseTap(this,'${book}',${chapter},${v})">${escapeHtml(text)}</div>
+          <div class="bib-hl-dots" id="bib-dots-${key}">${bibleHighlightDotsHtml(highlights)}</div>
+          <div class="bib-note-list" id="bib-notes-${key}">${bibleNoteListHtml(notes)}</div>
+        </div>
+        <div class="bib-verse-actions">
+          <button class="bib-bookmark-btn${isBm?' active':''}" onclick="onBibleBookmarkTap(this,'${book}',${chapter},${v})" aria-label="Bookmark this verse">&#9733;</button>
+          <button class="bib-note-btn" onclick="toggleBibleNoteForm('${key}','${book}',${chapter},${v})" aria-label="Leave a note">&#128172;</button>
+          <button class="bib-note-btn" onclick="toggleBibleAskForm('${key}','${book}',${chapter},${v})" aria-label="Ask Tink about this verse">&#10067;</button>
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function scrollToBibleVerse(verseNum){
+  const key = verseKey(_bibNav.book, _bibNav.chapter, verseNum);
+  const row = document.querySelector('#bib-verse-list [data-vkey="'+key+'"]');
+  if(!row) return;
+  row.scrollIntoView({block:'center', behavior:'smooth'});
+  row.classList.add('target');
+  setTimeout(() => row.classList.remove('target'), 2300);
+}
+
+function bibleHighlightDotsHtml(highlights){
+  if(!highlights || !highlights.length) return '';
+  return highlights.map(h =>
+    `<span class="bib-hl-dot" style="background:${h.color}" title="${FAMILY_DISPLAY_NAMES[h.personId]||h.personId} highlighted this"></span>`
+  ).join('');
+}
+
+function bibleNoteListHtml(notes){
+  if(!notes || !notes.length) return '';
+  return notes.map(n =>
+    `<div class="bib-note"><span class="bib-note-author">${escapeHtml(n.author)}:</span> ${escapeHtml(n.text)}</div>`
+  ).join('');
+}
+
+// Tap the verse text to toggle highlight. Re-fetches just this one
+// verse's highlight list after toggling (not the whole chapter) so
+// scroll position never jumps, and updates both this viewer's own "did I
+// highlight this" state and the shared dot row in one pass.
+function onBibleVerseTap(el, book, chapter, verse){
+  const personId = currentPersonId();
+  toggleSharedHighlight(personId, book, String(chapter), String(verse)).then(() => {
+    return getVerseHighlights(book, String(chapter), String(verse));
+  }).then(highlights => {
+    el.classList.toggle('hl', highlights.some(h => h.personId === personId));
+    const key = verseKey(book, chapter, verse);
+    const dotsEl = document.getElementById('bib-dots-'+key);
+    if(dotsEl) dotsEl.innerHTML = bibleHighlightDotsHtml(highlights);
+  });
+}
+
+// Bookmarking is the separate, explicit interaction — tapping the verse
+// itself only ever toggles highlight. Stays personal, unlike highlights.
+function onBibleBookmarkTap(btn, book, chapter, verse){
+  if(!_db) return;
+  const personId = currentPersonId();
+  const text = _kjvData[book][chapter][verse];
+  const ref = _db.ref(`stewart/bookmarks/${personId}/${verseKey(book,chapter,verse)}`);
+  ref.once('value').then(snap => {
+    if(snap.exists()) return ref.remove().then(() => false);
+    return ref.set({ book, chapter, verse, text, timestamp: Date.now() }).then(() => true);
+  }).then(isBm => {
+    btn.classList.toggle('active', isBm);
+  });
+}
+
+// Notes: standalone or alongside a highlight on the same verse — a note
+// and a highlight simply both existing on the same verse IS the
+// association, no separate "attach" mechanic needed.
+function toggleBibleNoteForm(key, book, chapter, verse){
+  const container = document.getElementById('bib-notes-'+key);
+  if(!container) return;
+  const existing = container.querySelector('.bib-note-compose');
+  if(existing){ existing.remove(); return; }
+  const compose = document.createElement('div');
+  compose.className = 'bib-note-compose';
+  compose.innerHTML = `
+    <textarea class="bib-note-input" id="bib-note-input-${key}" maxlength="500" placeholder="Leave a note on this verse..."></textarea>
+    <button class="bib-note-submit" onclick="submitBibleNote('${key}','${book}',${chapter},${verse})">Post</button>
+  `;
+  container.appendChild(compose);
+  const ta = document.getElementById('bib-note-input-'+key);
+  if(ta) ta.focus();
+}
+
+function submitBibleNote(key, book, chapter, verse){
+  const ta = document.getElementById('bib-note-input-'+key);
+  const text = ta ? ta.value.trim() : '';
+  if(!text) return;
+  addBibleNote(currentPersonId(), book, chapter, verse, text)
+    .then(() => getVerseNotes(book, chapter, verse))
+    .then(notes => {
+      const container = document.getElementById('bib-notes-'+key);
+      if(container) container.innerHTML = bibleNoteListHtml(notes);
+    });
+}
+
+// Ask Tink about the exact verse in view (Family Bible punch list, Step
+// 3). Officers' Country already has a real Tink chat tab (unlike
+// Bridge, which shows the answer inline instead) — submitting switches
+// to it and reuses sendTinkQuestion() (the same persistence and retry
+// handling the tab's own input already has) rather than building a
+// second chat UI inside the Bible tab.
+function toggleBibleAskForm(key, book, chapter, verse){
+  const container = document.getElementById('bib-notes-'+key);
+  if(!container) return;
+  const existing = container.querySelector('.bib-ask-compose');
+  if(existing){ existing.remove(); return; }
+  const compose = document.createElement('div');
+  compose.className = 'bib-ask-compose bib-note-compose';
+  compose.innerHTML = `
+    <textarea class="bib-note-input" id="bib-ask-input-${key}" maxlength="280" placeholder="Ask Tink about this verse..."></textarea>
+    <button class="bib-note-submit" onclick="submitBibleAsk('${key}','${book}',${chapter},${verse})">Ask Tink</button>
+  `;
+  container.appendChild(compose);
+  const ta = document.getElementById('bib-ask-input-'+key);
+  if(ta) ta.focus();
+}
+
+function submitBibleAsk(key, book, chapter, verse){
+  const ta = document.getElementById('bib-ask-input-'+key);
+  const question = ta ? ta.value.trim() : '';
+  if(!question) return;
+  const btn = document.querySelector('.bnb[onclick*="\'tink\'"]');
+  showTab('tink', btn);
+  initTinkChat();
+  sendTinkQuestion(question, { book, chapter, verse: String(verse) });
+}
+
+// ── Search: client-side linear scan over the full KJV (~31k verses) ──
+// Only runs on explicit submit, never on keystroke, so there's no perf
+// concern despite the full-book scan.
+const BIB_SEARCH_CAP = 50;
+function runBibleSearch(){
+  const input = document.getElementById('bib-search-input');
+  const query = input ? input.value.trim() : '';
+  const resultsEl = document.getElementById('bib-search-results');
+  if(!resultsEl) return;
+  if(!query){ resultsEl.innerHTML = ''; return; }
+  if(!_kjvData){
+    resultsEl.innerHTML = '<div class="empty-state">Still loading Scripture — try again in a moment.</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="empty-state">Searching...</div>';
+
+  const needle = query.toLowerCase();
+  const matches = [];
+  search:
+  for(const book of Object.keys(_kjvData)){
+    const chapters = _kjvData[book];
+    for(const chapter of Object.keys(chapters)){
+      const versesInChapter = chapters[chapter];
+      for(const verse of Object.keys(versesInChapter)){
+        const text = versesInChapter[verse];
+        if(text.toLowerCase().includes(needle)){
+          matches.push({book, chapter, verse, text});
+          if(matches.length >= BIB_SEARCH_CAP) break search;
+        }
+      }
+    }
+  }
+
+  if(!matches.length){
+    resultsEl.innerHTML = '<div class="empty-state">No verses found for &ldquo;'+escapeHtml(query)+'&rdquo;.</div>';
+    return;
+  }
+
+  // No silent cap — someone searching a common word should see the list
+  // was cut short, not think that's every match.
+  const metaHtml = matches.length >= BIB_SEARCH_CAP
+    ? `<div class="bib-search-meta">Showing the first ${BIB_SEARCH_CAP} matches — try a more specific word for a shorter list.</div>`
+    : `<div class="bib-search-meta">${matches.length} verse${matches.length===1?'':'s'} found.</div>`;
+
+  resultsEl.innerHTML = metaHtml + matches.map(m => `
+    <div class="bib-search-result" onclick="openBibleChapter('${m.book}',${m.chapter},{scrollToVerse:${m.verse}})">
+      <div class="bib-search-ref">${m.book} ${m.chapter}:${m.verse}</div>
+      <div class="bib-search-snippet">${highlightBibleSearchTerm(m.text, query)}</div>
+    </div>`).join('');
+}
+
+function highlightBibleSearchTerm(text, query){
+  const e = escapeHtml(text);
+  const eq = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if(!eq) return e;
+  return e.replace(new RegExp('('+eq+')', 'ig'), '<mark>$1</mark>');
 }
 
 // ══════════════════════════════════════════════════════
@@ -1809,14 +2209,30 @@ function renderTinkMessages(msgs){
           <button onclick="${def.cancelFn}('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:1px solid rgba(0,0,0,.3);background:none;color:inherit;font-size:11px;cursor:pointer;">Never mind</button>
         </div>`;
     }).join('') : '';
+    // citedVerse (Step 4, Family Bible punch list) renders a tappable
+    // deep-link into the Bible tab, same pattern as Tom's citation chip
+    // on the boys' side — only Tink messages ever carry one.
+    const cv = m.citedVerse;
+    const chipHtml = (isTink && cv && cv.book)
+      ? `<button class="tink-verse-chip" onclick="openVerseFromTink('${cv.book}',${cv.chapter},${cv.verse})">&#128214; Open ${cv.book} ${cv.chapter}:${cv.verse} in the Bible tab</button>`
+      : '';
     return `
     <div class="msg-bubble ${isTink?'received':'sent'}">
       <div class="msg-bubble-from">${escapeHtml(m.from || (isTink?'Tink':'Unknown'))}</div>
       ${linkify(m.text||'')}
+      ${chipHtml}
       ${confirmHtml}
     </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
+}
+
+function openVerseFromTink(book, chapter, verse){
+  const btn = document.querySelector('.bnb[onclick*="\'bible\'"]');
+  showTab('bible', btn);
+  loadKJV().then(() => {
+    openBibleChapter(book, Number(chapter), { scrollToVerse: Number(verse) });
+  });
 }
 
 // Turns the cached thread into the {role, content} history askTink expects,
@@ -1834,10 +2250,19 @@ async function askTinkDashboard(){
   const input = document.getElementById('tink-input');
   const question = input ? input.value.trim() : '';
   if(!question) return;
-
-  const history = tinkHistoryForApi(); // capture before pushing the new question
-
   input.value = '';
+  await sendTinkQuestion(question, null);
+}
+
+// Shared by the Tink tab's own input box and the Bible tab's "Ask Tink
+// about this verse" (Family Bible punch list, Step 3) — same
+// persistence, same retry logic, regardless of where the question came
+// from. verseContext, when given, is {book, chapter, verse} — the
+// server resolves the actual verse text itself from its own trusted KJV
+// copy rather than trusting whatever the client claims.
+async function sendTinkQuestion(question, verseContext){
+  if(_tinkSendLock || !_db || !question) return;
+  const history = tinkHistoryForApi(); // capture before pushing the new question
   _tinkSendLock = true;
 
   await _db.ref('stewart/tinkchat').push({
@@ -1850,7 +2275,9 @@ async function askTinkDashboard(){
   // mid-request even when askTink succeeds server-side, and a silent retry
   // masks that instead of showing a fallback for an answer that existed.
   const payload = { question, history, today: localDateStr() };
+  if(verseContext) payload.verseContext = verseContext;
   let text = null;
+  let citedVerse = null;
   let proposedPlanAction = null;
   let proposedShoppingAction = null;
   let proposedFamilyNightActivity = null;
@@ -1860,6 +2287,7 @@ async function askTinkDashboard(){
       const result = await callFunction('askTink', payload);
       const d = result && result.data;
       text = d && d.text;
+      citedVerse = (d && d.citedVerse) || null;
       proposedPlanAction = (d && d.proposedPlanAction) || null;
       proposedShoppingAction = (d && d.proposedShoppingAction) || null;
       proposedFamilyNightActivity = (d && d.proposedFamilyNightActivity) || null;
@@ -1869,8 +2297,12 @@ async function askTinkDashboard(){
       // one silent retry before falling back
     }
   }
+  // citedVerse (Step 4, Family Bible punch list) lets the chat UI render
+  // a tappable deep-link into the Bible tab, same as Tom's citations —
+  // only ever set when Tink actually cited/suggested a real verse.
   await thinkingRef.update({
     text: text || "Tink couldn't answer right now — try again in a moment.",
+    citedVerse,
     pendingPlanAction: proposedPlanAction,
     pendingShoppingAction: proposedShoppingAction,
     pendingFamilyNightActivity: proposedFamilyNightActivity,

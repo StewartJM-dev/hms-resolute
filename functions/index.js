@@ -441,6 +441,38 @@ function mightBeFamilyNightQuestion(question, history) {
   return FAMILY_NIGHT_KEYWORD_PATTERN.test(recentText);
 }
 
+// Step 4 (Family Bible punch list): "suggest a verse about X," "what
+// does the Bible say about Y." Deliberately narrower than a generic
+// "mentions Scripture" check — a question like "how should I talk to
+// Samuel about honesty" is devotional-adjacent but isn't asking Tink to
+// hand back a citable verse, so it shouldn't pay the structured-output
+// cost or risk of this path.
+const VERSE_SUGGEST_PATTERN = /\b(suggest(?:s|ed|ing)?\s+(?:a\s+|some\s+)?verse|verse(?:s)?\s+(?:about|on|for)|what\s+does\s+the\s+bible\s+say|bible\s+say\s+about|scripture\s+(?:about|on)|find\s+(?:me\s+)?a\s+verse)\b/i;
+function mightBeVerseSuggestionQuestion(question, history) {
+  const recentText = [question, ...(history || []).slice(-4).map(h => h.content)].join(' ');
+  return VERSE_SUGGEST_PATTERN.test(recentText);
+}
+
+const TINK_VERSE_SUGGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    message: { type: 'string' },
+    verseRef: { type: 'string' }
+  },
+  required: ['message', 'verseRef'],
+  additionalProperties: false
+};
+
+// Reuses Tom's exact citation-formatting approach (askTom, further
+// below): the model itself never quotes a verse's actual wording — it
+// only names a reference — and the server inserts the REAL, verified
+// text afterward via lookupVerse. That's what keeps a citation from ever
+// being a hallucinated paraphrase. Appended to TINK_SYSTEM_PROMPT only
+// for the specific call where mightBeVerseSuggestionQuestion gated in;
+// every other Tink question is untouched by any of this.
+const TINK_VERSE_SUGGEST_INSTRUCTIONS = `
+
+This question is a verse-suggestion request — pointing Dawn or John to a real Bible verse on a topic ("suggest a verse about patience," "what does the Bible say about anger"). For this answer specifically: don't quote or paraphrase a verse's exact wording yourself — the system inserts the real, verified verse text after your message, so write your answer as if a citation naturally follows it. Set "verseRef" to exactly ONE verse (never a range like "5:43-44") in "Book Chapter:Verse" format (e.g. "James 1:19", "Proverbs 15:1") — only ever a verse you're confident actually exists. If, on reflection, this particular message isn't really asking for a citable verse after all, leave "verseRef" as an empty string and just answer the actual question normally.`;
 // Real stewart/inventory + stewart/plan, plus every meal in MEALS_DB
 // scored for readiness against current stock (sorted best-first) — so
 // Tink can answer "what can I make tonight" or "are we ready for X"
@@ -764,9 +796,16 @@ async function extractLookupIntent(anthropic, { question, history, today }) {
 exports.askTink = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
-    const { question, context, history, today } = data || {};
+    const { question, context, history, today, verseContext } = data || {};
     if (!question) {
       throw new functions.https.HttpsError('invalid-argument', 'question is required.');
+    }
+    // Step 3 (Family Bible punch list): resolved server-side against the
+    // real KJV, same as askTom's identical handling — never trust
+    // client-supplied verse text.
+    let resolvedVerseContext = null;
+    if (verseContext && typeof verseContext === 'object') {
+      resolvedVerseContext = lookupVerse(`${verseContext.book} ${verseContext.chapter}:${verseContext.verse}`);
     }
 
     const sanitizedHistory = sanitizeHistory(history);
@@ -805,13 +844,23 @@ exports.askTink = functions
     // complex gate for how infrequently that overlap would actually happen.
     const isFamilyNightQuestion = !resolvedContext && !isPantryQuestion && mightBeFamilyNightQuestion(question, sanitizedHistory);
 
-    const model = (resolvedContext || isPantryQuestion || isFamilyNightQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+    // Only worth checking when a specific verse ISN'T already in view
+    // (Step 3's resolvedVerseContext) — those are two different asks:
+    // "tell me about the verse I'm looking at" already has its verse,
+    // it doesn't need one suggested.
+    const isVerseSuggestQuestion = !resolvedVerseContext && mightBeVerseSuggestionQuestion(question, sanitizedHistory);
+
+    const model = (resolvedContext || isPantryQuestion || isFamilyNightQuestion || resolvedVerseContext || isVerseSuggestQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
 
     // Grounded data accumulates as separate parts (rather than one
     // overwritable value) so a boy-lookup and a pantry question could both
     // ground the same answer if a message somehow touches both.
     const groundedParts = [];
     let familyNightUnlocked = false;
+
+    if (resolvedVerseContext) {
+      groundedParts.push(`Real data from the database — the verse currently in view in the Bible section: "${resolvedVerseContext.text}" — ${resolvedVerseContext.book} ${resolvedVerseContext.chapter}:${resolvedVerseContext.verse} (KJV). The question below is about this specific verse — answer about it directly, don't ask which verse they mean.`);
+    }
 
     // If context names a real boy, fetch real score/deduction data server-side
     // so the answer is grounded in fact rather than generated from nothing.
@@ -841,19 +890,53 @@ exports.askTink = functions
     const groundedData = groundedParts.length ? groundedParts.join('\n\n---\n\n') : null;
     const userContent = buildTinkUserPrompt({ question, context: resolvedContext, groundedData });
 
-    // Three call shapes: the pantry-question and family-night-question
-    // paths each force their own structured output so a write proposal is
-    // always a real, validated field the server can check — never
-    // something parsed back out of free-form prose. Every other Tink
-    // question keeps the existing plain-text call completely unchanged,
-    // zero risk of either schema affecting an unrelated answer.
+    // Four call shapes: verse-suggestion, pantry-question, and
+    // family-night-question each force their own structured output so a
+    // write proposal or citation is always a real, validated field the
+    // server can check — never something parsed back out of free-form
+    // prose. Every other Tink question keeps the existing plain-text call
+    // completely unchanged, zero risk of any schema affecting an
+    // unrelated answer. Verse-suggestion is checked first (same priority
+    // it had before pantry/family-night existed) since it's the most
+    // narrowly-scoped, deliberate gate of the three.
     let text = '';
+    let citedVerse = null;
     let proposedPlanAction = null;
     let proposedShoppingAction = null;
     let proposedFamilyNightActivity = null;
     let proposedSuperFamilyNightPlan = null;
 
-    if (isPantryQuestion) {
+    if (isVerseSuggestQuestion) {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: TINK_SYSTEM_PROMPT + TINK_VERSE_SUGGEST_INSTRUCTIONS,
+        output_config: { format: { type: 'json_schema', schema: TINK_VERSE_SUGGEST_SCHEMA } },
+        messages: [...sanitizedHistory, { role: 'user', content: userContent }]
+      });
+      await logTinkUsage(model, response.usage);
+
+      const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        throw new functions.https.HttpsError('internal', 'Could not parse Tink response.');
+      }
+      text = (parsed.message || '').trim();
+      if (parsed.verseRef) {
+        const verse = lookupVerse(parsed.verseRef);
+        if (verse) {
+          text += `\n\n"${verse.text}" — ${verse.book} ${verse.chapter}:${verse.verse} (KJV)`;
+          citedVerse = { book: verse.book, chapter: verse.chapter, verse: verse.verse };
+        }
+        // If it didn't resolve, text is left as-is — no fallback line
+        // appended, unlike Tom's flow. Tink isn't locked into a
+        // devotional-category response shape the way Tom is, so her own
+        // message (written expecting a citation to follow) still reads
+        // fine as a standalone answer without one.
+      }
+    } else if (isPantryQuestion) {
       const response = await anthropic.messages.create({
         model,
         max_tokens: 1024,
@@ -941,7 +1024,7 @@ exports.askTink = functions
       throw new functions.https.HttpsError('internal', 'No text returned from Anthropic.');
     }
 
-    return { text, proposedPlanAction, proposedShoppingAction, proposedFamilyNightActivity, proposedSuperFamilyNightPlan };
+    return { text, citedVerse, proposedPlanAction, proposedShoppingAction, proposedFamilyNightActivity, proposedSuperFamilyNightPlan };
   });
 
 // ════════════════════════════════════════════════════
@@ -1052,6 +1135,7 @@ Classify every message into exactly one category:
 Rules for the "message" field:
 - 2-4 sentences, in voice, talking directly to the boy.
 - For "devotional" and "verse_lookup": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to exactly ONE verse (never a range like "5:43-44" — pick the single verse that matters most) in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
+- If the message includes a bracketed "[He's currently viewing this verse...]" note, that verse IS the topic — he's already reading it, so discuss/explain that exact verse directly, don't quote it back at him (he can see it), and leave "verseRef" empty regardless of category — there's nothing to cite, since the verse in view is already on his screen. Only set "verseRef" when you're introducing a DIFFERENT verse he isn't already looking at.
 - For "interest": you may suggest exactly one real, well-known, kid-appropriate website or resource by name in "suggestedWebsite" (e.g. "NASA Kids' Club" or "khanacademy.org"), and mention it naturally in your message too.
 - For every other category, leave "verseRef" and "suggestedWebsite" as empty strings.
 - For "declined_*": firm but warm, brief, in voice — redirect, don't lecture, and never actually help with the sibling/discipline/rule-bypass ask itself.
@@ -1160,12 +1244,22 @@ function tomNudgeContextBlock(nudges) {
 exports.askTom = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
-    const { agentId, question, history } = data || {};
+    const { agentId, question, history, verseContext } = data || {};
     if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
       throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
     }
     if (!question) {
       throw new functions.https.HttpsError('invalid-argument', 'question is required.');
+    }
+    // Step 3 (Family Bible punch list): a question asked from within the
+    // Bible section carries which verse was in view. Resolved server-side
+    // against the real KJV (same lookupVerse the citation flow already
+    // trusts) rather than trusting whatever text the client sends — a boy
+    // could otherwise put arbitrary text in Tom's context by claiming it's
+    // "the verse in view."
+    let resolvedVerseContext = null;
+    if (verseContext && typeof verseContext === 'object') {
+      resolvedVerseContext = lookupVerse(`${verseContext.book} ${verseContext.chapter}:${verseContext.verse}`);
     }
 
     const agentName = AGENT_DISPLAY_NAMES[agentId];
@@ -1196,6 +1290,10 @@ exports.askTom = functions
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+    const userContent = resolvedVerseContext
+      ? `[He's currently viewing this verse in the Bible section: "${resolvedVerseContext.text}" — ${resolvedVerseContext.book} ${resolvedVerseContext.chapter}:${resolvedVerseContext.verse} (KJV). His question below is about this specific verse.]\n\n${question}`
+      : question;
+
     const response = await anthropic.messages.create({
       model: TOM_MODEL,
       max_tokens: 500,
@@ -1203,7 +1301,7 @@ exports.askTom = functions
       output_config: { format: { type: 'json_schema', schema: TOM_RESPONSE_SCHEMA } },
       messages: [
         ...sanitizedHistory,
-        { role: 'user', content: question }
+        { role: 'user', content: userContent }
       ]
     });
 
@@ -1233,6 +1331,17 @@ exports.askTom = functions
       type = 'declined';
       category = 'declined_budget';
       message = "Budget's tapped for this month, sailor — that one's on hold till next month. Ask me something in the app-help lane, though, anytime.";
+    } else if (resolvedVerseContext && (category === 'devotional' || category === 'verse_lookup')) {
+      // He's already looking at a specific verse — no citation to insert
+      // (the model was told to leave verseRef empty for exactly this
+      // case). Skipping just this branch, rather than falling through to
+      // lookupVerse('') and its "couldn't pull the exact verse" fallback
+      // below, is the fix: that fallback text used to get appended even
+      // though nothing was actually missing — there was never a new
+      // verse to look up in the first place. Scoped to these two
+      // categories specifically (not resolvedVerseContext alone) so an
+      // "interest" response with a verse in view still reaches its own
+      // suggestedWebsite handling below, unaffected.
     } else if (category === 'devotional' || category === 'verse_lookup') {
       const verse = lookupVerse(parsed.verseRef);
       if (verse) {
