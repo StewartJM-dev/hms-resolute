@@ -1751,15 +1751,29 @@ function sendDashGroupMessage(){
 // TINK — Dawn's plain-spoken AI assistant
 // Persisted to Firebase (stewart/tinkchat), shared across Officers'
 // Country like Family Channel — no wish counter, per the punch list.
-// The one exception is Tink's plan-write proposals (pendingPlanAction,
-// below): a real Confirm/Never mind step, same trust boundary as Tom's
-// wish-spend confirm on the boys' side — Tink never writes stewart/plan
-// on her own say-so.
+// The one exception is Tink's Tier 1 write-capable actions (see
+// tink-write-boundary-spec.md): plan/shopping/family-night proposals get
+// a real Confirm/Never mind step, same trust boundary as Tom's wish-spend
+// confirm on the boys' side — Tink never writes any of these paths on her
+// own say-so, only the client does, and only after a real tap.
 // ══════════════════════════════════════════════════════
 let _tinkSendLock = false;
 let _tinkListenerAttached = false;
 let _tinkMessageCache = []; // latest known thread, kept for building conversation history
 const MAX_TINK_HISTORY = 10; // last few exchanges — enough for a follow-up like "Stephen, this week" to connect
+
+// One entry per Tier 1 action askTink can propose. renderTinkMessages
+// walks this list so a message carrying more than one live proposal (e.g.
+// a plan addition AND a shopping addition from the same confirmation)
+// renders a confirm block per action, and adding a future Tier 1 action
+// (Bible notes, once the family Bible ships) means adding one entry here
+// instead of another copy-pasted confirm block.
+const TINK_TIER1_ACTIONS = [
+  { pendingField: 'pendingPlanAction', resolvedField: 'planActionResolved', confirmFn: 'confirmTinkPlanAction', cancelFn: 'cancelTinkPlanAction', label: 'Add to the plan', valid: a => a && a.day && a.mealName },
+  { pendingField: 'pendingShoppingAction', resolvedField: 'shoppingActionResolved', confirmFn: 'confirmTinkShoppingAction', cancelFn: 'cancelTinkShoppingAction', label: 'Add to the list', valid: a => a && Array.isArray(a.items) && a.items.length },
+  { pendingField: 'pendingFamilyNightActivity', resolvedField: 'familyNightActivityResolved', confirmFn: 'confirmTinkFamilyNightActivity', cancelFn: 'cancelTinkFamilyNightActivity', label: 'Set for tonight', valid: a => a && a.id },
+  { pendingField: 'pendingSuperFamilyNightPlan', resolvedField: 'superFamilyNightPlanResolved', confirmFn: 'confirmTinkSuperFamilyNightPlan', cancelFn: 'cancelTinkSuperFamilyNightPlan', label: 'Save the plan', valid: a => a && (a.food || a.activity) }
+];
 
 function initTinkChat(){
   if(!_db || _tinkListenerAttached) return;
@@ -1782,18 +1796,19 @@ function renderTinkMessages(msgs){
   }
   el.innerHTML = items.map(m => {
     const isTink = m.agentId === 'tink';
-    // pendingPlanAction (Tink's first write-capable action): the message
-    // text already IS Tink's real suggestion, unlike Tom's wish-spend
-    // flow which hides the real answer until confirmed — nothing here is
-    // hidden, the Confirm/Never mind buttons are just attached UI that
-    // performs (or discards) the actual stewart/plan write.
-    const pa = m.pendingPlanAction;
-    const confirmHtml = (isTink && pa && pa.day && pa.mealName && !m.planActionResolved)
-      ? `<div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="confirmTinkPlanAction('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:none;background:var(--gold);color:var(--black);font-size:11px;font-weight:700;cursor:pointer;">Add to the plan</button>
-          <button onclick="cancelTinkPlanAction('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:1px solid rgba(0,0,0,.3);background:none;color:inherit;font-size:11px;cursor:pointer;">Never mind</button>
-        </div>`
-      : '';
+    // Tier 1 proposals: the message text already IS Tink's real
+    // suggestion, unlike Tom's wish-spend flow which hides the real
+    // answer until confirmed — nothing here is hidden, the Confirm/Never
+    // mind buttons are just attached UI that performs (or discards) the
+    // actual write.
+    const confirmHtml = isTink ? TINK_TIER1_ACTIONS.map(def => {
+      const action = m[def.pendingField];
+      if(!action || m[def.resolvedField] || !def.valid(action)) return '';
+      return `<div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="${def.confirmFn}('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:none;background:var(--gold);color:var(--black);font-size:11px;font-weight:700;cursor:pointer;">${def.label}</button>
+          <button onclick="${def.cancelFn}('${m.key}')" style="flex:1;padding:7px;border-radius:16px;border:1px solid rgba(0,0,0,.3);background:none;color:inherit;font-size:11px;cursor:pointer;">Never mind</button>
+        </div>`;
+    }).join('') : '';
     return `
     <div class="msg-bubble ${isTink?'received':'sent'}">
       <div class="msg-bubble-from">${escapeHtml(m.from || (isTink?'Tink':'Unknown'))}</div>
@@ -1837,11 +1852,18 @@ async function askTinkDashboard(){
   const payload = { question, history, today: localDateStr() };
   let text = null;
   let proposedPlanAction = null;
+  let proposedShoppingAction = null;
+  let proposedFamilyNightActivity = null;
+  let proposedSuperFamilyNightPlan = null;
   for(let attempt = 1; attempt <= 2 && !text; attempt++){
     try{
       const result = await callFunction('askTink', payload);
-      text = result && result.data && result.data.text;
-      proposedPlanAction = (result && result.data && result.data.proposedPlanAction) || null;
+      const d = result && result.data;
+      text = d && d.text;
+      proposedPlanAction = (d && d.proposedPlanAction) || null;
+      proposedShoppingAction = (d && d.proposedShoppingAction) || null;
+      proposedFamilyNightActivity = (d && d.proposedFamilyNightActivity) || null;
+      proposedSuperFamilyNightPlan = (d && d.proposedSuperFamilyNightPlan) || null;
       if(!text) throw new Error('Empty response from askTink');
     }catch(e){
       // one silent retry before falling back
@@ -1849,7 +1871,10 @@ async function askTinkDashboard(){
   }
   await thinkingRef.update({
     text: text || "Tink couldn't answer right now — try again in a moment.",
-    pendingPlanAction: proposedPlanAction
+    pendingPlanAction: proposedPlanAction,
+    pendingShoppingAction: proposedShoppingAction,
+    pendingFamilyNightActivity: proposedFamilyNightActivity,
+    pendingSuperFamilyNightPlan: proposedSuperFamilyNightPlan
   });
 
   _tinkSendLock = false;
@@ -1929,6 +1954,135 @@ async function confirmTinkPlanAction(key){
 function cancelTinkPlanAction(key){
   if(!_db) return;
   _db.ref('stewart/tinkchat/'+key).update({ pendingPlanAction: null, planActionResolved: true });
+}
+
+// Tier 1 write-capable action: shopping list. Mirrors kitchen/index.html's
+// addToShopping() exactly — dedupe by lowercased name against the current
+// list, append anything new, save the whole array back (stewart/shopping
+// is a flat array too, same read-modify-write discipline as the plan).
+async function confirmTinkShoppingAction(key){
+  if(!_db) return;
+  const msg = _tinkMessageCache.find(m => m.key === key);
+  if(!msg || !msg.pendingShoppingAction) return;
+  const action = msg.pendingShoppingAction;
+  const ref = _db.ref('stewart/tinkchat/'+key);
+
+  try{
+    const shopSnap = await _db.ref('stewart/shopping').once('value');
+    const list = Array.isArray(shopSnap.val()) ? shopSnap.val() : [];
+    const existing = new Set(list.map(i => String(i.name||'').toLowerCase()));
+    let added = 0;
+    (action.items||[]).forEach(name => {
+      if(!existing.has(name.toLowerCase())){
+        list.push({ name, checked:false, reason:'Added via Tink' });
+        existing.add(name.toLowerCase());
+        added++;
+      }
+    });
+    await _db.ref('stewart/shopping').set(list);
+    await ref.update({
+      pendingShoppingAction: null,
+      shoppingActionResolved: true,
+      text: msg.text + (added ? `\n\n✓ Added to the shopping list: ${action.items.join(', ')}.` : '\n\nThose were already on the list.')
+    });
+  }catch(e){
+    await ref.update({
+      pendingShoppingAction: null,
+      shoppingActionResolved: true,
+      text: msg.text + '\n\n⚠️ Something went wrong saving that — try again from the Galley.'
+    });
+  }
+}
+
+function cancelTinkShoppingAction(key){
+  if(!_db) return;
+  _db.ref('stewart/tinkchat/'+key).update({ pendingShoppingAction: null, shoppingActionResolved: true });
+}
+
+// Tier 1 write-capable action: tonight's Family Night activity. Tink only
+// ever proposes a catalog id (validated server-side against
+// FAMILY_NIGHT_ACTIVITY_CATALOG) — this resolves it against the real,
+// full FAMILY_NIGHT_ACTIVITIES catalog (defined below) and writes the
+// exact same {id, label, icon, venue, timestamp} shape runActivityTonight()
+// already writes to stewart/familynight/activities/{date}, so the boys'
+// app reads it identically either way.
+async function confirmTinkFamilyNightActivity(key){
+  if(!_db) return;
+  const msg = _tinkMessageCache.find(m => m.key === key);
+  if(!msg || !msg.pendingFamilyNightActivity) return;
+  const activity = FAMILY_NIGHT_ACTIVITIES.find(a => a.id === msg.pendingFamilyNightActivity.id);
+  const ref = _db.ref('stewart/tinkchat/'+key);
+  if(!activity){
+    await ref.update({ pendingFamilyNightActivity: null, familyNightActivityResolved: true, text: msg.text + "\n\n⚠️ Couldn't find that activity — try setting it from Drydock instead." });
+    return;
+  }
+  try{
+    const today = localDateStr();
+    await _db.ref(`stewart/familynight/activities/${today}`).set({
+      id: activity.id, label: activity.label, icon: activity.icon, venue: activity.venue, timestamp: Date.now()
+    });
+    await ref.update({
+      pendingFamilyNightActivity: null,
+      familyNightActivityResolved: true,
+      text: msg.text + `\n\n✓ ${activity.icon} ${activity.label} set for tonight!`
+    });
+  }catch(e){
+    await ref.update({
+      pendingFamilyNightActivity: null,
+      familyNightActivityResolved: true,
+      text: msg.text + '\n\n⚠️ Something went wrong saving that — try again from Drydock.'
+    });
+  }
+}
+
+function cancelTinkFamilyNightActivity(key){
+  if(!_db) return;
+  _db.ref('stewart/tinkchat/'+key).update({ pendingFamilyNightActivity: null, familyNightActivityResolved: true });
+}
+
+// Tier 1 write-capable action: the Super Family Night takeout/activity
+// plan — but ONLY once it's actually unlocked (re-checked here from the
+// live data, not trusted from the server response alone) and ONLY the
+// fields Tink actually proposed; an unmentioned field is left exactly as
+// it was rather than blanked out, and "unlocked" itself is never touched
+// here — that flag is earned by the family's real performance average
+// elsewhere (renderSuperFNDashboard), never something Tink can grant.
+async function confirmTinkSuperFamilyNightPlan(key){
+  if(!_db) return;
+  const msg = _tinkMessageCache.find(m => m.key === key);
+  if(!msg || !msg.pendingSuperFamilyNightPlan) return;
+  const action = msg.pendingSuperFamilyNightPlan;
+  const ref = _db.ref('stewart/tinkchat/'+key);
+
+  try{
+    const monthKey = localDateStr().slice(0,7);
+    const sfnRef = _db.ref(`stewart/superfamilynight/${monthKey}`);
+    const current = (await sfnRef.once('value')).val() || {};
+    if(!current.unlocked){
+      await ref.update({ pendingSuperFamilyNightPlan: null, superFamilyNightPlanResolved: true, text: msg.text + "\n\n⚠️ Super Family Night isn't unlocked yet — nothing was saved." });
+      return;
+    }
+    const update = {};
+    if(action.food) update.food = action.food;
+    if(action.activity) update.activity = action.activity;
+    if(Object.keys(update).length) await sfnRef.update(update);
+    await ref.update({
+      pendingSuperFamilyNightPlan: null,
+      superFamilyNightPlanResolved: true,
+      text: msg.text + '\n\n✓ Super Family Night plan saved.'
+    });
+  }catch(e){
+    await ref.update({
+      pendingSuperFamilyNightPlan: null,
+      superFamilyNightPlanResolved: true,
+      text: msg.text + '\n\n⚠️ Something went wrong saving that — try again from Drydock.'
+    });
+  }
+}
+
+function cancelTinkSuperFamilyNightPlan(key){
+  if(!_db) return;
+  _db.ref('stewart/tinkchat/'+key).update({ pendingSuperFamilyNightPlan: null, superFamilyNightPlanResolved: true });
 }
 
 // Enter key sends
