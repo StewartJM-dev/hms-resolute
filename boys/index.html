@@ -480,6 +480,73 @@ body::before{
   font-style:italic;
 }
 
+/* THE WORD (Bible section) */
+.word-mode-row{display:flex;gap:6px;margin-bottom:14px;}
+.word-mode-btn{
+  flex:1;padding:9px 6px;border-radius:8px;
+  border:1px solid rgba(12,200,200,.3);background:transparent;
+  color:rgba(255,255,255,.5);font-family:'Orbitron',sans-serif;
+  font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;transition:all .2s;
+}
+.word-mode-btn.active{background:var(--teal);border-color:var(--teal);color:var(--black);}
+
+.word-crumb{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:11px;color:rgba(255,255,255,.5);flex-wrap:wrap;}
+.word-crumb button{background:none;border:none;color:var(--teal3);cursor:pointer;font-size:11px;padding:2px 0;font-family:'Exo 2',sans-serif;}
+.word-crumb .sep{opacity:.4;}
+
+.word-testament-label{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);margin:14px 0 8px;}
+.word-testament-label:first-child{margin-top:0;}
+.word-book-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.word-book-btn{
+  padding:10px 6px;border-radius:8px;
+  background:var(--dark2);border:1px solid rgba(12,200,200,.15);
+  color:var(--white);font-size:11px;text-align:center;
+  cursor:pointer;
+}
+.word-book-btn:active{background:rgba(12,200,200,.15);}
+
+.word-chapter-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.word-chapter-btn{
+  aspect-ratio:1;border-radius:6px;
+  background:var(--dark2);border:1px solid rgba(12,200,200,.15);
+  color:var(--white);font-size:12px;font-family:'Orbitron',sans-serif;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.word-chapter-btn:active{background:rgba(12,200,200,.15);}
+
+.word-chapter-title{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;color:var(--gold);margin-bottom:10px;}
+.word-verse{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+.word-verse-num{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--teal2);flex-shrink:0;width:20px;text-align:right;padding-top:3px;}
+.word-verse-text{flex:1;font-size:14px;line-height:1.65;color:var(--white);cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s;}
+.word-verse-text.hl{background:rgba(232,184,74,.22);}
+.word-verse.target{animation:word-target-flash 2.2s ease-out;border-radius:6px;}
+@keyframes word-target-flash{0%,35%{outline:2px solid var(--teal3);outline-offset:3px;border-radius:6px;}100%{outline:2px solid transparent;outline-offset:3px;}}
+.word-bookmark-btn{background:none;border:none;color:rgba(255,255,255,.25);font-size:16px;cursor:pointer;flex-shrink:0;padding:2px 4px;line-height:1;}
+.word-bookmark-btn.active{color:var(--gold);}
+
+.word-search-row{display:flex;gap:8px;margin-bottom:12px;}
+.word-search-input{flex:1;padding:10px 12px;border-radius:20px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;}
+.word-search-go{width:38px;height:38px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;color:var(--black);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.word-search-meta{font-size:10.5px;color:rgba(255,255,255,.4);margin-bottom:10px;font-style:italic;}
+.word-search-result{background:var(--dark2);border:1px solid rgba(12,200,200,.15);border-left:3px solid var(--teal);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
+.word-search-ref{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:var(--teal2);margin-bottom:4px;}
+.word-search-snippet{font-size:12.5px;color:rgba(255,255,255,.85);line-height:1.5;}
+.word-search-snippet mark{background:rgba(232,184,74,.35);color:var(--white);border-radius:2px;}
+
+.word-myverse-item{background:var(--dark2);border:1px solid rgba(12,200,200,.15);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
+.word-myverse-item .word-search-ref{color:var(--gold);}
+
+/* TOM'S VERSE CITATION CHIP (Word tab deep-link, Step 3) */
+.tom-verse-chip{
+  display:flex;align-items:center;gap:6px;width:100%;
+  margin-top:9px;padding:8px 11px;border-radius:16px;
+  border:1px solid rgba(200,146,42,.5);background:rgba(200,146,42,.14);
+  color:var(--gold2,var(--gold));font-family:'Exo 2',sans-serif;
+  font-size:11px;font-weight:700;cursor:pointer;text-align:left;
+}
+.tom-verse-chip:active{background:rgba(200,146,42,.28);}
+
 /* STATUS BADGE */
 .status-badge{
   display:inline-flex;align-items:center;gap:5px;
@@ -504,6 +571,7 @@ body.theme-alpha .lunch-day-btn.active{background:var(--alpha2);border-color:var
 body.theme-alpha .lunch-option.selected{border-color:var(--alpha2);background:rgba(30,58,110,.12);}
 body.theme-alpha .lunch-option.selected .lunch-opt-check{background:var(--alpha2);border-color:var(--alpha2);}
 body.theme-alpha .mission-check.done{background:var(--alpha2);border-color:var(--alpha2);}
+body.theme-alpha .word-mode-btn.active{background:var(--alpha2);border-color:var(--alpha2);}
 
 body.theme-bravo .topbar{border-bottom-color:var(--bravo2);}
 body.theme-bravo .topbar-codename{color:var(--bravo2);}
@@ -516,6 +584,7 @@ body.theme-bravo .lunch-day-btn.active{background:var(--bravo2);border-color:var
 body.theme-bravo .lunch-option.selected{border-color:var(--bravo2);background:rgba(110,30,30,.12);}
 body.theme-bravo .lunch-option.selected .lunch-opt-check{background:var(--bravo2);border-color:var(--bravo2);}
 body.theme-bravo .mission-check.done{background:var(--bravo2);border-color:var(--bravo2);}
+body.theme-bravo .word-mode-btn.active{background:var(--bravo2);border-color:var(--bravo2);}
 
 body.theme-dino .topbar{border-bottom-color:var(--dino2);}
 body.theme-dino .topbar-codename{color:var(--dino2);}
@@ -528,6 +597,7 @@ body.theme-dino .lunch-day-btn.active{background:var(--dino2);border-color:var(-
 body.theme-dino .lunch-option.selected{border-color:var(--dino2);background:rgba(30,92,42,.12);}
 body.theme-dino .lunch-option.selected .lunch-opt-check{background:var(--dino2);border-color:var(--dino2);}
 body.theme-dino .mission-check.done{background:var(--dino2);border-color:var(--dino2);}
+body.theme-dino .word-mode-btn.active{background:var(--dino2);border-color:var(--dino2);}
 
 body.theme-wild .topbar{border-bottom-color:var(--wild2);}
 body.theme-wild .topbar-codename{color:var(--wild2);}
@@ -540,6 +610,7 @@ body.theme-wild .lunch-day-btn.active{background:var(--wild2);border-color:var(-
 body.theme-wild .lunch-option.selected{border-color:var(--wild2);background:rgba(122,92,30,.12);}
 body.theme-wild .lunch-option.selected .lunch-opt-check{background:var(--wild2);border-color:var(--wild2);}
 body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--wild2);}
+body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(--wild2);}
 
 /* UTILITY */
 .empty{text-align:center;padding:30px;color:rgba(255,255,255,.3);font-style:italic;font-size:13px;}
@@ -1020,6 +1091,33 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
       </div>
     </div>
 
+    <!-- TAB: THE WORD -->
+    <div class="tab" id="tab-word">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">The Word</div>
+        <div class="sec-head-line"></div>
+      </div>
+
+      <div class="word-mode-row">
+        <button class="word-mode-btn active" id="word-mode-btn-browse" onclick="setWordMode('browse')">Browse</button>
+        <button class="word-mode-btn" id="word-mode-btn-search" onclick="setWordMode('search')">Search</button>
+        <button class="word-mode-btn" id="word-mode-btn-myverses" onclick="setWordMode('myverses')">My Verses</button>
+      </div>
+
+      <div id="word-browse-view"><div class="empty">Loading Scripture...</div></div>
+
+      <div id="word-search-view" style="display:none;">
+        <div class="word-search-row">
+          <input type="text" id="word-search-input" class="word-search-input" placeholder="Search a word or phrase..." maxlength="60" autocomplete="off">
+          <button class="word-search-go" onclick="runWordSearch()">&#128269;</button>
+        </div>
+        <div id="word-search-results"></div>
+      </div>
+
+      <div id="word-myverses-view" style="display:none;"></div>
+    </div>
+
   </div><!-- /content -->
 
   <!-- BOTTOM NAV -->
@@ -1056,6 +1154,10 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
     <button class="bnb" onclick="showTab('compass',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
       Compass
+    </button>
+    <button class="bnb" onclick="showTab('word',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Word
     </button>
   </nav>
 
@@ -1237,14 +1339,63 @@ function selectAgent(id, codename, name, rank, theme, icon){
 // Shown once per agent (tracked in Firebase so it persists across devices),
 // then Ship's Orders takes over as normal from then on. Revisitable anytime
 // via the Help (?) icon, which is a separate, full reference page — this
-// walkthrough is deliberately short, just the big picture.
+// walkthrough is deliberately short per stop, just the big picture, even
+// though there are more stops than there used to be.
+//
+// Mirrors functions/index.js's AGENT_AGES and tomAgeGuidance's three tiers
+// exactly, so a step's wording lands at the same complexity level Tom
+// already scales to for the same boy. Keep these two in sync if either
+// changes — there's no shared module between client and Cloud Functions
+// to enforce it automatically (same caveat as KJV_BOOK_ALIASES in Step 1).
+const AGENT_AGES = { samuel: 13, johnjr: 11, stephen: 9, daniel: 7 };
+function walkthroughAgeTier(){
+  const age = AGENT_AGES[currentAgent && currentAgent.id];
+  if(age === undefined) return 'mid';
+  if(age <= 8) return 'young';
+  if(age <= 10) return 'mid';
+  return 'old';
+}
+// A step's body is either one string (used for every age — fine for
+// content simple enough it doesn't need scaling) or {young, mid, old},
+// resolved against the current agent's tier same as tomAgeGuidance.
+function wtBodyText(step){
+  if(typeof step.body === 'string') return step.body;
+  const tier = walkthroughAgeTier();
+  return step.body[tier] || step.body.mid;
+}
+
 const WALKTHROUGH_STEPS = [
-  { icon:'&#9875;', title:'Welcome Aboard, Agent', body:"Quick tour before you get started — six short stops, then you're set. Skip anytime with the link up top." },
+  { icon:'&#9875;', title:'Welcome Aboard, Agent', body:"Quick tour before you get started — a bunch of short stops, then you're set. Skip anytime with the link up top." },
   { icon:'&#9989;', title:'Missions', body:"Every day you've got a list of missions — chores worth points. Finish them and you earn both money and screen time." },
-  { icon:'&#127918;', title:'Screen Time Bank', body:"Finish your missions and earn bonus screen time — up to 30 minutes a day, on top of your normal Chromebook time. Cash it out anytime from the Missions tab." },
+  { icon:'&#9203;', title:'Screen Time — The Rules', body:{
+    young:"You get screen time three times a day — a half hour in the morning, a half hour after lunch, and a half hour after dinner. That's 1.5 hours total. You have to watch the time yourself — a timer helps a lot. Big rule: if time runs out before you check off your chores, they stay unchecked. Even if you really did them.",
+    mid:"You get 1.5 hours of Chromebook time a day, split into three 30-minute windows — morning, after lunch, after dinner. It's yours to manage: nobody's going to remind you mid-session, so set a timer. And here's the one that matters most — if a window runs out before you've marked your chores done, they don't get marked. No exceptions, no marking late.",
+    old:"Screen time is 1.5 hours a day, broken into three fixed 30-minute windows — morning, after lunch, after dinner. Managing that time is entirely on you; nobody's tracking it for you, so a timer is worth setting. The rule that actually bites: if a window closes before you've marked a chore done in the app, it doesn't count as done — no exceptions, no going back to mark it late. Doing the chore isn't enough; checking it off inside the window is what counts."
+  }},
+  { icon:'&#127918;', title:'Screen Time Bank', body:"Finish your missions and earn bonus screen time — up to 30 minutes a day, on top of the 1.5 hours you just read about. Cash it out anytime from the Missions tab." },
   { icon:'&#9875;', title:'Ship Account', body:"Every dollar you earn goes straight into your own account on the Pay tab. Cash it out to Greenlight, or save it up." },
   { icon:'&#127974;', title:"Ship's Store", body:"Spend what you've saved on real prizes — right now, your own Chromebook for $45. Find it from the Ship Account card." },
-  { icon:'&#129517;', title:"Ship's Orders", body:"Tap the compass icon anytime for today's checklist — tap any item and it takes you right there. That's opening now." },
+  { icon:'&#127942;', title:'Medals', body:{
+    young:"You can earn medals for doing well! Ways to earn one: 7 good days in a row, 30 good days in a row, a whole week with no chat trouble, not using too many wishes in a week, or doing your devotional every day for a week. When you earn one, there's a big celebration, your icon changes for a bit, and everyone in the family sees you got it!",
+    mid:"Five ways to earn a medal: a 7-day clean streak, a 30-day clean streak, a full week with zero chat strikes, going easy on your wishes for a week, or staying consistent with your devotional for a week. Earn one and you get a real celebration, your agent icon changes for a while, and the whole family sees it announced in group chat.",
+    old:"Medals reward sustained consistency, not one-off good days: a 7-day clean streak, a 30-day clean streak, a full week with zero moderation strikes, restraint in how many wishes you spend in a week, and a week of consistent devotional engagement. Earning one triggers a celebration screen, temporarily changes your agent icon, and gets announced to the whole family in group chat — it's visible, on purpose."
+  }},
+  { icon:'&#128172;', title:'Meet Tom (Compass Tab)', body:{
+    young:"Tom is in the Compass tab — tap it and ask him stuff! Questions about the app are free. Asking him to find a Bible verse is free too. Some questions cost a wish, which you earn by doing your chores. If you ask Tom about God or the Bible, he always says to check with the Bible and with Dad, not just trust him.",
+    mid:"Tom lives in the Compass tab at the bottom of your screen — ask him anything. App questions are always free, and so is asking him to find a real Bible verse for you. Curiosity, learning, and devotional questions cost a wish — you earn those by finishing chores. On faith questions, Tom always points you back to Scripture and Dad as the real answer, never himself.",
+    old:"Tom's your AI companion in the Compass tab. App-help questions and verse lookups are always free — no wish needed. Interest, learning, and devotional questions each cost one wish, and your wish supply is tied directly to how much of your daily chores you complete. On anything devotional, Tom's built to defer — Scripture and Dad are the final word, he's just a starting point, not the authority."
+  }},
+  { icon:'&#128214;', title:'The Word Tab', body:{
+    young:"The Word tab has the whole Bible in it! Pick a book, then a chapter, and read. You can also search for a word. Tap a verse to highlight it in gold. Tap the star to save it — you can find all your saved verses under My Verses.",
+    mid:"Your own copy of the Bible, right in the app — tap Word at the bottom. Browse any book and chapter, or search for a word or phrase. Tap a verse to highlight it, or tap the star to bookmark it for later — both save to your account, and My Verses collects them all in one place.",
+    old:"The Word tab holds the full KJV text, browsable by book and chapter or searchable by keyword. Tapping a verse toggles a highlight on it; the star next to it bookmarks it separately — either, both, or neither, per verse. Everything you highlight or bookmark is saved to your account and collected under My Verses so you don't have to go hunting for it again."
+  }},
+  { icon:'&#9888;&#65039;', title:'Chat Rules', body:{
+    young:"Everything you type in chat gets checked — even messages to Tom. If you type nonsense, it gets deleted and Tom tells you why. If you're mean to someone, Mom and Dad find out right away. If you get in trouble 3 times in one day, your chat gets paused until the next day. Even though it resets each day, Mom and Dad can still see everything that happened that week.",
+    mid:"Every message you send — group chat, private, or to Tom — gets checked. Gibberish or spam gets deleted, with a private nudge from Tom explaining why. Anything unkind stays visible, but Mom and Dad get told right away, every time. Hit 3 strikes in one day and chat pauses until midnight. Strikes reset each day, but Mom and Dad's weekly report still sees everything that happened.",
+    old:"All chat — group, private, and Compass — runs through the same check. Gibberish/spam gets deleted and you get a private nudge from Tom explaining what happened. Unkindness isn't deleted, but Mom and Dad are notified immediately, no exceptions. Three strikes in a single day pauses your chat access until midnight. The strike count resets daily, but nothing's actually forgotten — the weekly report card shows Mom and Dad the full pattern regardless."
+  }},
+  { icon:'&#129517;', title:"Ship's Orders", body:"Tap the compass icon up top anytime for today's checklist — tap any item and it takes you right there. That's opening now." },
 ];
 let wtStep = 0;
 
@@ -1276,7 +1427,7 @@ function renderWalkthroughStep(){
   const s = WALKTHROUGH_STEPS[wtStep];
   document.getElementById('wt-icon').innerHTML = s.icon;
   document.getElementById('wt-title').textContent = s.title;
-  document.getElementById('wt-body').innerHTML = s.body;
+  document.getElementById('wt-body').innerHTML = wtBodyText(s);
   document.getElementById('wt-dots').innerHTML = WALKTHROUGH_STEPS.map((_,i) =>
     `<span style="width:6px;height:6px;border-radius:50%;background:${i===wtStep?'var(--gold,#e8b84a)':'rgba(255,255,255,.2)'};"></span>`
   ).join('');
@@ -1327,6 +1478,7 @@ function showTab(name, btn){
   if(name === 'transmissions'){ renderTransmissions(); initGroupThreadInline(); initPrivateThreadInline(); }
   if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
   if(name === 'compass'){ initTomChat(); renderTomWishCounter(); }
+  if(name === 'word') renderWordTab();
 }
 
 // ══════════════════════════════════════════════════════
@@ -3074,6 +3226,13 @@ function renderTomMessages(msgs){
         </div>`;
     } else {
       bodyHtml = linkify(m.text||'');
+      // Tappable deep-link into the Word tab (Step 3) — only once the
+      // citation is actually visible (never on a still-pending wish
+      // prompt, which hasn't revealed the real message yet).
+      if(m.citedVerse && m.citedVerse.book){
+        const cv = m.citedVerse;
+        bodyHtml += `<button class="tom-verse-chip" onclick="openVerseFromTom('${cv.book}',${cv.chapter},${cv.verse})">&#128214; Open ${cv.book} ${cv.chapter}:${cv.verse} in The Word</button>`;
+      }
     }
 
     return `<div style="display:flex;flex-direction:column;align-items:${isTom?'flex-start':'flex-end'};">
@@ -3088,6 +3247,21 @@ function renderTomMessages(msgs){
     </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
+}
+
+// Deep-link from a Tom citation chip into the Word tab (Step 3). Switches
+// tabs immediately (same pattern as goToShipsOrderItem), then explicitly
+// awaits loadKJV() before opening the chapter — showTab('word',...) also
+// triggers its own KJV load, but that one's async and racing it would mean
+// openWordChapter() could run before the data (and the chapter's DOM) is
+// ready, silently failing the scroll-to-verse. loadKJV() dedupes concurrent
+// callers, so this doesn't cause a second fetch.
+function openVerseFromTom(book, chapter, verse){
+  const btn = document.querySelector('.bnb[onclick*="\'word\'"]');
+  showTab('word', btn);
+  loadKJV().then(() => {
+    openWordChapter(book, Number(chapter), { scrollToVerse: Number(verse) });
+  });
 }
 
 // Last few real exchanges as {role, content}, for follow-up continuity —
@@ -3162,6 +3336,10 @@ async function askTomChat(){
         text: 'Spend it wisely, sailor — use a wish?',
         pendingWish: true,
         realText: result.message,
+        // Held alongside realText until the wish is actually confirmed —
+        // confirmTomWish() promotes it into the visible message the same
+        // way it promotes realText into text.
+        citedVerse: result.citedVerse || null,
         category: result.category,
         type: result.type
       });
@@ -3176,7 +3354,9 @@ async function askTomChat(){
     // category/type persisted here (not just used transiently) so the
     // weekly report card can later summarize what a boy's actually been
     // asking Tom about — that data didn't exist in stewart/tomchat before.
-    await thinkingRef.update({ text: result.message, category: result.category, type: result.type });
+    // citedVerse (Step 3) lets the chat UI render a tappable deep-link
+    // into the Word tab instead of the citation being unreachable prose.
+    await thinkingRef.update({ text: result.message, citedVerse: result.citedVerse || null, category: result.category, type: result.type });
   }
 
   _tomSendLock = false;
@@ -3191,12 +3371,16 @@ async function confirmTomWish(key){
   try{
     const res = await callFunction('spendTomWish', { agentId: currentAgent.id, today: localDateStr() });
     if(res && res.data && res.data.spent){
+      // citedVerse (if any) was already sitting on this node from
+      // askTomChat() — left alone here so it survives into the revealed
+      // message; only cleared in the fallback branches below, where the
+      // real content (and any citation) never actually gets shown.
       await ref.update({ text: msg.realText, pendingWish: null, realText: null });
     } else {
-      await ref.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.", pendingWish: null, realText: null });
+      await ref.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.", pendingWish: null, realText: null, citedVerse: null });
     }
   }catch(e){
-    await ref.update({ text: "Couldn't confirm that just now, sailor — try again in a moment.", pendingWish: null, realText: null });
+    await ref.update({ text: "Couldn't confirm that just now, sailor — try again in a moment.", pendingWish: null, realText: null, citedVerse: null });
   }
   renderTomWishCounter();
 }
@@ -3206,7 +3390,8 @@ function cancelTomWish(key){
   _db.ref(`stewart/tomchat/${currentAgent.id}/${key}`).update({
     text: 'No worries — ask me something else anytime.',
     pendingWish: null,
-    realText: null
+    realText: null,
+    citedVerse: null
   });
 }
 
@@ -4827,12 +5012,399 @@ function renderFamilyDevotionalDisplay(){
   });
 }
 
+// ══════════════════════════════════════════════════════
+// THE WORD — Bible section data layer (Step 1 of the Word/Tutorial build)
+// Loads the same assets/kjv.json Tom's server-side lookupVerse already
+// uses for devotional grounding (functions/index.js) — one trusted
+// source, browsed here instead of duplicated. Structure is confirmed as
+// {book: {chapter: {verse: text}}}, string-keyed chapters/verses — direct
+// O(1) lookup for browsing and deep-linking, and flat enough that a
+// client-side keyword search (Step 2) can just linear-scan it; no
+// restructuring needed.
+//
+// Bookmarks and highlights are simple verse-reference-keyed entries under
+// stewart/bookmarks/{agentId} and stewart/highlights/{agentId}. The key
+// is a safe, reversible slug (spaces in a book name become underscores,
+// e.g. "1 Samuel" 17:45 -> "1_Samuel_17_45") rather than the raw
+// reference string — RTDB keys are fragile to build UI around when they
+// carry punctuation, and the human-readable book/chapter/verse are also
+// stored on the value itself so nothing ever needs to be reverse-parsed
+// from the key just to render a list.
+// ══════════════════════════════════════════════════════
+
+let _kjvData = null;
+let _kjvLoadPromise = null;
+function loadKJV(){
+  if(_kjvData) return Promise.resolve(_kjvData);
+  if(_kjvLoadPromise) return _kjvLoadPromise;
+  _kjvLoadPromise = fetch('../assets/kjv.json').then(r => r.json()).then(data => {
+    _kjvData = data;
+    return data;
+  });
+  return _kjvLoadPromise;
+}
+
+// Mirrors functions/index.js's normalizeBookName/BOOK_ALIASES exactly, so
+// a reference Tom cites server-side (Step 3 deep-link) resolves to the
+// same book here that it did there. Keep these two in sync if either
+// changes — there's no shared module between client and Cloud Functions
+// to enforce it automatically.
+const KJV_BOOK_ALIASES = {
+  'song of songs': 'Song of Solomon',
+  'canticles': 'Song of Solomon',
+  'psalm': 'Psalms',
+  'revelations': 'Revelation'
+};
+function normalizeBookName(raw, bookSet){
+  const trimmed = String(raw||'').trim();
+  if(bookSet.has(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if(KJV_BOOK_ALIASES[lower]) return KJV_BOOK_ALIASES[lower];
+  const found = [...bookSet].find(b => b.toLowerCase() === lower);
+  return found || null;
+}
+
+// "Book Chapter:Verse" (e.g. "1 Samuel 17:45"), tolerating a range
+// ("Matthew 5:43-44") by resolving just the first verse — same tolerance
+// as the server-side parser this mirrors.
+function parseVerseRef(ref){
+  const m = String(ref||'').trim().match(/^(.*?)\s+(\d+):(\d+)(?:-\d+)?$/);
+  if(!m) return null;
+  return { bookRaw: m[1], chapter: m[2], verse: m[3] };
+}
+
+function verseKey(book, chapter, verse){
+  return String(book).replace(/\s+/g,'_') + '_' + chapter + '_' + verse;
+}
+
+// Resolves a "Book Chapter:Verse" reference against the loaded KJV data —
+// returns {book, chapter, verse, text, key} or null if the reference
+// doesn't parse or the verse doesn't exist. One resolver used by
+// browsing, bookmarking, highlighting, and (Step 3) Tom's citation
+// deep-link, so all four always agree on what a given reference means.
+// Callers must await loadKJV() first — returns null rather than loading
+// on demand, so a resolve-in-a-loop (e.g. rendering a chapter) never
+// triggers redundant fetches.
+function resolveVerseRef(ref){
+  if(!_kjvData) return null;
+  const parsed = parseVerseRef(ref);
+  if(!parsed) return null;
+  const book = normalizeBookName(parsed.bookRaw, new Set(Object.keys(_kjvData)));
+  if(!book) return null;
+  const chapterData = _kjvData[book] && _kjvData[book][parsed.chapter];
+  const text = chapterData && chapterData[parsed.verse];
+  if(!text) return null;
+  return { book, chapter: parsed.chapter, verse: parsed.verse, text, key: verseKey(book, parsed.chapter, parsed.verse) };
+}
+
+// ─── Bookmarks (stewart/bookmarks/{agentId}/{verseKey}) ───
+
+function isVerseBookmarked(agentId, book, chapter, verse){
+  if(!_db) return Promise.resolve(false);
+  return _db.ref(`stewart/bookmarks/${agentId}/${verseKey(book,chapter,verse)}`).once('value').then(snap => snap.exists());
+}
+
+// Returns the new state (true = now bookmarked, false = now removed) so a
+// caller can update a button's appearance without a second read.
+function toggleBookmark(agentId, book, chapter, verse, text){
+  if(!_db) return Promise.resolve(false);
+  const ref = _db.ref(`stewart/bookmarks/${agentId}/${verseKey(book,chapter,verse)}`);
+  return ref.once('value').then(snap => {
+    if(snap.exists()) return ref.remove().then(() => false);
+    return ref.set({ book, chapter, verse, text, timestamp: Date.now() }).then(() => true);
+  });
+}
+
+function getBookmarks(agentId){
+  if(!_db) return Promise.resolve([]);
+  return _db.ref(`stewart/bookmarks/${agentId}`).once('value').then(snap => {
+    const all = snap.val() || {};
+    return Object.entries(all)
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+  });
+}
+
+// ─── Highlights (stewart/highlights/{agentId}/{verseKey}) ───
+// Same shape and mechanics as bookmarks, but a separate path rather than
+// a flag on the bookmark entry — a verse can be highlighted without being
+// bookmarked (and vice versa), and the Word tab (Step 2) needs to query/
+// style each independently while rendering a chapter.
+
+function isVerseHighlighted(agentId, book, chapter, verse){
+  if(!_db) return Promise.resolve(false);
+  return _db.ref(`stewart/highlights/${agentId}/${verseKey(book,chapter,verse)}`).once('value').then(snap => snap.exists());
+}
+
+function toggleHighlight(agentId, book, chapter, verse, text){
+  if(!_db) return Promise.resolve(false);
+  const ref = _db.ref(`stewart/highlights/${agentId}/${verseKey(book,chapter,verse)}`);
+  return ref.once('value').then(snap => {
+    if(snap.exists()) return ref.remove().then(() => false);
+    return ref.set({ book, chapter, verse, text, timestamp: Date.now() }).then(() => true);
+  });
+}
+
+function getHighlights(agentId){
+  if(!_db) return Promise.resolve([]);
+  return _db.ref(`stewart/highlights/${agentId}`).once('value').then(snap => {
+    const all = snap.val() || {};
+    return Object.entries(all)
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+  });
+}
+
+// ─── STEP 2: WORD TAB UI ───
+// _wordNav remembers browse position (book/chapter) across mode switches
+// within a visit, so tapping "My Verses" then back to "Browse" doesn't
+// lose where you were reading.
+let _wordMode = 'browse';
+let _wordNav = { book: null, chapter: null };
+const KJV_OT_BOOK_COUNT = 39; // Genesis..Malachi; the rest is New Testament
+
+function renderWordTab(){
+  loadKJV().then(() => {
+    if(_wordMode === 'browse') renderWordBrowse();
+    if(_wordMode === 'myverses') renderWordMyVerses();
+  }).catch(() => {
+    const el = document.getElementById('word-browse-view');
+    if(el) el.innerHTML = '<div class="empty">Could not load Scripture &mdash; check your connection and reopen this tab.</div>';
+  });
+}
+
+function setWordMode(mode){
+  _wordMode = mode;
+  ['browse','search','myverses'].forEach(m => {
+    const btn = document.getElementById('word-mode-btn-'+m);
+    const view = document.getElementById('word-'+m+'-view');
+    if(btn) btn.classList.toggle('active', m===mode);
+    if(view) view.style.display = (m===mode) ? '' : 'none';
+  });
+  if(mode === 'browse') renderWordBrowse();
+  if(mode === 'myverses') renderWordMyVerses();
+}
+
+// ── Browse: book grid -> chapter grid -> chapter verses ──
+
+function renderWordBrowse(){
+  const el = document.getElementById('word-browse-view');
+  if(!el || !_kjvData) return;
+  if(_wordNav.book && _wordNav.chapter) renderWordChapterView(el, _wordNav.book, _wordNav.chapter);
+  else if(_wordNav.book) renderWordChapterGrid(el, _wordNav.book);
+  else renderWordBookGrid(el);
+}
+
+function renderWordBookGrid(el){
+  const books = Object.keys(_kjvData);
+  const bookBtn = b => `<button class="word-book-btn" onclick="openWordBook('${b}')">${b}</button>`;
+  el.innerHTML = `
+    <div class="word-testament-label">Old Testament</div>
+    <div class="word-book-grid">${books.slice(0, KJV_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
+    <div class="word-testament-label">New Testament</div>
+    <div class="word-book-grid">${books.slice(KJV_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
+  `;
+}
+
+function openWordBook(book){
+  _wordNav.book = book;
+  _wordNav.chapter = null;
+  renderWordBrowse();
+}
+
+function backToWordBooks(){
+  _wordNav.book = null;
+  _wordNav.chapter = null;
+  renderWordBrowse();
+}
+
+function renderWordChapterGrid(el, book){
+  const chapters = Object.keys(_kjvData[book]).map(Number).sort((a,b) => a-b);
+  el.innerHTML = `
+    <div class="word-crumb"><button onclick="backToWordBooks()">&larr; Books</button><span class="sep">/</span><span>${book}</span></div>
+    <div class="word-chapter-grid">${chapters.map(c => `<button class="word-chapter-btn" onclick="openWordChapter('${book}',${c})">${c}</button>`).join('')}</div>
+  `;
+}
+
+// opts.scrollToVerse: used by search results and My Verses to jump
+// straight to a specific verse and briefly highlight its position.
+function openWordChapter(book, chapter, opts){
+  opts = opts || {};
+  _wordNav.book = book;
+  _wordNav.chapter = String(chapter);
+  if(_wordMode !== 'browse') setWordMode('browse');
+  else renderWordBrowse();
+  if(opts.scrollToVerse) setTimeout(() => scrollToWordVerse(opts.scrollToVerse), 80);
+}
+
+// Verse bookmark/highlight state is fetched once as a full snapshot (not
+// per-verse) so opening a chapter is a single round trip regardless of how
+// many verses it has.
+function renderWordChapterView(el, book, chapter){
+  const chapterData = _kjvData[book][chapter];
+  const verses = Object.keys(chapterData).map(Number).sort((a,b) => a-b);
+  const agentId = currentAgent.id;
+
+  el.innerHTML = `
+    <div class="word-crumb">
+      <button onclick="backToWordBooks()">&larr; Books</button><span class="sep">/</span>
+      <button onclick="openWordBook('${book}')">${book}</button><span class="sep">/</span>
+      <span>Chapter ${chapter}</span>
+    </div>
+    <div class="word-chapter-title">${book} ${chapter}</div>
+    <div id="word-verse-list"><div class="empty">Loading verses...</div></div>
+  `;
+
+  Promise.all([
+    _db.ref(`stewart/bookmarks/${agentId}`).once('value'),
+    _db.ref(`stewart/highlights/${agentId}`).once('value')
+  ]).then(([bmSnap, hlSnap]) => {
+    const bookmarkKeys = new Set(Object.keys(bmSnap.val() || {}));
+    const highlightKeys = new Set(Object.keys(hlSnap.val() || {}));
+    const listEl = document.getElementById('word-verse-list');
+    if(!listEl) return;
+    listEl.innerHTML = verses.map(v => {
+      const text = chapterData[v];
+      const key = verseKey(book, chapter, v);
+      const isHl = highlightKeys.has(key);
+      const isBm = bookmarkKeys.has(key);
+      return `<div class="word-verse" data-vkey="${key}">
+        <span class="word-verse-num">${v}</span>
+        <div class="word-verse-text${isHl?' hl':''}" onclick="onWordVerseTap(this,'${book}',${chapter},${v})">${escapeHtml(text)}</div>
+        <button class="word-bookmark-btn${isBm?' active':''}" onclick="onWordBookmarkTap(this,'${book}',${chapter},${v})" aria-label="Bookmark this verse">&#9733;</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+function scrollToWordVerse(verseNum){
+  const key = verseKey(_wordNav.book, _wordNav.chapter, verseNum);
+  const row = document.querySelector('#word-verse-list [data-vkey="'+key+'"]');
+  if(!row) return;
+  row.scrollIntoView({block:'center', behavior:'smooth'});
+  row.classList.add('target');
+  setTimeout(() => row.classList.remove('target'), 2300);
+}
+
+// Tap the verse text to toggle highlight — a single, direct interaction
+// (no confirm step), matching how tapping a mission checkbox works.
+// Updates just this element rather than re-rendering the chapter, so
+// scroll position never jumps mid-read.
+function onWordVerseTap(el, book, chapter, verse){
+  if(!currentAgent) return;
+  const text = _kjvData[book][chapter][verse];
+  toggleHighlight(currentAgent.id, book, String(chapter), String(verse), text).then(isHl => {
+    el.classList.toggle('hl', isHl);
+  });
+}
+
+// Bookmarking is the separate, explicit interaction (its own button) —
+// tapping the verse itself only ever toggles highlight.
+function onWordBookmarkTap(btn, book, chapter, verse){
+  if(!currentAgent) return;
+  const text = _kjvData[book][chapter][verse];
+  toggleBookmark(currentAgent.id, book, String(chapter), String(verse), text).then(isBm => {
+    btn.classList.toggle('active', isBm);
+  });
+}
+
+// ── Search: client-side linear scan over the full KJV (~31k verses) ──
+// Only runs on explicit submit (button/Enter), never on keystroke, so
+// there's no perf concern despite the full-book scan.
+const WORD_SEARCH_CAP = 50;
+function runWordSearch(){
+  const input = document.getElementById('word-search-input');
+  const query = input ? input.value.trim() : '';
+  const resultsEl = document.getElementById('word-search-results');
+  if(!resultsEl) return;
+  if(!query){ resultsEl.innerHTML = ''; return; }
+  if(!_kjvData){
+    resultsEl.innerHTML = '<div class="empty">Still loading Scripture &mdash; try again in a moment.</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="empty">Searching...</div>';
+
+  const needle = query.toLowerCase();
+  const matches = [];
+  search:
+  for(const book of Object.keys(_kjvData)){
+    const chapters = _kjvData[book];
+    for(const chapter of Object.keys(chapters)){
+      const versesInChapter = chapters[chapter];
+      for(const verse of Object.keys(versesInChapter)){
+        const text = versesInChapter[verse];
+        if(text.toLowerCase().includes(needle)){
+          matches.push({book, chapter, verse, text});
+          if(matches.length >= WORD_SEARCH_CAP) break search;
+        }
+      }
+    }
+  }
+
+  if(!matches.length){
+    resultsEl.innerHTML = '<div class="empty">No verses found for &ldquo;'+escapeHtml(query)+'&rdquo;.</div>';
+    return;
+  }
+
+  // No silent cap — a boy searching a common word ("love", "the") should
+  // see that the list was cut short, not think that's every match.
+  const metaHtml = matches.length >= WORD_SEARCH_CAP
+    ? `<div class="word-search-meta">Showing the first ${WORD_SEARCH_CAP} matches &mdash; try a more specific word for a shorter list.</div>`
+    : `<div class="word-search-meta">${matches.length} verse${matches.length===1?'':'s'} found.</div>`;
+
+  resultsEl.innerHTML = metaHtml + matches.map(m => `
+    <div class="word-search-result" onclick="openWordChapter('${m.book}',${m.chapter},{scrollToVerse:${m.verse}})">
+      <div class="word-search-ref">${m.book} ${m.chapter}:${m.verse}</div>
+      <div class="word-search-snippet">${highlightSearchTerm(m.text, query)}</div>
+    </div>`).join('');
+}
+
+function highlightSearchTerm(text, query){
+  const esc = escapeHtml(text);
+  const escQuery = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if(!escQuery) return esc;
+  return esc.replace(new RegExp('('+escQuery+')', 'ig'), '<mark>$1</mark>');
+}
+
+// ── My Verses: bookmarks and highlights, each tap-through to the chapter ──
+
+function renderWordMyVerses(){
+  if(!currentAgent) return;
+  const el = document.getElementById('word-myverses-view');
+  if(!el) return;
+  el.innerHTML = '<div class="empty">Loading your verses...</div>';
+
+  Promise.all([getBookmarks(currentAgent.id), getHighlights(currentAgent.id)]).then(([bookmarks, highlights]) => {
+    let html = '<div class="sec-head" style="margin-bottom:10px;"><div class="sec-head-diamond"></div><div class="sec-head-text">Bookmarked</div><div class="sec-head-line"></div></div>';
+    html += bookmarks.length
+      ? bookmarks.map(wordMyVerseItemHtml).join('')
+      : '<div class="empty">No bookmarks yet. Tap the star on any verse to save it here.</div>';
+
+    html += '<div class="sec-head" style="margin:18px 0 10px;"><div class="sec-head-diamond"></div><div class="sec-head-text">Highlighted</div><div class="sec-head-line"></div></div>';
+    html += highlights.length
+      ? highlights.map(wordMyVerseItemHtml).join('')
+      : '<div class="empty">No highlights yet. Tap any verse while reading to highlight it.</div>';
+
+    el.innerHTML = html;
+  });
+}
+
+function wordMyVerseItemHtml(v){
+  return `<div class="word-myverse-item" onclick="openWordChapter('${v.book}',${v.chapter},{scrollToVerse:${v.verse}})">
+    <div class="word-search-ref">${v.book} ${v.chapter}:${v.verse}</div>
+    <div class="word-search-snippet">${escapeHtml(v.text)}</div>
+  </div>`;
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
   if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) sendPrivateMessage(); });
 
   const ti = document.getElementById('tom-input');
   if(ti) ti.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) askTomChat(); });
+
+  const wsi = document.getElementById('word-search-input');
+  if(wsi) wsi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) runWordSearch(); });
 
   // ── Sign-out reminder: triggers once per visit when the mouse nears the
   //    bottom-right corner of the page (where they head to sign out / close up). ──
