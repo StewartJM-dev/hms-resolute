@@ -8,21 +8,91 @@
 // apart. Relies on a global `_db` (Firebase ref) already existing on the
 // page, same convention mission-engine.js uses.
 //
-// SCOPE NOTE (as of Step 1 of the Family Bible punch list): this file
-// currently covers only the NEW shared-family pieces — colors, verseKey,
-// highlights, notes. boys/index.html's own KJV-loading/verse-resolution
-// code (loadKJV, resolveVerseRef, etc., built for the earlier personal
-// Word tab) and its PERSONAL highlight mechanism
-// (stewart/highlights/{agentId}/{verseKey}) still live inline in that
-// file as of this commit. Step 2 (the actual Bible UI for Bridge and
-// Officers' Country) is where those get consolidated into this file too,
-// and boys/index.html gets migrated from personal highlights onto the
-// shared model below. Until that migration happens, verseKey() here MUST
-// stay byte-for-byte identical to boys/index.html's own copy — both
-// independently compute the same RTDB keys, and a personal Word-tab
-// highlight written under the old path won't show up under the new
-// shared one (or vice versa) if the two ever disagree on key format.
+// As of Step 2 of the Family Bible punch list, this file also owns the
+// KJV loading/verse-resolution code originally built inline in
+// boys/index.html for the personal Word tab (loadKJV, resolveVerseRef,
+// etc.) — moved here so Bridge and Officers' Country can browse/search/
+// resolve verses identically instead of reimplementing it. boys/index.html
+// now loads this file and no longer keeps its own copies.
 // ════════════════════════════════════════════════════
+
+// Loads the same assets/kjv.json Tom's server-side lookupVerse already
+// uses for devotional grounding (functions/index.js) — one trusted
+// source, browsed here instead of duplicated. Structure is confirmed as
+// {book: {chapter: {verse: text}}}, string-keyed chapters/verses — direct
+// O(1) lookup for browsing and deep-linking, and flat enough that a
+// client-side keyword search can just linear-scan it; no restructuring
+// needed. Every page loading this file is one directory below the repo
+// root (boys/, bridge/, dashboard/), so the relative path is the same
+// for all three.
+let _kjvData = null;
+let _kjvLoadPromise = null;
+function loadKJV(){
+  if(_kjvData) return Promise.resolve(_kjvData);
+  if(_kjvLoadPromise) return _kjvLoadPromise;
+  _kjvLoadPromise = fetch('../assets/kjv.json').then(r => r.json()).then(data => {
+    _kjvData = data;
+    return data;
+  });
+  return _kjvLoadPromise;
+}
+
+// Mirrors functions/index.js's normalizeBookName/BOOK_ALIASES exactly, so
+// a reference Tom or Tink cites server-side resolves to the same book
+// here that it did there. Keep these two in sync if either changes —
+// there's no shared module between client and Cloud Functions to enforce
+// it automatically.
+const KJV_BOOK_ALIASES = {
+  'song of songs': 'Song of Solomon',
+  'canticles': 'Song of Solomon',
+  'psalm': 'Psalms',
+  'revelations': 'Revelation'
+};
+function normalizeBookName(raw, bookSet){
+  const trimmed = String(raw||'').trim();
+  if(bookSet.has(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if(KJV_BOOK_ALIASES[lower]) return KJV_BOOK_ALIASES[lower];
+  const found = [...bookSet].find(b => b.toLowerCase() === lower);
+  return found || null;
+}
+
+// "Book Chapter:Verse" (e.g. "1 Samuel 17:45"), tolerating a range
+// ("Matthew 5:43-44") by resolving just the first verse — same tolerance
+// as the server-side parser this mirrors.
+function parseVerseRef(ref){
+  const m = String(ref||'').trim().match(/^(.*?)\s+(\d+):(\d+)(?:-\d+)?$/);
+  if(!m) return null;
+  return { bookRaw: m[1], chapter: m[2], verse: m[3] };
+}
+
+// Reversible, RTDB-safe verse key — spaces in a book name become
+// underscores (e.g. "1 Samuel" 17:45 -> "1_Samuel_17_45"). The single
+// source of truth for this format everywhere in the app — highlights,
+// notes, bookmarks, and citation deep-links all key off this.
+function verseKey(book, chapter, verse){
+  return String(book).replace(/\s+/g,'_') + '_' + chapter + '_' + verse;
+}
+
+// Resolves a "Book Chapter:Verse" reference against the loaded KJV data —
+// returns {book, chapter, verse, text, key} or null if the reference
+// doesn't parse or the verse doesn't exist. One resolver used by
+// browsing, bookmarking, highlighting, notes, and citation deep-links, so
+// all of them always agree on what a given reference means. Callers must
+// await loadKJV() first — returns null rather than loading on demand, so
+// a resolve-in-a-loop (e.g. rendering a chapter) never triggers redundant
+// fetches.
+function resolveVerseRef(ref){
+  if(!_kjvData) return null;
+  const parsed = parseVerseRef(ref);
+  if(!parsed) return null;
+  const book = normalizeBookName(parsed.bookRaw, new Set(Object.keys(_kjvData)));
+  if(!book) return null;
+  const chapterData = _kjvData[book] && _kjvData[book][parsed.chapter];
+  const text = chapterData && chapterData[parsed.verse];
+  if(!text) return null;
+  return { book, chapter: parsed.chapter, verse: parsed.verse, text, key: verseKey(book, parsed.chapter, parsed.verse) };
+}
 
 // Every family member's fixed, permanent color — reused everywhere a
 // highlight or attribution needs to visually identify who it belongs to.
@@ -53,12 +123,6 @@ const FAMILY_DISPLAY_NAMES = {
 
 const FAMILY_PERSON_IDS = Object.keys(FAMILY_COLORS);
 
-// Reversible, RTDB-safe verse key — spaces in a book name become
-// underscores (e.g. "1 Samuel" 17:45 -> "1_Samuel_17_45"). MUST match
-// boys/index.html's own verseKey() exactly — see file header.
-function verseKey(book, chapter, verse){
-  return String(book).replace(/\s+/g,'_') + '_' + chapter + '_' + verse;
-}
 
 // The startAt/endAt('') pair is the standard Firebase technique for
 // a "starts with" range query over lexicographically-sorted keys. Every
