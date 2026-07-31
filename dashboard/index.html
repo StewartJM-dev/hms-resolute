@@ -711,7 +711,7 @@ body{
 
       <div class="sec-hd">This Week — Chore Grid</div>
       <div id="week-grid-wrap" style="margin-bottom:8px;"></div>
-      <div style="font-size:11px;opacity:.6;text-align:center;margin-bottom:18px;">Every chore, every day this week, at a glance.</div>
+      <div style="font-size:11px;opacity:.6;text-align:center;margin-bottom:18px;">Every chore shown day by day; counts above are eligible chores only (excludes Computer Missions &amp; Officer of the Watch), same as pay and the weekly report card.</div>
     </div>
 
 
@@ -1958,16 +1958,21 @@ function renderWeekGrid(){
       let daysHtml = '';
       days.forEach((d, di) => {
         const dObj = new Date(d+'T12:00:00');
-        const assigned = buildMissions(a.id, dObj);
+        const assigned = buildMissions(a.id, dObj); // full list — drives the checklist below, unfiltered
+        // Same "eligible" definition as pay and the report card (excludes
+        // Computer Missions and Officer of the Watch) — this is what the
+        // count badges show, so this grid, the other grid, pay, and the
+        // report card all agree on the same number for the same day.
+        const eligible = assigned.filter(m => m.category !== 'computer' && m.category !== 'officer-of-the-watch');
         const done = all[ai][di].val() || {};
         const isFuture = d > today;
         const isToday = d === today;
+        const eligibleDone = eligible.filter(m => !!done[m.id]).length;
         if(!isFuture){
-          weekAssigned += assigned.length;
-          weekDone += assigned.filter(m => !!done[m.id]).length;
+          weekAssigned += eligible.length;
+          weekDone += eligibleDone;
         }
         const dayLabel = dayNames[di] + ' ' + d.slice(5).replace('-','/');
-        const doneCount = assigned.filter(m => !!done[m.id]).length;
 
         let itemsHtml;
         if(isFuture){
@@ -1982,7 +1987,7 @@ function renderWeekGrid(){
         const dayId = 'bwc-day-'+a.id+'-'+d;
         daysHtml += '<div class="bwc-day'+(isToday?' bwc-today open':'')+(isFuture?' bwc-future':'')+'" id="'+dayId+'">'+
           '<div class="bwc-day-hd" onclick="toggleBwcDay(\''+dayId+'\')"><span>'+dayLabel+'<span class="bwc-day-chevron">&#9662;</span></span>'+
-          (isFuture ? '<span class="bwc-upcoming">Upcoming</span>' : '<span class="bwc-day-count">'+doneCount+'/'+assigned.length+'</span>')+
+          (isFuture ? '<span class="bwc-upcoming">Upcoming</span>' : '<span class="bwc-day-count" title="Eligible chores completed">'+eligibleDone+'/'+eligible.length+'</span>')+
           '</div>'+
           '<div class="bwc-day-body"><ul class="bwc-checklist">'+itemsHtml+'</ul></div>'+
         '</div>';
@@ -1993,7 +1998,7 @@ function renderWeekGrid(){
 
       html += '<div class="bwc-card" id="bwc-'+a.id+'">'+
         '<div class="bwc-head" onclick="toggleBwcCard(\''+a.id+'\')"><span class="bwc-name">'+a.icon+' '+a.name+'</span>'+
-        '<span><span class="bwc-total '+totalCls+'">'+weekDone+' / '+weekAssigned+' this week</span><span class="bwc-chevron">▾</span></span></div>'+
+        '<span><span class="bwc-total '+totalCls+'" title="Excludes Computer Missions and Officer of the Watch">Eligible chores: '+weekDone+' / '+weekAssigned+' this week</span><span class="bwc-chevron">▾</span></span></div>'+
         '<div class="bwc-days">'+daysHtml+'</div>'+
       '</div>';
     });

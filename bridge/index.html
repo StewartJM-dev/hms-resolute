@@ -355,7 +355,7 @@ body{
 .bwg th,.bwg td{border:1px solid rgba(200,160,70,.2);padding:6px 3px;text-align:center;}
 .bwg th{font-family:'Cinzel',serif;font-size:10px;color:var(--gold2,#e8b84a);font-weight:700;}
 .bwg th.bwg-agent,.bwg td.bwg-agent{text-align:left;padding-left:7px;white-space:nowrap;font-family:'Cinzel',serif;font-size:12px;color:#f6efe0;}
-.bwg td.bwg-cell{font-weight:700;font-family:'Lato',sans-serif;}
+.bwg td.bwg-cell{font-weight:700;font-family:'Lato',sans-serif;white-space:nowrap;}
 .bwg td.bwg-hi{background:rgba(47,212,95,.22);color:#9affb4;}
 .bwg td.bwg-mid{background:rgba(232,184,74,.18);color:#ffe08a;}
 .bwg td.bwg-lo{background:rgba(224,80,80,.16);color:#ff9b9b;}
@@ -482,7 +482,7 @@ body{
 
     <div class="shead">This Week — Chore Log</div>
     <div id="bridge-week-grid"></div>
-    <div style="font-size:11px;opacity:.55;text-align:center;margin-top:6px;">Chores completed each day. Fills as the week goes.</div>
+    <div style="font-size:11px;opacity:.55;text-align:center;margin-top:6px;">Eligible chores completed each day (excludes Computer Missions &amp; Officer of the Watch), same as pay and the weekly report card. Fills as the week goes.</div>
 
     <!-- WEEKLY REPORT CARD -->
     <div class="shead">Weekly Report Card</div>
@@ -1597,16 +1597,17 @@ function renderBridgeWeekGrid(){
   Promise.all(AGENTS.map(a =>
     Promise.all(days.map(d => _db.ref('stewart/missions/'+a.id+'/'+d).once('value')))
   )).then(all=>{
-    // find the week's max completed count to scale color thresholds sensibly
-    let maxDone=0;
-    const counts=AGENTS.map((a,ai)=>days.map((d,di)=>{
-      const v=all[ai][di].val()||{};
-      const n=Object.keys(v).filter(k=>v[k]).length;
-      if(n>maxDone) maxDone=n;
-      return n;
+    // Same "eligible" definition as pay, the report card, and Officers'
+    // Country's chore grid (excludes Computer Missions and Officer of the
+    // Watch) — this used to be a bare, unfiltered count of every checked
+    // box with no denominator at all, which is exactly why this grid and
+    // Officers' Country's could show different numbers for the same day.
+    const cells=AGENTS.map((a,ai)=>days.map((d,di)=>{
+      const done=all[ai][di].val()||{};
+      const dObj=new Date(d+'T12:00:00');
+      const eligible=buildMissions(a.id, dObj).filter(m => m.category !== 'computer' && m.category !== 'officer-of-the-watch');
+      return { n: eligible.filter(m=>done[m.id]).length, total: eligible.length };
     }));
-    const hiThresh=Math.max(6, Math.round(maxDone*0.75)); // "high" if near the week's best
-    const midThresh=1;
     let html='<table class="bwg"><thead><tr><th class="bwg-agent">Crew</th>';
     days.forEach((d,i)=>{ html+='<th>'+dayNames[i]+'<span class="bwg-mini">'+d.slice(5).replace('-','/')+'</span></th>'; });
     html+='</tr></thead><tbody>';
@@ -1615,10 +1616,11 @@ function renderBridgeWeekGrid(){
       days.forEach((d,di)=>{
         const isFuture = d>today;
         if(isFuture){ html+='<td class="bwg-cell bwg-future">—</td>'; return; }
-        const n=counts[ai][di];
-        const cls = n>=hiThresh?'bwg-hi':(n>=midThresh?'bwg-mid':'bwg-lo');
+        const {n, total} = cells[ai][di];
+        const ratio = total>0 ? n/total : 0;
+        const cls = ratio>=0.75?'bwg-hi':(n>0?'bwg-mid':'bwg-lo');
         const todayCls = d===today?' bwg-today':'';
-        html+='<td class="bwg-cell '+cls+todayCls+'">'+n+'</td>';
+        html+='<td class="bwg-cell '+cls+todayCls+'" title="Eligible chores completed">'+n+'/'+total+'</td>';
       });
       html+='</tr>';
     });
