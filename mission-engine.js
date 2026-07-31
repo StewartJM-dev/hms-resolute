@@ -148,12 +148,18 @@ function calculateDayScore(agentId, missions, doneMap){
   // of transfer credits/behavior deductions, which only ever adjust the
   // points100 score above, not this figure — matches the exact rule as
   // given, with no adjustment factored in unless asked for separately.
-  const payableMissions = missions.filter(m => m.category !== 'computer' && m.category !== 'officer-of-the-watch');
-  const payableCompleted = payableMissions.filter(m => doneMap[m.id]).length;
-  const dollars = payableMissions.length > 0 ? (payableCompleted / payableMissions.length) : 0;
+  // "Eligible" is the same payable-mission definition used for pay, and now
+  // the single shared definition for any raw completed/total count shown
+  // anywhere in the app (report card, both weekly chore-log grids) — one
+  // definition, not a third one invented per surface.
+  const eligibleMissions = missions.filter(m => m.category !== 'computer' && m.category !== 'officer-of-the-watch');
+  const eligibleCompleted = eligibleMissions.filter(m => doneMap[m.id]).length;
+  const eligibleTotal = eligibleMissions.length;
+  const dollars = eligibleTotal > 0 ? (eligibleCompleted / eligibleTotal) : 0;
 
   return {
     earned, possible, pct,
+    eligibleCompleted, eligibleTotal,
     points100: Math.round(pct * 100),
     dollars,
     minutes: pct * 6
@@ -241,7 +247,8 @@ function recalculateScore(agentId, dateStr){
       return Promise.all([
         _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null),
         _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(0),
-        _db.ref(`stewart/pay/${agentId}/${dateStr}`).set(null)
+        _db.ref(`stewart/pay/${agentId}/${dateStr}`).set(null),
+        _db.ref(`stewart/eligible/${agentId}/${dateStr}`).set(null)
       ]);
     }
 
@@ -262,7 +269,13 @@ function recalculateScore(agentId, dateStr){
       // display time. Deliberately NOT adjusted by transferAdjust/
       // deductions, matching calculateDayScore's own dollars — those only
       // ever move the points100 score above.
-      _db.ref(`stewart/pay/${agentId}/${dateStr}`).set(base.dollars)
+      _db.ref(`stewart/pay/${agentId}/${dateStr}`).set(base.dollars),
+      // Raw completed/total eligible-mission count, same definition as pay
+      // — lets any surface (report card, chore-log grids) show real counts
+      // alongside the percentage score without needing its own copy of
+      // buildMissions to compute one (the report card in particular runs
+      // server-side, where mission-engine.js isn't loaded at all).
+      _db.ref(`stewart/eligible/${agentId}/${dateStr}`).set({ completed: base.eligibleCompleted, total: base.eligibleTotal })
     ]);
   });
 }

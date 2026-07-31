@@ -1251,8 +1251,9 @@ async function fetchBoyWeekData(agentId, dates) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
 
-  const [scoreSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations] = await Promise.all([
+  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations] = await Promise.all([
     Promise.all(dates.map(date => db.ref(`stewart/scores/${agentId}/${date}`).once('value'))),
+    Promise.all(dates.map(date => db.ref(`stewart/eligible/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/deductions/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/wishes/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value'))),
@@ -1263,6 +1264,7 @@ async function fetchBoyWeekData(agentId, dates) {
 
   const days = dates.map((date, i) => {
     const score = scoreSnaps[i].val();
+    const eligible = eligibleSnaps[i].val();
     const deductions = deductionSnaps[i].val() || {};
     const wishes = wishSnaps[i].val() || {};
     const strikeRec = strikeSnaps[i].val() || {};
@@ -1270,6 +1272,14 @@ async function fetchBoyWeekData(agentId, dates) {
     return {
       date,
       score: (score === undefined || score === null) ? null : score,
+      // Same "eligible" definition as pay: excludes Computer Missions and
+      // Officer of the Watch checks. Real completed/total counts, not a
+      // second copy of the percentage — lets the write-up cite both
+      // ("scored 73% — 11 of 15 eligible chores") instead of leaving score
+      // as the only number, which is what made this look mismatched
+      // against the chore-log grids in the first place.
+      eligibleCompleted: (eligible && typeof eligible.completed === 'number') ? eligible.completed : null,
+      eligibleTotal: (eligible && typeof eligible.total === 'number') ? eligible.total : null,
       deductionTotal: Object.values(deductions).reduce((a, b) => a + b, 0),
       deductionReasons: Object.keys(deductions),
       wishesEarned: wishes.earned || 0,
@@ -1283,6 +1293,8 @@ async function fetchBoyWeekData(agentId, dates) {
   const totals = {
     daysScored: scoredDays.length,
     avgScore: scoredDays.length ? Math.round(scoredDays.reduce((a, d) => a + d.score, 0) / scoredDays.length) : null,
+    totalEligibleCompleted: days.reduce((a, d) => a + (d.eligibleCompleted || 0), 0),
+    totalEligibleAssigned: days.reduce((a, d) => a + (d.eligibleTotal || 0), 0),
     totalDeductions: days.reduce((a, d) => a + d.deductionTotal, 0),
     totalWishesEarned: days.reduce((a, d) => a + d.wishesEarned, 0),
     totalWishesUsed: days.reduce((a, d) => a + d.wishesUsed, 0),
@@ -1411,9 +1423,11 @@ async function aggregateWeeklyReportData(weekOf) {
 // ════════════════════════════════════════════════════
 const REPORT_WRITEUP_MODEL = 'claude-sonnet-4-6';
 
-const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, White Glove room-inspection results, and each boy's conversations with Tom (his AI companion) that week.
+const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, raw eligible-chore completed/total counts, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, White Glove room-inspection results, and each boy's conversations with Tom (his AI companion) that week.
 
 Write like a sharp, honest coach's report, not a form letter. Be specific: cite real days, real numbers, real patterns ("completed every morning round, missed evening three times" — not "did well overall"). Note trends across the week (improving, slipping, consistent) where the data actually shows one. If a category has no data for the week (e.g. zero strikes, zero Courage Dare entries), say so plainly and briefly rather than padding — absence of a problem is itself useful information, but don't manufacture insight where there isn't any.
+
+Each day has BOTH a "score" (0-100%, weighted by how many points each chore is worth) and a raw "eligibleCompleted"/"eligibleTotal" count (how many actual chores he finished out of how many he had, excluding Computer Missions and Officer of the Watch checks — the same two things already excluded from score). These are genuinely different numbers and can diverge (a boy can finish most of his LOW-point chores and skip a big one, giving a lower score than his completed-count alone would suggest, or the reverse). Cite BOTH together at least once per boy's summary, e.g. "scored 73% — 11 of 15 eligible chores" — don't make the parent reconcile a percentage against what they see on the chore-log grid themselves. Use totalEligibleCompleted/totalEligibleAssigned the same way for the week-level pattern.
 
 Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
 
