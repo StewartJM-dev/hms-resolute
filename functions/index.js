@@ -1812,6 +1812,86 @@ async function fetchDawnWeekData(dates) {
   return { tinkUsage, growthWeekly: growthWeeklySnap.val() || null };
 }
 
+// War Room prayer requests (resolute/prayer/requests, .../valor) and
+// Crow's Nest praises (resolute/crowsnest) live under the resolute/ root,
+// not stewart/ like everything else this report card pulls from — but
+// `db` here (functions/index.js:12, admin.database()) is a reference to
+// the whole database, not scoped to one root, so db.ref('resolute/...')
+// reads exactly the same way db.ref('stewart/...') does everywhere else
+// in this file. No special handling needed for the root difference.
+
+// Each boy's own name/aliases, for attributing a prayer request's freeform
+// "forWho" text to a specific boy when he wasn't the one who submitted it
+// (e.g. Dawn submits "pray for Stephen's game tomorrow"). Deliberately
+// narrower than Tink's BOY_NAME_PATTERN gate (which only needs to detect
+// *a* boy was mentioned) — this needs to say *which* boy.
+const BOY_NAME_ALIASES = {
+  samuel: /\b(samuel|sam)\b/i,
+  johnjr: /\b(john\s*jr\.?|johnjr|j\.?\s*j\.?)\b/i,
+  stephen: /\b(stephen|steve)\b/i,
+  daniel: /\b(daniel|dan|danny)\b/i
+};
+function matchBoyInText(text) {
+  if (!text) return null;
+  return ALLOWED_AGENT_IDS.find(id => BOY_NAME_ALIASES[id].test(text)) || null;
+}
+
+// Attributes a prayer request to a boy if HE submitted it (by === his
+// agentId — takes priority, since that's a real, unambiguous action of
+// his that week) or, failing that, if the freeform "forWho" text clearly
+// names him (someone else prayed for him by name). Anything that matches
+// neither goes to "household" — parent-submitted requests for people
+// outside the family, general family requests, etc. Only reads
+// resolute/prayer/requests (approved/active/answered/retired), not
+// resolute/prayer/pending — a still-unreviewed submission a parent
+// hasn't even seen yet isn't something to surface in a report card.
+async function fetchPrayerWeekData(weekStartMs, weekEndMs) {
+  const [reqSnap, valorSnap] = await Promise.all([
+    db.ref('resolute/prayer/requests').once('value'),
+    db.ref('resolute/prayer/valor').once('value')
+  ]);
+  const requests = Object.values(reqSnap.val() || {})
+    .filter(r => r && typeof r.created === 'number' && r.created >= weekStartMs && r.created < weekEndMs);
+  const answered = Object.values(valorSnap.val() || {})
+    .filter(r => r && typeof r.answered === 'number' && r.answered >= weekStartMs && r.answered < weekEndMs);
+
+  const byBoy = {};
+  ALLOWED_AGENT_IDS.forEach(id => { byBoy[id] = { submitted: [], answered: [] }; });
+  const household = { submitted: [], answered: [] };
+
+  const attribute = r => (ALLOWED_AGENT_IDS.includes(r.by) ? r.by : null) || matchBoyInText(r.forWho);
+
+  requests.forEach(r => {
+    const bucket = attribute(r) ? byBoy[attribute(r)].submitted : household.submitted;
+    bucket.push({ forWho: r.forWho, txt: r.txt, by: r.by });
+  });
+  answered.forEach(r => {
+    const bucket = attribute(r) ? byBoy[attribute(r)].answered : household.answered;
+    bucket.push({ forWho: r.forWho, txt: r.txt, how: r.how });
+  });
+
+  return { byBoy, household };
+}
+
+// Crow's Nest entries are keyed by who logged them (john/dawn/samuel/
+// johnjr/stephen/daniel — a plain select, crowsnest/index.html) — a
+// clean, unambiguous signal, unlike prayer's freeform "forWho".
+async function fetchCrowsnestWeekData(weekStartMs, weekEndMs) {
+  const snap = await db.ref('resolute/crowsnest').once('value');
+  const entries = Object.values(snap.val() || {})
+    .filter(e => e && typeof e.t === 'number' && e.t >= weekStartMs && e.t < weekEndMs);
+
+  const byBoy = {};
+  ALLOWED_AGENT_IDS.forEach(id => { byBoy[id] = []; });
+  const household = [];
+
+  entries.forEach(e => {
+    (ALLOWED_AGENT_IDS.includes(e.who) ? byBoy[e.who] : household).push({ txt: e.txt });
+  });
+
+  return { byBoy, household };
+}
+
 // Shared by both the scheduled Monday auto-run and the on-demand callable
 // check-in — same aggregation logic, different weekOf, same output
 // location, so Bridge and Officers' Country can never see different data.
@@ -1819,15 +1899,27 @@ async function aggregateWeeklyReportData(weekOf) {
   const weekEnd = formatDateStr(new Date(parseDateStr(weekOf).getTime() + 6 * 24 * 60 * 60 * 1000));
   const dates = dateRange(weekOf, weekEnd, 7);
   const todayStr = easternDateStr();
+  const weekStartMs = parseDateStr(dates[0]).getTime();
+  const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000;
 
-  const [boys, whiteglove, dawn] = await Promise.all([
+  const [boys, whiteglove, dawn, prayer, crowsnest] = await Promise.all([
     Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates))),
     fetchWhiteGloveWeekData(dates),
-    fetchDawnWeekData(dates)
+    fetchDawnWeekData(dates),
+    fetchPrayerWeekData(weekStartMs, weekEndMs),
+    fetchCrowsnestWeekData(weekStartMs, weekEndMs)
   ]);
 
   const boysById = {};
   boys.forEach(b => { boysById[b.agentId] = b; });
+  // Merged inline onto each boy's own object (alongside days/totals/
+  // tomConversations/etc) rather than left as a separate top-level
+  // lookup — everything attributable to a specific boy lives in one
+  // place, matching how the rest of fetchBoyWeekData's shape works.
+  ALLOWED_AGENT_IDS.forEach(id => {
+    boysById[id].prayer = prayer.byBoy[id];
+    boysById[id].crowsnest = crowsnest.byBoy[id];
+  });
 
   const report = {
     weekOf,
@@ -1836,7 +1928,9 @@ async function aggregateWeeklyReportData(weekOf) {
     isPartialWeek: weekEnd > todayStr, // string comparison is valid for YYYY-MM-DD
     boys: boysById,
     whiteglove,
-    dawn
+    dawn,
+    prayerHousehold: prayer.household,
+    crowsnestHousehold: crowsnest.household
   };
 
   await db.ref(`stewart/reportcards/${weekOf}`).set(report);
@@ -1850,7 +1944,7 @@ async function aggregateWeeklyReportData(weekOf) {
 // ════════════════════════════════════════════════════
 const REPORT_WRITEUP_MODEL = 'claude-sonnet-4-6';
 
-const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, raw eligible-chore completed/total counts, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, White Glove room-inspection results, and each boy's conversations with Tom (his AI companion) that week.
+const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summaries for parents (John and Dawn) reviewing their four boys' week in a family chore-tracking app. You will be given real structured data for one week — chore scores, raw eligible-chore completed/total counts, deductions, wish usage, moderation strikes (with category and day), Courage Dare devotional completions, White Glove room-inspection results, each boy's conversations with Tom (his AI companion), prayer requests, and Crow's Nest praise entries that week.
 
 Write like a sharp, honest coach's report, not a form letter. Be specific: cite real days, real numbers, real patterns ("completed every morning round, missed evening three times" — not "did well overall"). Note trends across the week (improving, slipping, consistent) where the data actually shows one. If a category has no data for the week (e.g. zero strikes, zero Courage Dare entries), say so plainly and briefly rather than padding — absence of a problem is itself useful information, but don't manufacture insight where there isn't any.
 
@@ -1860,9 +1954,11 @@ Each day also carries a "ranOutOfTime" flag (true/false) — set from the Bridge
 
 Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
 
+Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{forWho,txt,how}]}) and "crowsnest" ([{txt}]) — prayer requests attributed to him (either he submitted it himself, or someone else's request was clearly for him by name) and Crow's Nest praise/gratitude entries he personally logged that week. These are genuine spiritual-life signals worth a brief, warm mention if present — a boy bringing a real prayer request, one of his being answered, or him logging something he saw God do all say something worth John/Dawn knowing, distinct from the chore/behavior data. Don't force a mention if both are empty; one clause at most, don't dwell on it. Don't quote a prayer request or praise entry verbatim if it's sensitive-sounding — summarize gently, the same restraint you'd use for a Tom conversation.
+
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
-The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.`;
+The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.`;
 
 const REPORT_WRITEUP_SCHEMA = {
   type: 'object',
@@ -1893,7 +1989,7 @@ async function generateReportCardWriteup(reportData) {
     output_config: { format: { type: 'json_schema', schema: REPORT_WRITEUP_SCHEMA } },
     messages: [{
       role: 'user',
-      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn })}`
+      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold })}`
     }]
   });
 
