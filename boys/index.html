@@ -480,6 +480,63 @@ body::before{
   font-style:italic;
 }
 
+/* THE WORD (Bible section) */
+.word-mode-row{display:flex;gap:6px;margin-bottom:14px;}
+.word-mode-btn{
+  flex:1;padding:9px 6px;border-radius:8px;
+  border:1px solid rgba(12,200,200,.3);background:transparent;
+  color:rgba(255,255,255,.5);font-family:'Orbitron',sans-serif;
+  font-size:9px;letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;transition:all .2s;
+}
+.word-mode-btn.active{background:var(--teal);border-color:var(--teal);color:var(--black);}
+
+.word-crumb{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:11px;color:rgba(255,255,255,.5);flex-wrap:wrap;}
+.word-crumb button{background:none;border:none;color:var(--teal3);cursor:pointer;font-size:11px;padding:2px 0;font-family:'Exo 2',sans-serif;}
+.word-crumb .sep{opacity:.4;}
+
+.word-testament-label{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.3);margin:14px 0 8px;}
+.word-testament-label:first-child{margin-top:0;}
+.word-book-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.word-book-btn{
+  padding:10px 6px;border-radius:8px;
+  background:var(--dark2);border:1px solid rgba(12,200,200,.15);
+  color:var(--white);font-size:11px;text-align:center;
+  cursor:pointer;
+}
+.word-book-btn:active{background:rgba(12,200,200,.15);}
+
+.word-chapter-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.word-chapter-btn{
+  aspect-ratio:1;border-radius:6px;
+  background:var(--dark2);border:1px solid rgba(12,200,200,.15);
+  color:var(--white);font-size:12px;font-family:'Orbitron',sans-serif;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.word-chapter-btn:active{background:rgba(12,200,200,.15);}
+
+.word-chapter-title{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;color:var(--gold);margin-bottom:10px;}
+.word-verse{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+.word-verse-num{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--teal2);flex-shrink:0;width:20px;text-align:right;padding-top:3px;}
+.word-verse-text{flex:1;font-size:14px;line-height:1.65;color:var(--white);cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s;}
+.word-verse-text.hl{background:rgba(232,184,74,.22);}
+.word-verse.target{animation:word-target-flash 2.2s ease-out;border-radius:6px;}
+@keyframes word-target-flash{0%,35%{outline:2px solid var(--teal3);outline-offset:3px;border-radius:6px;}100%{outline:2px solid transparent;outline-offset:3px;}}
+.word-bookmark-btn{background:none;border:none;color:rgba(255,255,255,.25);font-size:16px;cursor:pointer;flex-shrink:0;padding:2px 4px;line-height:1;}
+.word-bookmark-btn.active{color:var(--gold);}
+
+.word-search-row{display:flex;gap:8px;margin-bottom:12px;}
+.word-search-input{flex:1;padding:10px 12px;border-radius:20px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;}
+.word-search-go{width:38px;height:38px;border-radius:50%;background:var(--teal);border:none;cursor:pointer;color:var(--black);font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.word-search-meta{font-size:10.5px;color:rgba(255,255,255,.4);margin-bottom:10px;font-style:italic;}
+.word-search-result{background:var(--dark2);border:1px solid rgba(12,200,200,.15);border-left:3px solid var(--teal);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
+.word-search-ref{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:var(--teal2);margin-bottom:4px;}
+.word-search-snippet{font-size:12.5px;color:rgba(255,255,255,.85);line-height:1.5;}
+.word-search-snippet mark{background:rgba(232,184,74,.35);color:var(--white);border-radius:2px;}
+
+.word-myverse-item{background:var(--dark2);border:1px solid rgba(12,200,200,.15);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;}
+.word-myverse-item .word-search-ref{color:var(--gold);}
+
 /* STATUS BADGE */
 .status-badge{
   display:inline-flex;align-items:center;gap:5px;
@@ -504,6 +561,7 @@ body.theme-alpha .lunch-day-btn.active{background:var(--alpha2);border-color:var
 body.theme-alpha .lunch-option.selected{border-color:var(--alpha2);background:rgba(30,58,110,.12);}
 body.theme-alpha .lunch-option.selected .lunch-opt-check{background:var(--alpha2);border-color:var(--alpha2);}
 body.theme-alpha .mission-check.done{background:var(--alpha2);border-color:var(--alpha2);}
+body.theme-alpha .word-mode-btn.active{background:var(--alpha2);border-color:var(--alpha2);}
 
 body.theme-bravo .topbar{border-bottom-color:var(--bravo2);}
 body.theme-bravo .topbar-codename{color:var(--bravo2);}
@@ -516,6 +574,7 @@ body.theme-bravo .lunch-day-btn.active{background:var(--bravo2);border-color:var
 body.theme-bravo .lunch-option.selected{border-color:var(--bravo2);background:rgba(110,30,30,.12);}
 body.theme-bravo .lunch-option.selected .lunch-opt-check{background:var(--bravo2);border-color:var(--bravo2);}
 body.theme-bravo .mission-check.done{background:var(--bravo2);border-color:var(--bravo2);}
+body.theme-bravo .word-mode-btn.active{background:var(--bravo2);border-color:var(--bravo2);}
 
 body.theme-dino .topbar{border-bottom-color:var(--dino2);}
 body.theme-dino .topbar-codename{color:var(--dino2);}
@@ -528,6 +587,7 @@ body.theme-dino .lunch-day-btn.active{background:var(--dino2);border-color:var(-
 body.theme-dino .lunch-option.selected{border-color:var(--dino2);background:rgba(30,92,42,.12);}
 body.theme-dino .lunch-option.selected .lunch-opt-check{background:var(--dino2);border-color:var(--dino2);}
 body.theme-dino .mission-check.done{background:var(--dino2);border-color:var(--dino2);}
+body.theme-dino .word-mode-btn.active{background:var(--dino2);border-color:var(--dino2);}
 
 body.theme-wild .topbar{border-bottom-color:var(--wild2);}
 body.theme-wild .topbar-codename{color:var(--wild2);}
@@ -540,6 +600,7 @@ body.theme-wild .lunch-day-btn.active{background:var(--wild2);border-color:var(-
 body.theme-wild .lunch-option.selected{border-color:var(--wild2);background:rgba(122,92,30,.12);}
 body.theme-wild .lunch-option.selected .lunch-opt-check{background:var(--wild2);border-color:var(--wild2);}
 body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--wild2);}
+body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(--wild2);}
 
 /* UTILITY */
 .empty{text-align:center;padding:30px;color:rgba(255,255,255,.3);font-style:italic;font-size:13px;}
@@ -1020,6 +1081,33 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
       </div>
     </div>
 
+    <!-- TAB: THE WORD -->
+    <div class="tab" id="tab-word">
+      <div class="sec-head">
+        <div class="sec-head-diamond"></div>
+        <div class="sec-head-text">The Word</div>
+        <div class="sec-head-line"></div>
+      </div>
+
+      <div class="word-mode-row">
+        <button class="word-mode-btn active" id="word-mode-btn-browse" onclick="setWordMode('browse')">Browse</button>
+        <button class="word-mode-btn" id="word-mode-btn-search" onclick="setWordMode('search')">Search</button>
+        <button class="word-mode-btn" id="word-mode-btn-myverses" onclick="setWordMode('myverses')">My Verses</button>
+      </div>
+
+      <div id="word-browse-view"><div class="empty">Loading Scripture...</div></div>
+
+      <div id="word-search-view" style="display:none;">
+        <div class="word-search-row">
+          <input type="text" id="word-search-input" class="word-search-input" placeholder="Search a word or phrase..." maxlength="60" autocomplete="off">
+          <button class="word-search-go" onclick="runWordSearch()">&#128269;</button>
+        </div>
+        <div id="word-search-results"></div>
+      </div>
+
+      <div id="word-myverses-view" style="display:none;"></div>
+    </div>
+
   </div><!-- /content -->
 
   <!-- BOTTOM NAV -->
@@ -1056,6 +1144,10 @@ body.theme-wild .mission-check.done{background:var(--wild2);border-color:var(--w
     <button class="bnb" onclick="showTab('compass',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
       Compass
+    </button>
+    <button class="bnb" onclick="showTab('word',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Word
     </button>
   </nav>
 
@@ -1327,6 +1419,7 @@ function showTab(name, btn){
   if(name === 'transmissions'){ renderTransmissions(); initGroupThreadInline(); initPrivateThreadInline(); }
   if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
   if(name === 'compass'){ initTomChat(); renderTomWishCounter(); }
+  if(name === 'word') renderWordTab();
 }
 
 // ══════════════════════════════════════════════════════
@@ -4970,12 +5063,256 @@ function getHighlights(agentId){
   });
 }
 
+// ─── STEP 2: WORD TAB UI ───
+// _wordNav remembers browse position (book/chapter) across mode switches
+// within a visit, so tapping "My Verses" then back to "Browse" doesn't
+// lose where you were reading.
+let _wordMode = 'browse';
+let _wordNav = { book: null, chapter: null };
+const KJV_OT_BOOK_COUNT = 39; // Genesis..Malachi; the rest is New Testament
+
+function renderWordTab(){
+  loadKJV().then(() => {
+    if(_wordMode === 'browse') renderWordBrowse();
+    if(_wordMode === 'myverses') renderWordMyVerses();
+  }).catch(() => {
+    const el = document.getElementById('word-browse-view');
+    if(el) el.innerHTML = '<div class="empty">Could not load Scripture &mdash; check your connection and reopen this tab.</div>';
+  });
+}
+
+function setWordMode(mode){
+  _wordMode = mode;
+  ['browse','search','myverses'].forEach(m => {
+    const btn = document.getElementById('word-mode-btn-'+m);
+    const view = document.getElementById('word-'+m+'-view');
+    if(btn) btn.classList.toggle('active', m===mode);
+    if(view) view.style.display = (m===mode) ? '' : 'none';
+  });
+  if(mode === 'browse') renderWordBrowse();
+  if(mode === 'myverses') renderWordMyVerses();
+}
+
+// ── Browse: book grid -> chapter grid -> chapter verses ──
+
+function renderWordBrowse(){
+  const el = document.getElementById('word-browse-view');
+  if(!el || !_kjvData) return;
+  if(_wordNav.book && _wordNav.chapter) renderWordChapterView(el, _wordNav.book, _wordNav.chapter);
+  else if(_wordNav.book) renderWordChapterGrid(el, _wordNav.book);
+  else renderWordBookGrid(el);
+}
+
+function renderWordBookGrid(el){
+  const books = Object.keys(_kjvData);
+  const bookBtn = b => `<button class="word-book-btn" onclick="openWordBook('${b}')">${b}</button>`;
+  el.innerHTML = `
+    <div class="word-testament-label">Old Testament</div>
+    <div class="word-book-grid">${books.slice(0, KJV_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
+    <div class="word-testament-label">New Testament</div>
+    <div class="word-book-grid">${books.slice(KJV_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
+  `;
+}
+
+function openWordBook(book){
+  _wordNav.book = book;
+  _wordNav.chapter = null;
+  renderWordBrowse();
+}
+
+function backToWordBooks(){
+  _wordNav.book = null;
+  _wordNav.chapter = null;
+  renderWordBrowse();
+}
+
+function renderWordChapterGrid(el, book){
+  const chapters = Object.keys(_kjvData[book]).map(Number).sort((a,b) => a-b);
+  el.innerHTML = `
+    <div class="word-crumb"><button onclick="backToWordBooks()">&larr; Books</button><span class="sep">/</span><span>${book}</span></div>
+    <div class="word-chapter-grid">${chapters.map(c => `<button class="word-chapter-btn" onclick="openWordChapter('${book}',${c})">${c}</button>`).join('')}</div>
+  `;
+}
+
+// opts.scrollToVerse: used by search results and My Verses to jump
+// straight to a specific verse and briefly highlight its position.
+function openWordChapter(book, chapter, opts){
+  opts = opts || {};
+  _wordNav.book = book;
+  _wordNav.chapter = String(chapter);
+  if(_wordMode !== 'browse') setWordMode('browse');
+  else renderWordBrowse();
+  if(opts.scrollToVerse) setTimeout(() => scrollToWordVerse(opts.scrollToVerse), 80);
+}
+
+// Verse bookmark/highlight state is fetched once as a full snapshot (not
+// per-verse) so opening a chapter is a single round trip regardless of how
+// many verses it has.
+function renderWordChapterView(el, book, chapter){
+  const chapterData = _kjvData[book][chapter];
+  const verses = Object.keys(chapterData).map(Number).sort((a,b) => a-b);
+  const agentId = currentAgent.id;
+
+  el.innerHTML = `
+    <div class="word-crumb">
+      <button onclick="backToWordBooks()">&larr; Books</button><span class="sep">/</span>
+      <button onclick="openWordBook('${book}')">${book}</button><span class="sep">/</span>
+      <span>Chapter ${chapter}</span>
+    </div>
+    <div class="word-chapter-title">${book} ${chapter}</div>
+    <div id="word-verse-list"><div class="empty">Loading verses...</div></div>
+  `;
+
+  Promise.all([
+    _db.ref(`stewart/bookmarks/${agentId}`).once('value'),
+    _db.ref(`stewart/highlights/${agentId}`).once('value')
+  ]).then(([bmSnap, hlSnap]) => {
+    const bookmarkKeys = new Set(Object.keys(bmSnap.val() || {}));
+    const highlightKeys = new Set(Object.keys(hlSnap.val() || {}));
+    const listEl = document.getElementById('word-verse-list');
+    if(!listEl) return;
+    listEl.innerHTML = verses.map(v => {
+      const text = chapterData[v];
+      const key = verseKey(book, chapter, v);
+      const isHl = highlightKeys.has(key);
+      const isBm = bookmarkKeys.has(key);
+      return `<div class="word-verse" data-vkey="${key}">
+        <span class="word-verse-num">${v}</span>
+        <div class="word-verse-text${isHl?' hl':''}" onclick="onWordVerseTap(this,'${book}',${chapter},${v})">${escapeHtml(text)}</div>
+        <button class="word-bookmark-btn${isBm?' active':''}" onclick="onWordBookmarkTap(this,'${book}',${chapter},${v})" aria-label="Bookmark this verse">&#9733;</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+function scrollToWordVerse(verseNum){
+  const key = verseKey(_wordNav.book, _wordNav.chapter, verseNum);
+  const row = document.querySelector('#word-verse-list [data-vkey="'+key+'"]');
+  if(!row) return;
+  row.scrollIntoView({block:'center', behavior:'smooth'});
+  row.classList.add('target');
+  setTimeout(() => row.classList.remove('target'), 2300);
+}
+
+// Tap the verse text to toggle highlight — a single, direct interaction
+// (no confirm step), matching how tapping a mission checkbox works.
+// Updates just this element rather than re-rendering the chapter, so
+// scroll position never jumps mid-read.
+function onWordVerseTap(el, book, chapter, verse){
+  if(!currentAgent) return;
+  const text = _kjvData[book][chapter][verse];
+  toggleHighlight(currentAgent.id, book, String(chapter), String(verse), text).then(isHl => {
+    el.classList.toggle('hl', isHl);
+  });
+}
+
+// Bookmarking is the separate, explicit interaction (its own button) —
+// tapping the verse itself only ever toggles highlight.
+function onWordBookmarkTap(btn, book, chapter, verse){
+  if(!currentAgent) return;
+  const text = _kjvData[book][chapter][verse];
+  toggleBookmark(currentAgent.id, book, String(chapter), String(verse), text).then(isBm => {
+    btn.classList.toggle('active', isBm);
+  });
+}
+
+// ── Search: client-side linear scan over the full KJV (~31k verses) ──
+// Only runs on explicit submit (button/Enter), never on keystroke, so
+// there's no perf concern despite the full-book scan.
+const WORD_SEARCH_CAP = 50;
+function runWordSearch(){
+  const input = document.getElementById('word-search-input');
+  const query = input ? input.value.trim() : '';
+  const resultsEl = document.getElementById('word-search-results');
+  if(!resultsEl) return;
+  if(!query){ resultsEl.innerHTML = ''; return; }
+  if(!_kjvData){
+    resultsEl.innerHTML = '<div class="empty">Still loading Scripture &mdash; try again in a moment.</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="empty">Searching...</div>';
+
+  const needle = query.toLowerCase();
+  const matches = [];
+  search:
+  for(const book of Object.keys(_kjvData)){
+    const chapters = _kjvData[book];
+    for(const chapter of Object.keys(chapters)){
+      const versesInChapter = chapters[chapter];
+      for(const verse of Object.keys(versesInChapter)){
+        const text = versesInChapter[verse];
+        if(text.toLowerCase().includes(needle)){
+          matches.push({book, chapter, verse, text});
+          if(matches.length >= WORD_SEARCH_CAP) break search;
+        }
+      }
+    }
+  }
+
+  if(!matches.length){
+    resultsEl.innerHTML = '<div class="empty">No verses found for &ldquo;'+escapeHtml(query)+'&rdquo;.</div>';
+    return;
+  }
+
+  // No silent cap — a boy searching a common word ("love", "the") should
+  // see that the list was cut short, not think that's every match.
+  const metaHtml = matches.length >= WORD_SEARCH_CAP
+    ? `<div class="word-search-meta">Showing the first ${WORD_SEARCH_CAP} matches &mdash; try a more specific word for a shorter list.</div>`
+    : `<div class="word-search-meta">${matches.length} verse${matches.length===1?'':'s'} found.</div>`;
+
+  resultsEl.innerHTML = metaHtml + matches.map(m => `
+    <div class="word-search-result" onclick="openWordChapter('${m.book}',${m.chapter},{scrollToVerse:${m.verse}})">
+      <div class="word-search-ref">${m.book} ${m.chapter}:${m.verse}</div>
+      <div class="word-search-snippet">${highlightSearchTerm(m.text, query)}</div>
+    </div>`).join('');
+}
+
+function highlightSearchTerm(text, query){
+  const esc = escapeHtml(text);
+  const escQuery = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if(!escQuery) return esc;
+  return esc.replace(new RegExp('('+escQuery+')', 'ig'), '<mark>$1</mark>');
+}
+
+// ── My Verses: bookmarks and highlights, each tap-through to the chapter ──
+
+function renderWordMyVerses(){
+  if(!currentAgent) return;
+  const el = document.getElementById('word-myverses-view');
+  if(!el) return;
+  el.innerHTML = '<div class="empty">Loading your verses...</div>';
+
+  Promise.all([getBookmarks(currentAgent.id), getHighlights(currentAgent.id)]).then(([bookmarks, highlights]) => {
+    let html = '<div class="sec-head" style="margin-bottom:10px;"><div class="sec-head-diamond"></div><div class="sec-head-text">Bookmarked</div><div class="sec-head-line"></div></div>';
+    html += bookmarks.length
+      ? bookmarks.map(wordMyVerseItemHtml).join('')
+      : '<div class="empty">No bookmarks yet. Tap the star on any verse to save it here.</div>';
+
+    html += '<div class="sec-head" style="margin:18px 0 10px;"><div class="sec-head-diamond"></div><div class="sec-head-text">Highlighted</div><div class="sec-head-line"></div></div>';
+    html += highlights.length
+      ? highlights.map(wordMyVerseItemHtml).join('')
+      : '<div class="empty">No highlights yet. Tap any verse while reading to highlight it.</div>';
+
+    el.innerHTML = html;
+  });
+}
+
+function wordMyVerseItemHtml(v){
+  return `<div class="word-myverse-item" onclick="openWordChapter('${v.book}',${v.chapter},{scrollToVerse:${v.verse}})">
+    <div class="word-search-ref">${v.book} ${v.chapter}:${v.verse}</div>
+    <div class="word-search-snippet">${escapeHtml(v.text)}</div>
+  </div>`;
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   const pi = document.getElementById('private-input');
   if(pi) pi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) sendPrivateMessage(); });
 
   const ti = document.getElementById('tom-input');
   if(ti) ti.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) askTomChat(); });
+
+  const wsi = document.getElementById('word-search-input');
+  if(wsi) wsi.addEventListener('keydown', e => { if(e.key==='Enter' && !e.repeat) runWordSearch(); });
 
   // ── Sign-out reminder: triggers once per visit when the mouse nears the
   //    bottom-right corner of the page (where they head to sign out / close up). ──
