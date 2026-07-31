@@ -525,7 +525,7 @@ body::before{
 .word-verse.target{animation:word-target-flash 2.2s ease-out;border-radius:6px;}
 @keyframes word-target-flash{0%,35%{outline:2px solid var(--teal3);outline-offset:3px;border-radius:6px;}100%{outline:2px solid transparent;outline-offset:3px;}}
 .word-verse-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
-.word-bookmark-btn,.word-note-btn{background:none;border:none;color:rgba(255,255,255,.25);font-size:15px;cursor:pointer;flex-shrink:0;padding:2px 4px;line-height:1;}
+.word-bookmark-btn,.word-note-btn,.word-ask-btn{background:none;border:none;color:rgba(255,255,255,.25);font-size:15px;cursor:pointer;flex-shrink:0;padding:2px 4px;line-height:1;}
 .word-bookmark-btn.active{color:var(--gold);}
 
 /* Family Bible: who-highlighted-this dots + notes (shared across the family) */
@@ -3318,9 +3318,20 @@ async function askTomChat(){
   const input = document.getElementById('tom-input');
   const question = input ? input.value.trim() : '';
   if(!question) return;
-
-  const history = tomHistoryForApi(); // capture before pushing the new question
   input.value = '';
+  await sendTomQuestion(question, null);
+}
+
+// Shared by the Compass tab's own input box and the Word tab's "Ask Tom
+// about this verse" (Family Bible punch list, Step 3) — same
+// persistence, same wish-spend handling, same retry logic, regardless of
+// where the question came from. verseContext, when given, is
+// {book, chapter, verse} — the server resolves the actual verse text
+// itself from its own trusted KJV copy rather than trusting whatever the
+// client claims, same as citedVerse already does for citations.
+async function sendTomQuestion(question, verseContext){
+  if(_tomSendLock || !_db || !currentAgent || !question) return;
+  const history = tomHistoryForApi(); // capture before pushing the new question
   _tomSendLock = true;
 
   await _db.ref(`stewart/tomchat/${currentAgent.id}`).push({
@@ -3334,7 +3345,9 @@ async function askTomChat(){
   let result = null;
   for(let attempt = 1; attempt <= 2 && !result; attempt++){
     try{
-      const res = await callFunction('askTom', { agentId: currentAgent.id, question, history });
+      const payload = { agentId: currentAgent.id, question, history };
+      if(verseContext) payload.verseContext = verseContext;
+      const res = await callFunction('askTom', payload);
       if(!res || !res.data || !res.data.message) throw new Error('Empty response from askTom');
       result = res.data;
     }catch(e){
@@ -5198,6 +5211,7 @@ function renderWordChapterView(el, book, chapter){
         <div class="word-verse-actions">
           <button class="word-bookmark-btn${isBm?' active':''}" onclick="onWordBookmarkTap(this,'${book}',${chapter},${v})" aria-label="Bookmark this verse">&#9733;</button>
           <button class="word-note-btn" onclick="toggleWordNoteForm('${key}','${book}',${chapter},${v})" aria-label="Leave a note">&#128172;</button>
+          <button class="word-ask-btn" onclick="toggleWordAskForm('${key}','${book}',${chapter},${v})" aria-label="Ask Tom about this verse">&#10067;</button>
         </div>
       </div>`;
     }).join('');
@@ -5292,6 +5306,37 @@ function submitWordNote(key, book, chapter, verse){
       const container = document.getElementById('word-notes-'+key);
       if(container) container.innerHTML = wordNoteListHtml(notes);
     });
+}
+
+// Ask Tom about the exact verse in view (Family Bible punch list, Step
+// 3) — same inline-compose pattern as leaving a note. Submitting jumps
+// to the Compass tab and reuses sendTomQuestion() (the same persistence,
+// wish-spend confirmation, and retry handling the normal Compass input
+// already has) rather than building a second chat UI inside the Word
+// tab — the answer shows up there through the exact same machinery.
+function toggleWordAskForm(key, book, chapter, verse){
+  const container = document.getElementById('word-notes-'+key);
+  if(!container) return;
+  const existing = container.querySelector('.word-ask-compose');
+  if(existing){ existing.remove(); return; }
+  const compose = document.createElement('div');
+  compose.className = 'word-ask-compose word-note-compose';
+  compose.innerHTML = `
+    <textarea class="word-note-input" id="word-ask-input-${key}" maxlength="280" placeholder="Ask Tom about this verse..."></textarea>
+    <button class="word-note-submit" onclick="submitWordAsk('${key}','${book}',${chapter},${verse})">Ask Tom</button>
+  `;
+  container.appendChild(compose);
+  const ta = document.getElementById('word-ask-input-'+key);
+  if(ta) ta.focus();
+}
+
+function submitWordAsk(key, book, chapter, verse){
+  const ta = document.getElementById('word-ask-input-'+key);
+  const question = ta ? ta.value.trim() : '';
+  if(!question) return;
+  const btn = document.querySelector('.bnb[onclick*="\'compass\'"]');
+  showTab('compass', btn);
+  sendTomQuestion(question, { book, chapter, verse: String(verse) });
 }
 
 // ── Search: client-side linear scan over the full KJV (~31k verses) ──

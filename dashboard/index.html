@@ -1963,6 +1963,7 @@ function renderBibleChapterView(el, book, chapter){
         <div class="bib-verse-actions">
           <button class="bib-bookmark-btn${isBm?' active':''}" onclick="onBibleBookmarkTap(this,'${book}',${chapter},${v})" aria-label="Bookmark this verse">&#9733;</button>
           <button class="bib-note-btn" onclick="toggleBibleNoteForm('${key}','${book}',${chapter},${v})" aria-label="Leave a note">&#128172;</button>
+          <button class="bib-note-btn" onclick="toggleBibleAskForm('${key}','${book}',${chapter},${v})" aria-label="Ask Tink about this verse">&#10067;</button>
         </div>
       </div>`;
     }).join('');
@@ -2052,6 +2053,38 @@ function submitBibleNote(key, book, chapter, verse){
       const container = document.getElementById('bib-notes-'+key);
       if(container) container.innerHTML = bibleNoteListHtml(notes);
     });
+}
+
+// Ask Tink about the exact verse in view (Family Bible punch list, Step
+// 3). Officers' Country already has a real Tink chat tab (unlike
+// Bridge, which shows the answer inline instead) — submitting switches
+// to it and reuses sendTinkQuestion() (the same persistence and retry
+// handling the tab's own input already has) rather than building a
+// second chat UI inside the Bible tab.
+function toggleBibleAskForm(key, book, chapter, verse){
+  const container = document.getElementById('bib-notes-'+key);
+  if(!container) return;
+  const existing = container.querySelector('.bib-ask-compose');
+  if(existing){ existing.remove(); return; }
+  const compose = document.createElement('div');
+  compose.className = 'bib-ask-compose bib-note-compose';
+  compose.innerHTML = `
+    <textarea class="bib-note-input" id="bib-ask-input-${key}" maxlength="280" placeholder="Ask Tink about this verse..."></textarea>
+    <button class="bib-note-submit" onclick="submitBibleAsk('${key}','${book}',${chapter},${verse})">Ask Tink</button>
+  `;
+  container.appendChild(compose);
+  const ta = document.getElementById('bib-ask-input-'+key);
+  if(ta) ta.focus();
+}
+
+function submitBibleAsk(key, book, chapter, verse){
+  const ta = document.getElementById('bib-ask-input-'+key);
+  const question = ta ? ta.value.trim() : '';
+  if(!question) return;
+  const btn = document.querySelector('.bnb[onclick*="\'tink\'"]');
+  showTab('tink', btn);
+  initTinkChat();
+  sendTinkQuestion(question, { book, chapter, verse: String(verse) });
 }
 
 // ── Search: client-side linear scan over the full KJV (~31k verses) ──
@@ -2166,10 +2199,19 @@ async function askTinkDashboard(){
   const input = document.getElementById('tink-input');
   const question = input ? input.value.trim() : '';
   if(!question) return;
-
-  const history = tinkHistoryForApi(); // capture before pushing the new question
-
   input.value = '';
+  await sendTinkQuestion(question, null);
+}
+
+// Shared by the Tink tab's own input box and the Bible tab's "Ask Tink
+// about this verse" (Family Bible punch list, Step 3) — same
+// persistence, same retry logic, regardless of where the question came
+// from. verseContext, when given, is {book, chapter, verse} — the
+// server resolves the actual verse text itself from its own trusted KJV
+// copy rather than trusting whatever the client claims.
+async function sendTinkQuestion(question, verseContext){
+  if(_tinkSendLock || !_db || !question) return;
+  const history = tinkHistoryForApi(); // capture before pushing the new question
   _tinkSendLock = true;
 
   await _db.ref('stewart/tinkchat').push({
@@ -2182,6 +2224,7 @@ async function askTinkDashboard(){
   // mid-request even when askTink succeeds server-side, and a silent retry
   // masks that instead of showing a fallback for an answer that existed.
   const payload = { question, history, today: localDateStr() };
+  if(verseContext) payload.verseContext = verseContext;
   let text = null;
   for(let attempt = 1; attempt <= 2 && !text; attempt++){
     try{

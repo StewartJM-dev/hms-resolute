@@ -351,6 +351,8 @@ body{
 .bib-note-compose{margin:6px 4px 0;display:flex;flex-direction:column;gap:6px;}
 .bib-note-input{width:100%;min-height:54px;padding:8px 10px;border-radius:8px;border:1px solid rgba(200,146,42,.3);background:rgba(0,0,0,.3);color:#f6efe0;font-family:'Lato',sans-serif;font-size:12.5px;resize:vertical;}
 .bib-note-submit{align-self:flex-end;padding:6px 14px;border-radius:14px;border:none;background:var(--gold,#c8922a);color:#16120c;font-family:'Cinzel',serif;font-size:11px;font-weight:700;cursor:pointer;}
+.bib-ask-answer{font-size:12.5px;line-height:1.55;color:rgba(255,255,255,.85);font-style:italic;}
+.bib-ask-answer:empty{display:none;}
 
 .bib-search-row{display:flex;gap:8px;margin-bottom:12px;}
 .bib-search-input{flex:1;padding:10px 12px;border-radius:20px;border:1px solid rgba(200,146,42,.35);background:rgba(0,0,0,.3);color:#f6efe0;font-family:'Lato',sans-serif;font-size:13px;}
@@ -1632,6 +1634,7 @@ function renderBibleChapterView(el, book, chapter){
         <div class="bib-verse-actions">
           <button class="bib-bookmark-btn${isBm?' active':''}" onclick="onBibleBookmarkTap(this,'${book}',${chapter},${v})" aria-label="Bookmark this verse">&#9733;</button>
           <button class="bib-note-btn" onclick="toggleBibleNoteForm('${key}','${book}',${chapter},${v})" aria-label="Leave a note">&#128172;</button>
+          <button class="bib-note-btn" onclick="toggleBibleAskForm('${key}','${book}',${chapter},${v})" aria-label="Ask Tink about this verse">&#10067;</button>
         </div>
       </div>`;
     }).join('');
@@ -1721,6 +1724,61 @@ function submitBibleNote(key, book, chapter, verse){
       const container = document.getElementById('bib-notes-'+key);
       if(container) container.innerHTML = bibleNoteListHtml(notes);
     });
+}
+
+// Ask Tink about the exact verse in view (Family Bible punch list, Step
+// 3). Bridge has no Tink chat UI of its own (that's Officers' Country),
+// so unlike Tom's version of this on the boys' side — which reuses the
+// full Compass chat thread — this shows the answer inline, right here,
+// while STILL logging the exchange to the same shared stewart/tinkchat
+// thread Officers' Country reads, so John and Dawn both see it later
+// regardless of which one asked or from where.
+function toggleBibleAskForm(key, book, chapter, verse){
+  const container = document.getElementById('bib-notes-'+key);
+  if(!container) return;
+  const existing = container.querySelector('.bib-ask-compose');
+  if(existing){ existing.remove(); return; }
+  const compose = document.createElement('div');
+  compose.className = 'bib-ask-compose bib-note-compose';
+  compose.innerHTML = `
+    <textarea class="bib-note-input" id="bib-ask-input-${key}" maxlength="280" placeholder="Ask Tink about this verse..."></textarea>
+    <button class="bib-note-submit" onclick="submitBibleAsk('${key}','${book}',${chapter},${verse})">Ask Tink</button>
+    <div class="bib-ask-answer" id="bib-ask-answer-${key}"></div>
+  `;
+  container.appendChild(compose);
+  const ta = document.getElementById('bib-ask-input-'+key);
+  if(ta) ta.focus();
+}
+
+async function submitBibleAsk(key, book, chapter, verse){
+  if(!_db) return;
+  const ta = document.getElementById('bib-ask-input-'+key);
+  const question = ta ? ta.value.trim() : '';
+  if(!question) return;
+  const answerEl = document.getElementById('bib-ask-answer-'+key);
+  if(answerEl) answerEl.textContent = 'Tink is thinking…';
+  if(ta) ta.disabled = true;
+
+  const verseContext = { book, chapter, verse: String(verse) };
+  const personName = FAMILY_DISPLAY_NAMES[currentPersonId()] || 'Someone';
+
+  await _db.ref('stewart/tinkchat').push({ text: question, from: personName, agentId:'parent', timestamp: Date.now() });
+
+  let text = null;
+  for(let attempt = 1; attempt <= 2 && !text; attempt++){
+    try{
+      const res = await callFunction('askTink', { question, verseContext, history: [] });
+      text = res && res.data && res.data.text;
+    }catch(e){
+      // one silent retry before falling back
+    }
+  }
+  const finalText = text || "Couldn't reach Tink just now — try again in a moment.";
+
+  await _db.ref('stewart/tinkchat').push({ text: finalText, from:'Tink', agentId:'tink', timestamp: Date.now() });
+
+  if(answerEl) answerEl.textContent = finalText;
+  if(ta) ta.disabled = false;
 }
 
 // ── Search: client-side linear scan over the full KJV (~31k verses) ──
