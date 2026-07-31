@@ -349,6 +349,8 @@ body{
 }
 .msg-bubble-from{font-size:9px;opacity:.7;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
 .msg-bubble-time{font-size:9px;opacity:.6;margin-top:4px;text-align:right;}
+.tink-verse-chip{display:flex;align-items:center;gap:6px;margin-top:8px;padding:7px 11px;border-radius:16px;border:1px solid var(--green2);background:rgba(45,106,71,.1);color:var(--green2);font-size:11px;font-weight:700;cursor:pointer;width:100%;text-align:left;}
+.tink-verse-chip:active{background:rgba(45,106,71,.2);}
 .msg-compose{
   display:flex;gap:8px;padding:10px 13px;
   border-top:1px solid var(--border);background:var(--card);
@@ -2175,13 +2177,29 @@ function renderTinkMessages(msgs){
   }
   el.innerHTML = items.map(m => {
     const isTink = m.agentId === 'tink';
+    // citedVerse (Step 4, Family Bible punch list) renders a tappable
+    // deep-link into the Bible tab, same pattern as Tom's citation chip
+    // on the boys' side — only Tink messages ever carry one.
+    const cv = m.citedVerse;
+    const chipHtml = (isTink && cv && cv.book)
+      ? `<button class="tink-verse-chip" onclick="openVerseFromTink('${cv.book}',${cv.chapter},${cv.verse})">&#128214; Open ${cv.book} ${cv.chapter}:${cv.verse} in the Bible tab</button>`
+      : '';
     return `
     <div class="msg-bubble ${isTink?'received':'sent'}">
       <div class="msg-bubble-from">${escapeHtml(m.from || (isTink?'Tink':'Unknown'))}</div>
       ${linkify(m.text||'')}
+      ${chipHtml}
     </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
+}
+
+function openVerseFromTink(book, chapter, verse){
+  const btn = document.querySelector('.bnb[onclick*="\'bible\'"]');
+  showTab('bible', btn);
+  loadKJV().then(() => {
+    openBibleChapter(book, Number(chapter), { scrollToVerse: Number(verse) });
+  });
 }
 
 // Turns the cached thread into the {role, content} history askTink expects,
@@ -2226,16 +2244,21 @@ async function sendTinkQuestion(question, verseContext){
   const payload = { question, history, today: localDateStr() };
   if(verseContext) payload.verseContext = verseContext;
   let text = null;
+  let citedVerse = null;
   for(let attempt = 1; attempt <= 2 && !text; attempt++){
     try{
       const result = await callFunction('askTink', payload);
       text = result && result.data && result.data.text;
+      citedVerse = (result && result.data && result.data.citedVerse) || null;
       if(!text) throw new Error('Empty response from askTink');
     }catch(e){
       // one silent retry before falling back
     }
   }
-  await thinkingRef.update({ text: text || "Tink couldn't answer right now — try again in a moment." });
+  // citedVerse (Step 4, Family Bible punch list) lets the chat UI render
+  // a tappable deep-link into the Bible tab, same as Tom's citations —
+  // only ever set when Tink actually cited/suggested a real verse.
+  await thinkingRef.update({ text: text || "Tink couldn't answer right now — try again in a moment.", citedVerse });
 
   _tinkSendLock = false;
 }

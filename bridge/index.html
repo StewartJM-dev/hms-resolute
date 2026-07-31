@@ -1750,6 +1750,16 @@ function toggleBibleAskForm(key, book, chapter, verse){
   if(ta) ta.focus();
 }
 
+// This flow always sends a verseContext (the verse the boy... er, the
+// parent is currently viewing), which server-side makes askTink treat it
+// as Step 3's "explain the verse in view" case, not Step 4's "suggest a
+// verse" case — those are mutually exclusive there on purpose. So a
+// citedVerse chip is never applicable to a response from here; Step 4's
+// verse-suggestion + deep-link chip only applies to Officers' Country's
+// general Tink tab (renderTinkMessages/openVerseFromTink), which is the
+// only place a parent can ask Tink an open-ended question with no verse
+// already in view. Bridge has no general (non-verse) Tink entry point at
+// all — a pre-existing gap, not something this feature added.
 async function submitBibleAsk(key, book, chapter, verse){
   if(!_db) return;
   const ta = document.getElementById('bib-ask-input-'+key);

@@ -432,6 +432,39 @@ function mightBePantryQuestion(question, history) {
   return PANTRY_KEYWORD_PATTERN.test(recentText);
 }
 
+// Step 4 (Family Bible punch list): "suggest a verse about X," "what
+// does the Bible say about Y." Deliberately narrower than a generic
+// "mentions Scripture" check — a question like "how should I talk to
+// Samuel about honesty" is devotional-adjacent but isn't asking Tink to
+// hand back a citable verse, so it shouldn't pay the structured-output
+// cost or risk of this path.
+const VERSE_SUGGEST_PATTERN = /\b(suggest(?:s|ed|ing)?\s+(?:a\s+|some\s+)?verse|verse(?:s)?\s+(?:about|on|for)|what\s+does\s+the\s+bible\s+say|bible\s+say\s+about|scripture\s+(?:about|on)|find\s+(?:me\s+)?a\s+verse)\b/i;
+function mightBeVerseSuggestionQuestion(question, history) {
+  const recentText = [question, ...(history || []).slice(-4).map(h => h.content)].join(' ');
+  return VERSE_SUGGEST_PATTERN.test(recentText);
+}
+
+const TINK_VERSE_SUGGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    message: { type: 'string' },
+    verseRef: { type: 'string' }
+  },
+  required: ['message', 'verseRef'],
+  additionalProperties: false
+};
+
+// Reuses Tom's exact citation-formatting approach (askTom, further
+// below): the model itself never quotes a verse's actual wording — it
+// only names a reference — and the server inserts the REAL, verified
+// text afterward via lookupVerse. That's what keeps a citation from ever
+// being a hallucinated paraphrase. Appended to TINK_SYSTEM_PROMPT only
+// for the specific call where mightBeVerseSuggestionQuestion gated in;
+// every other Tink question is untouched by any of this.
+const TINK_VERSE_SUGGEST_INSTRUCTIONS = `
+
+This question is a verse-suggestion request — pointing Dawn or John to a real Bible verse on a topic ("suggest a verse about patience," "what does the Bible say about anger"). For this answer specifically: don't quote or paraphrase a verse's exact wording yourself — the system inserts the real, verified verse text after your message, so write your answer as if a citation naturally follows it. Set "verseRef" to exactly ONE verse (never a range like "5:43-44") in "Book Chapter:Verse" format (e.g. "James 1:19", "Proverbs 15:1") — only ever a verse you're confident actually exists. If, on reflection, this particular message isn't really asking for a citable verse after all, leave "verseRef" as an empty string and just answer the actual question normally.`;
+
 // Real stewart/inventory + stewart/plan, plus every meal in MEALS_DB
 // scored for readiness against current stock (sorted best-first) — so
 // Tink can answer "what can I make tonight" or "are we ready for X"
@@ -651,7 +684,13 @@ exports.askTink = functions
     // no context at all).
     const isPantryQuestion = !resolvedContext && mightBePantryQuestion(question, sanitizedHistory);
 
-    const model = (resolvedContext || isPantryQuestion || resolvedVerseContext) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+    // Only worth checking when a specific verse ISN'T already in view
+    // (Step 3's resolvedVerseContext) — those are two different asks:
+    // "tell me about the verse I'm looking at" already has its verse,
+    // it doesn't need one suggested.
+    const isVerseSuggestQuestion = !resolvedVerseContext && mightBeVerseSuggestionQuestion(question, sanitizedHistory);
+
+    const model = (resolvedContext || isPantryQuestion || resolvedVerseContext || isVerseSuggestQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
 
     // Grounded data accumulates as separate parts (rather than one
     // overwritable value) so a boy-lookup and a pantry question could both
@@ -682,33 +721,68 @@ exports.askTink = functions
     }
 
     const groundedData = groundedParts.length ? groundedParts.join('\n\n---\n\n') : null;
+    const userContent = buildTinkUserPrompt({ question, context: resolvedContext, groundedData });
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      system: TINK_SYSTEM_PROMPT,
-      messages: [
-        ...sanitizedHistory,
-        {
-          role: 'user',
-          content: buildTinkUserPrompt({ question, context: resolvedContext, groundedData })
+    // Two call shapes: the verse-suggestion path forces structured
+    // {message, verseRef} output (same JSON-schema-constrained approach
+    // askTom already uses for its citations) so the server — not the
+    // model — is the one inserting real, verified verse text. Every
+    // other Tink question keeps the existing plain-text call completely
+    // unchanged, zero risk of the schema affecting unrelated answers.
+    let text = '';
+    let citedVerse = null;
+
+    if (isVerseSuggestQuestion) {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: TINK_SYSTEM_PROMPT + TINK_VERSE_SUGGEST_INSTRUCTIONS,
+        output_config: { format: { type: 'json_schema', schema: TINK_VERSE_SUGGEST_SCHEMA } },
+        messages: [...sanitizedHistory, { role: 'user', content: userContent }]
+      });
+      await logTinkUsage(model, response.usage);
+
+      const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        throw new functions.https.HttpsError('internal', 'Could not parse Tink response.');
+      }
+      text = (parsed.message || '').trim();
+      if (parsed.verseRef) {
+        const verse = lookupVerse(parsed.verseRef);
+        if (verse) {
+          text += `\n\n"${verse.text}" — ${verse.book} ${verse.chapter}:${verse.verse} (KJV)`;
+          citedVerse = { book: verse.book, chapter: verse.chapter, verse: verse.verse };
         }
-      ]
-    });
+        // If it didn't resolve, text is left as-is — no fallback line
+        // appended, unlike Tom's flow. Tink isn't locked into a
+        // devotional-category response shape the way Tom is, so her own
+        // message (written expecting a citation to follow) still reads
+        // fine as a standalone answer without one.
+      }
+    } else {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: TINK_SYSTEM_PROMPT,
+        messages: [...sanitizedHistory, { role: 'user', content: userContent }]
+      });
+      await logTinkUsage(model, response.usage);
 
-    const text = (response.content || [])
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('')
-      .trim();
-
-    await logTinkUsage(model, response.usage);
+      text = (response.content || [])
+        .filter(block => block.type === 'text')
+        .map(block => block.text)
+        .join('')
+        .trim();
+    }
 
     if (!text) {
       throw new functions.https.HttpsError('internal', 'No text returned from Anthropic.');
     }
 
-    return { text };
+    return { text, citedVerse };
   });
 
 // ════════════════════════════════════════════════════
