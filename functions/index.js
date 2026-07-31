@@ -609,9 +609,16 @@ async function extractLookupIntent(anthropic, { question, history, today }) {
 exports.askTink = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
-    const { question, context, history, today } = data || {};
+    const { question, context, history, today, verseContext } = data || {};
     if (!question) {
       throw new functions.https.HttpsError('invalid-argument', 'question is required.');
+    }
+    // Step 3 (Family Bible punch list): resolved server-side against the
+    // real KJV, same as askTom's identical handling — never trust
+    // client-supplied verse text.
+    let resolvedVerseContext = null;
+    if (verseContext && typeof verseContext === 'object') {
+      resolvedVerseContext = lookupVerse(`${verseContext.book} ${verseContext.chapter}:${verseContext.verse}`);
     }
 
     const sanitizedHistory = sanitizeHistory(history);
@@ -644,12 +651,16 @@ exports.askTink = functions
     // no context at all).
     const isPantryQuestion = !resolvedContext && mightBePantryQuestion(question, sanitizedHistory);
 
-    const model = (resolvedContext || isPantryQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+    const model = (resolvedContext || isPantryQuestion || resolvedVerseContext) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
 
     // Grounded data accumulates as separate parts (rather than one
     // overwritable value) so a boy-lookup and a pantry question could both
     // ground the same answer if a message somehow touches both.
     const groundedParts = [];
+
+    if (resolvedVerseContext) {
+      groundedParts.push(`Real data from the database — the verse currently in view in the Bible section: "${resolvedVerseContext.text}" — ${resolvedVerseContext.book} ${resolvedVerseContext.chapter}:${resolvedVerseContext.verse} (KJV). The question below is about this specific verse — answer about it directly, don't ask which verse they mean.`);
+    }
 
     // If context names a real boy, fetch real score/deduction data server-side
     // so the answer is grounded in fact rather than generated from nothing.
@@ -808,6 +819,7 @@ Classify every message into exactly one category:
 Rules for the "message" field:
 - 2-4 sentences, in voice, talking directly to the boy.
 - For "devotional" and "verse_lookup": do NOT quote or paraphrase a specific verse yourself — the system inserts the real verse text after your message, so write as if a citation naturally follows. Set "verseRef" to exactly ONE verse (never a range like "5:43-44" — pick the single verse that matters most) in "Book Chapter:Verse" format (e.g. "John 3:16", "Psalms 23:1", "1 Corinthians 13:4") — only ever a verse you're confident actually exists.
+- If the message includes a bracketed "[He's currently viewing this verse...]" note, that verse IS the topic — he's already reading it, so discuss/explain that exact verse directly, don't quote it back at him (he can see it), and leave "verseRef" empty regardless of category — there's nothing to cite, since the verse in view is already on his screen. Only set "verseRef" when you're introducing a DIFFERENT verse he isn't already looking at.
 - For "interest": you may suggest exactly one real, well-known, kid-appropriate website or resource by name in "suggestedWebsite" (e.g. "NASA Kids' Club" or "khanacademy.org"), and mention it naturally in your message too.
 - For every other category, leave "verseRef" and "suggestedWebsite" as empty strings.
 - For "declined_*": firm but warm, brief, in voice — redirect, don't lecture, and never actually help with the sibling/discipline/rule-bypass ask itself.
@@ -916,12 +928,22 @@ function tomNudgeContextBlock(nudges) {
 exports.askTom = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
-    const { agentId, question, history } = data || {};
+    const { agentId, question, history, verseContext } = data || {};
     if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
       throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
     }
     if (!question) {
       throw new functions.https.HttpsError('invalid-argument', 'question is required.');
+    }
+    // Step 3 (Family Bible punch list): a question asked from within the
+    // Bible section carries which verse was in view. Resolved server-side
+    // against the real KJV (same lookupVerse the citation flow already
+    // trusts) rather than trusting whatever text the client sends — a boy
+    // could otherwise put arbitrary text in Tom's context by claiming it's
+    // "the verse in view."
+    let resolvedVerseContext = null;
+    if (verseContext && typeof verseContext === 'object') {
+      resolvedVerseContext = lookupVerse(`${verseContext.book} ${verseContext.chapter}:${verseContext.verse}`);
     }
 
     const agentName = AGENT_DISPLAY_NAMES[agentId];
@@ -952,6 +974,10 @@ exports.askTom = functions
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+    const userContent = resolvedVerseContext
+      ? `[He's currently viewing this verse in the Bible section: "${resolvedVerseContext.text}" — ${resolvedVerseContext.book} ${resolvedVerseContext.chapter}:${resolvedVerseContext.verse} (KJV). His question below is about this specific verse.]\n\n${question}`
+      : question;
+
     const response = await anthropic.messages.create({
       model: TOM_MODEL,
       max_tokens: 500,
@@ -959,7 +985,7 @@ exports.askTom = functions
       output_config: { format: { type: 'json_schema', schema: TOM_RESPONSE_SCHEMA } },
       messages: [
         ...sanitizedHistory,
-        { role: 'user', content: question }
+        { role: 'user', content: userContent }
       ]
     });
 
@@ -989,6 +1015,17 @@ exports.askTom = functions
       type = 'declined';
       category = 'declined_budget';
       message = "Budget's tapped for this month, sailor — that one's on hold till next month. Ask me something in the app-help lane, though, anytime.";
+    } else if (resolvedVerseContext && (category === 'devotional' || category === 'verse_lookup')) {
+      // He's already looking at a specific verse — no citation to insert
+      // (the model was told to leave verseRef empty for exactly this
+      // case). Skipping just this branch, rather than falling through to
+      // lookupVerse('') and its "couldn't pull the exact verse" fallback
+      // below, is the fix: that fallback text used to get appended even
+      // though nothing was actually missing — there was never a new
+      // verse to look up in the first place. Scoped to these two
+      // categories specifically (not resolvedVerseContext alone) so an
+      // "interest" response with a verse in view still reaches its own
+      // suggestedWebsite handling below, unaffected.
     } else if (category === 'devotional' || category === 'verse_lookup') {
       const verse = lookupVerse(parsed.verseRef);
       if (verse) {
