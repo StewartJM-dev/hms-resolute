@@ -46,6 +46,19 @@ function toMidnight(d){
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+// DECIDED (2026-07-31): historical stewart/scores is NOT being retroactively
+// corrected for whatever this bug affected before the fix above landed.
+// This closes the "audit in progress" note left in the fix's own commit
+// message (47a6b79) — that audit was opened, then explicitly decided
+// against rather than actually run. Reasons: the rotation bug could only
+// ever shift WHICH chores a boy was assigned that day, never how many he
+// completed of what he was actually shown — and stewart/scores also
+// directly drives Ship Account's real, already-partially-spent balance
+// (see the pay-calculation note in functions/index.js/boys/index.html from
+// e77e489), so silently rewriting it would rewrite real family financial
+// history for a discrepancy nobody could distinguish from normal day-to-day
+// variance. If this ever needs revisiting, it's a deliberate reopening of a
+// closed decision, not a forgotten TODO.
 function isLaundryDayFor(agentId, dayOfWeek){
   if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
   if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
