@@ -278,7 +278,7 @@ Here is what actually exists in HMS Resolute today. Never invent functionality b
 - Compass: Tom, a live AI companion for the boys (built and deployed). Boys spend earned wishes to ask Tom interest/discovery, learning, or devotional questions (devotional answers cite a real KJV verse); app-help questions about the app itself are always free. Off-topic, sibling, discipline, and rule-bypass questions are declined in-voice, no wish spent. Each boy has a $1/month Anthropic budget cap; over the cap, wish-spend questions decline gracefully but app-help keeps working. If Tom suggests a website, it queues for parent approval the same way screen-time and Ship Account requests do.
 - Also linked from Agent HQ: Ship's Store (spend Ship Account balance on real prizes — currently a Chromebook contest), a Crew Deck Map, a read-only recipe browser, and an in-app Help page documenting all boys'-side mechanics.
 
-**The Galley (kitchen app):** a meal-readiness engine (not AI) with Meals (recipe browser), Planner (weekly plan generator with cook-time alerts and iCal export), Chains (tracks meals that reuse a protein/leftover), Pantry (inventory with low-stock flags), Shop (shopping list synced to low stock), Health (nutrition notes), and a parent-facing Dashboard view. "Ask Tink for a recipe" is wired to this engine — prefer deferring to it over inventing recipes yourself.
+**The Galley (kitchen app):** a meal-readiness engine (not AI) with Meals (recipe browser), Planner (weekly plan generator with cook-time alerts and iCal export), Chains (tracks meals that reuse a protein/leftover), Pantry (inventory with low-stock flags), Shop (shopping list synced to low stock), Health (nutrition notes), and a parent-facing Dashboard view. On a pantry/recipe/meal-plan question, you're given real current inventory, the real saved meal plan, and every known meal scored for readiness against that inventory (same scoring the Galley's own engine uses) as a "Real data from the database" section — answer from those real numbers, never invent what's in stock or guess a readiness percentage.
 
 **Bridge (Dad's command post):** Helm (today's focus, 7-day cycle, crew walkthrough status), Comms (private threads, family chat, moderation, Ship Account transfer approvals, Screen Time cash-out approvals), Instruments (per-crew gauges, Ship Accounts, a status board, weekly chore-log grid), Saga (writes Adamah Saga chapters and each boy's private Log story), Word (writes the weekly Family Devotional — scripture, narrative, discussion question, prayer prompt).
 
@@ -369,6 +369,104 @@ async function fetchLookupData(agentId, dates) {
       };
     })
   ));
+}
+
+// ── Pantry/recipe grounding for askTink ──
+// kitchen/index.html's "Ask Tink" recipe-builder box already computes real
+// mealReadiness() scores CLIENT-SIDE and passes them in as explicit
+// `context` — that path was already working. What was never built is the
+// general case: Dawn asking a pantry/recipe question from her own
+// dashboard Tink chat (askTinkDashboard, which sends no context at all),
+// where askTink had no way to see stewart/inventory or stewart/plan on
+// its own — exactly the gap this closes.
+//
+// ingTokens/haveIngredient/inStockNames/mealReadiness are a faithful port
+// of the real, non-AI matching logic kitchen/index.html itself scores
+// readiness with — not a reimplementation from scratch, and not an LLM
+// guess. MEALS_DB (functions/meals.json) is a minimal {id, name,
+// ingredients} copy of kitchen/index.html's MEALS array, same duplication
+// pattern as KJV above (kitchen/index.html is a separate, unbundled app
+// Cloud Functions can't reach). Keep both the scoring logic and
+// meals.json in sync with kitchen/index.html if either ever changes.
+const MEALS_DB = require('./meals.json');
+const ING_STOPWORDS = ['fresh', 'frozen', 'canned', 'can', 'cans', 'box', 'boxes', 'bag', 'bags', 'jar', 'jars', 'lb', 'lbs', 'oz', 'cup', 'cups', 'tbsp', 'tsp', 'pkg', 'pkgs', 'package', 'pieces', 'piece', 'cloves', 'clove', 'diced', 'chopped', 'sliced', 'minced', 'crushed', 'ground', 'small', 'medium', 'large', 'leftover', 'cooked', 'optional', 'divided', 'thawed', 'drained', 'to', 'of', 'the', 'for', 'and', 'or', 'a', 'an', 'with', 'about', 'approx', 'retain', 'juice', 'each', 'head', 'heads', 'bunch', 'stick', 'sticks', 'container', 'bottle', 'bottles', 'pkt', 'pkts', 'count', 'dash', 'pinch', 'taste'];
+
+function ingTokens(str) {
+  return String(str).toLowerCase()
+    .replace(/[0-9]+([./][0-9]+)?/g, ' ')
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !ING_STOPWORDS.includes(w));
+}
+
+function haveIngredient(ingStr, invNames) {
+  const tokens = ingTokens(ingStr);
+  if (!tokens.length) return true; // pure seasoning/water etc -- assume on hand
+  return invNames.some(inv => {
+    const invToks = ingTokens(inv);
+    return tokens.some(t => invToks.some(it => it === t || (t.length > 4 && it.includes(t)) || (it.length > 4 && t.includes(it))));
+  });
+}
+
+function inStockNames(inventory) {
+  const sections = ['freezer', 'pantry', 'fridge'];
+  const all = sections.reduce((acc, s) => acc.concat(inventory[s] || []), []);
+  return all.filter(i => (i.qty || 0) > 0).map(i => i.name);
+}
+
+function mealReadiness(meal, invNames) {
+  if (!meal.ingredients || !meal.ingredients.length) return { pct: 100, have: 0, total: 0, missing: [] };
+  let have = 0;
+  const missing = [];
+  meal.ingredients.forEach(ing => {
+    if (haveIngredient(ing, invNames)) have++;
+    else missing.push(ing);
+  });
+  const total = meal.ingredients.length;
+  return { pct: Math.round((have / total) * 100), have, total, missing };
+}
+
+const PANTRY_KEYWORD_PATTERN = /\b(recipe|recipes|meal|meals|dinner|breakfast|lunch|cook|cooking|pantry|inventory|ingredient|ingredients|stock|shopping|grocery|groceries|fridge|freezer|leftover|leftovers|meal\s*plan|planner)\b/i;
+function mightBePantryQuestion(question, history) {
+  const recentText = [question, ...(history || []).slice(-4).map(h => h.content)].join(' ');
+  return PANTRY_KEYWORD_PATTERN.test(recentText);
+}
+
+// Real stewart/inventory + stewart/plan, plus every meal in MEALS_DB
+// scored for readiness against current stock (sorted best-first) — so
+// Tink can answer "what can I make tonight" or "are we ready for X"
+// with the same real numbers the Galley's own readiness engine would
+// show, not a guess.
+async function fetchPantryGrounding() {
+  const [invSnap, planSnap] = await Promise.all([
+    db.ref('stewart/inventory').once('value'),
+    db.ref('stewart/plan').once('value')
+  ]);
+  const inventory = invSnap.val() || { freezer: [], pantry: [], fridge: [] };
+  const plan = Array.isArray(planSnap.val()) ? planSnap.val() : [];
+  const invNames = inStockNames(inventory);
+
+  const invLines = ['freezer', 'pantry', 'fridge'].map(sec => {
+    const items = inventory[sec] || [];
+    if (!items.length) return `${sec.toUpperCase()}: (empty)`;
+    const itemLines = items.map(i => `${i.name} — ${i.qty} ${i.unit}${i.qty <= (i.low || 0) ? ' (LOW/OUT)' : ''}`);
+    return `${sec.toUpperCase()}:\n  ${itemLines.join('\n  ')}`;
+  }).join('\n\n');
+
+  const planLines = plan.length
+    ? plan.map(p => p.noMeal
+      ? `${p.day} ${p.type}: no meal planned`
+      : `${p.day} ${p.type}: ${p.mealName || p.label || '(unnamed)'}${p.sides ? ' — sides: ' + p.sides : ''}`
+    ).join('\n')
+    : '(no meal plan currently saved)';
+
+  const readinessLines = MEALS_DB
+    .map(m => ({ name: m.name, ...mealReadiness(m, invNames) }))
+    .sort((a, b) => b.pct - a.pct)
+    .map(r => `${r.name}: ${r.pct}% ready (${r.have}/${r.total} ingredients on hand)${r.missing.length ? ' — missing: ' + r.missing.join(', ') : ''}`)
+    .join('\n');
+
+  return `Real data from the database — current pantry inventory (stewart/inventory):\n${invLines}\n\nCurrent meal plan (stewart/plan):\n${planLines}\n\nEvery known meal scored for readiness against current inventory, best-first — same scoring the Galley kitchen app's own readiness engine uses (% of that meal's ingredients you have on hand right now):\n${readinessLines}`;
 }
 
 function formatLookupData(agentName, rows) {
@@ -538,11 +636,23 @@ exports.askTink = functions
       }
     }
 
-    const model = resolvedContext ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+    // Same reasoning as the boy-lookup pass above: only worth checking when
+    // the caller didn't already hand us explicit context (kitchen/index.html's
+    // Recipe Builder box always does, with its own client-computed
+    // readiness — this only fires for the general case, e.g. Dawn asking a
+    // pantry/recipe question from her own dashboard Tink chat, which sends
+    // no context at all).
+    const isPantryQuestion = !resolvedContext && mightBePantryQuestion(question, sanitizedHistory);
+
+    const model = (resolvedContext || isPantryQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+
+    // Grounded data accumulates as separate parts (rather than one
+    // overwritable value) so a boy-lookup and a pantry question could both
+    // ground the same answer if a message somehow touches both.
+    const groundedParts = [];
 
     // If context names a real boy, fetch real score/deduction data server-side
     // so the answer is grounded in fact rather than generated from nothing.
-    let groundedData = null;
     if (resolvedContext && typeof resolvedContext === 'object' && !Array.isArray(resolvedContext) && resolvedContext.agentId) {
       if (!ALLOWED_AGENT_IDS.includes(resolvedContext.agentId)) {
         throw new functions.https.HttpsError('invalid-argument', `Unknown agentId: ${resolvedContext.agentId}`);
@@ -552,9 +662,15 @@ exports.askTink = functions
         const endDate = typeof resolvedContext.endDate === 'string' && DATE_RE.test(resolvedContext.endDate) ? resolvedContext.endDate : startDate;
         const dates = dateRange(startDate, endDate, MAX_LOOKUP_DAYS);
         const rows = await fetchLookupData(resolvedContext.agentId, dates);
-        groundedData = formatLookupData(AGENT_DISPLAY_NAMES[resolvedContext.agentId], rows);
+        groundedParts.push(formatLookupData(AGENT_DISPLAY_NAMES[resolvedContext.agentId], rows));
       }
     }
+
+    if (isPantryQuestion) {
+      groundedParts.push(await fetchPantryGrounding());
+    }
+
+    const groundedData = groundedParts.length ? groundedParts.join('\n\n---\n\n') : null;
 
     const response = await anthropic.messages.create({
       model,
