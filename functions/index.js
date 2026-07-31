@@ -264,7 +264,7 @@ Here is what actually exists in HMS Resolute today. Never invent functionality b
 - Comms (messenger): private 1:1 threads with each boy, a Family Channel group chat, and the ability to pause a boy's chat.
 - XO's Quarters: White Glove room inspections (Morning/Afternoon/Evening; four compartments — Kitchen, Living Room, Bathroom, Bedrooms — each rated across five categories as Clear/Not Clear, with a responsible boy assigned; oversight/accountability only, doesn't directly dock points), a Devotional Wishes suggestion box, homestead task lists, The Grace Dare devotional, Family Devotional input, Dawn's personal devotional, and a static Weekly Rhythm reference (laundry/trash/deep-clean schedule).
 - Ship's Log (growth): Art of Parenting 8-session tracker, weekly application notes, a reflection log, the "20 Character Qualities to Pray For" list, per-boy notes.
-- Drydock (projects): Family Night Activity bank, a Teach Me session list with vote management, House/Exterior project trackers, a Stone Collection log, and a Super Family Night progress tracker.
+- Drydock (projects): Family Night Activity bank, a Teach Me session list with vote management, House/Exterior project trackers, a Stone Collection log, and a Super Family Night progress tracker. You can propose setting tonight's Family Night activity (from the real activity bank) and, once Super Family Night is actually unlocked by the family's performance average, propose saving its takeout/activity plan — but you can't write either yourself, and you'd never propose unlocking it early, since that's earned, not something you or a parent can just grant.
 - Tink: this chat.
 
 **Agent HQ (the boys' app), tabs:**
@@ -278,7 +278,7 @@ Here is what actually exists in HMS Resolute today. Never invent functionality b
 - Compass: Tom, a live AI companion for the boys (built and deployed). Boys spend earned wishes to ask Tom interest/discovery, learning, or devotional questions (devotional answers cite a real KJV verse); app-help questions about the app itself are always free. Off-topic, sibling, discipline, and rule-bypass questions are declined in-voice, no wish spent. Each boy has a $1/month Anthropic budget cap; over the cap, wish-spend questions decline gracefully but app-help keeps working. If Tom suggests a website, it queues for parent approval the same way screen-time and Ship Account requests do.
 - Also linked from Agent HQ: Ship's Store (spend Ship Account balance on real prizes — currently a Chromebook contest), a Crew Deck Map, a read-only recipe browser, and an in-app Help page documenting all boys'-side mechanics.
 
-**The Galley (kitchen app):** a meal-readiness engine (not AI) with Meals (recipe browser), Planner (weekly plan generator with cook-time alerts and iCal export), Chains (tracks meals that reuse a protein/leftover), Pantry (inventory with low-stock flags), Shop (shopping list synced to low stock), Health (nutrition notes), and a parent-facing Dashboard view. On a pantry/recipe/meal-plan question, you're given real current inventory, the real saved meal plan, and every known meal scored for readiness against that inventory (same scoring the Galley's own engine uses) as a "Real data from the database" section — answer from those real numbers, never invent what's in stock or guess a readiness percentage. You can propose adding a specific meal to a specific day of the plan, but you can't write to it yourself — a proposal only becomes real once Dawn or John taps an explicit Confirm button in the app.
+**The Galley (kitchen app):** a meal-readiness engine (not AI) with Meals (recipe browser), Planner (weekly plan generator with cook-time alerts and iCal export), Chains (tracks meals that reuse a protein/leftover), Pantry (inventory with low-stock flags), Shop (shopping list synced to low stock), Health (nutrition notes), and a parent-facing Dashboard view. On a pantry/recipe/meal-plan question, you're given real current inventory, the real saved meal plan, and every known meal scored for readiness against that inventory (same scoring the Galley's own engine uses) as a "Real data from the database" section — answer from those real numbers, never invent what's in stock or guess a readiness percentage. You can propose adding a specific meal to a specific day of the plan, and propose adding specific items to the shopping list, but you can't write either yourself — a proposal only becomes real once Dawn or John taps an explicit Confirm button in the app.
 
 **Bridge (Dad's command post):** Helm (today's focus, 7-day cycle, crew walkthrough status), Comms (private threads, family chat, moderation, Ship Account transfer approvals, Screen Time cash-out approvals), Instruments (per-crew gauges, Ship Accounts, a status board, weekly chore-log grid), Saga (writes Adamah Saga chapters and each boy's private Log story), Word (writes the weekly Family Devotional — scripture, narrative, discussion question, prayer prompt).
 
@@ -432,6 +432,15 @@ function mightBePantryQuestion(question, history) {
   return PANTRY_KEYWORD_PATTERN.test(recentText);
 }
 
+// Tier 1 write-capable action (tink-write-boundary-spec.md): family night
+// scheduling. Separate gate from pantry — a different topic entirely —
+// so it doesn't pay the structured-output cost on every recipe question.
+const FAMILY_NIGHT_KEYWORD_PATTERN = /\b(family\s*night|super\s*family\s*night|campfire|game\s*night|movie\s*night|board\s*game|activity\s*bank|barn\s*night|stargazing)\b/i;
+function mightBeFamilyNightQuestion(question, history) {
+  const recentText = [question, ...(history || []).slice(-4).map(h => h.content)].join(' ');
+  return FAMILY_NIGHT_KEYWORD_PATTERN.test(recentText);
+}
+
 // Real stewart/inventory + stewart/plan, plus every meal in MEALS_DB
 // scored for readiness against current stock (sorted best-first) — so
 // Tink can answer "what can I make tonight" or "are we ready for X"
@@ -475,6 +484,11 @@ async function fetchPantryGrounding() {
 // one of these is silently dropped rather than handed to the client.
 const VALID_PLAN_DAYS = new Set(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
 
+// Covers both of the write-boundary spec's kitchen-side Tier 1 actions
+// (meal plan + shopping list) in one schema, since both share the same
+// isPantryQuestion gate and call — no reason to pay for two Sonnet calls
+// when one message ("add tacos to Tuesday and put sour cream on the
+// list") can plausibly confirm both at once.
 const TINK_PLAN_ACTION_SCHEMA = {
   type: 'object',
   properties: {
@@ -483,20 +497,23 @@ const TINK_PLAN_ACTION_SCHEMA = {
     planDay: { type: 'string' },
     planType: { type: 'string' },
     planMealName: { type: 'string' },
-    planSides: { type: 'string' }
+    planSides: { type: 'string' },
+    proposeAddToShopping: { type: 'boolean' },
+    shoppingItems: { type: 'array', items: { type: 'string' } }
   },
-  required: ['message', 'proposeAddToPlan', 'planDay', 'planType', 'planMealName', 'planSides'],
+  required: ['message', 'proposeAddToPlan', 'planDay', 'planType', 'planMealName', 'planSides', 'proposeAddToShopping', 'shoppingItems'],
   additionalProperties: false
 };
 
-// Tink's first write-capable action. She never touches stewart/plan
-// herself — this only ever produces a PROPOSAL the server hands back to
-// the client; the actual read-modify-write happens client-side (same
-// place Kitchen's own savePlan() already writes this path from), and
-// only after Dawn or John taps an explicit Confirm button — same trust
-// boundary as Tom's wish-spend confirm on the boys' side. Appended to
-// TINK_SYSTEM_PROMPT only for the pantry-question call path — every
-// other Tink question is completely untouched by this.
+// Tier 1 write-capable actions (tink-write-boundary-spec.md): informational/
+// logistical, confirm-before-write. Tink never touches stewart/plan or
+// stewart/shopping herself — this only ever produces a PROPOSAL the server
+// hands back to the client; the actual read-modify-write happens
+// client-side (same place Kitchen's own savePlan()/saveShop() already
+// write these paths from), and only after Dawn or John taps an explicit
+// Confirm button — same trust boundary as Tom's wish-spend confirm on the
+// boys' side. Appended to TINK_SYSTEM_PROMPT only for the pantry-question
+// call path — every other Tink question is completely untouched by this.
 const TINK_PLAN_ACTION_INSTRUCTIONS = `
 
 You can propose adding a meal to the weekly meal plan (stewart/plan) — but you can't write to it yourself. A proposal only becomes real once Dawn or John taps an explicit Confirm button in the app; nothing is saved just because you said it. Set "proposeAddToPlan" to true ONLY when their MOST RECENT message is a clear, explicit confirmation that one specific meal should go on one specific day — e.g. "yes, add that to Tuesday," "let's do that," "sounds good, put it on the plan," "add Chicken Tacos to Wednesday."
@@ -505,7 +522,96 @@ Do NOT propose just because a meal was mentioned, suggested, or discussed. Brain
 
 When you DO propose: "planDay" must be exactly one of Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday — resolve relative references ("tomorrow," "tonight") against today's date. "planType" should be "Family" unless they specifically said the boys are cooking that day, in which case "Boys Cook". "planMealName" is the specific meal being added — never leave it vague ("dinner," "something") when proposing; if you don't know a specific enough name yet, don't propose, ask what to call it instead. "planSides" is optional — leave it an empty string if nothing was mentioned.
 
-If proposeAddToPlan is false, leave planDay/planType/planMealName/planSides all as empty strings.`;
+If proposeAddToPlan is false, leave planDay/planType/planMealName/planSides all as empty strings.
+
+You can also propose adding items to the shopping list (stewart/shopping) — same rule: only on a clear, explicit confirmation, e.g. "yes add milk," "put eggs and bacon on the list," "we need more butter, add it." Set "proposeAddToShopping" true and list each item as its own short string in "shoppingItems" (e.g. ["milk", "eggs"]) — a quantity or brief note is fine within one item's string ("2 gallons of milk") but don't bundle multiple items into one string. Don't propose just because an ingredient was mentioned while discussing a recipe — only on an actual request to add it to the list.
+
+If proposeAddToShopping is false, leave shoppingItems as an empty array.`;
+
+// Mirror of dashboard/index.html's FAMILY_NIGHT_ACTIVITIES — id+label only
+// (the client already has the full catalog with icon/venue/desc loaded, so
+// the server only needs enough to validate a proposed id and describe the
+// options to the model). Same duplication caveat as MEALS_DB/KJV: keep in
+// sync with dashboard/index.html if that catalog ever changes.
+const FAMILY_NIGHT_ACTIVITY_CATALOG = [
+  { id: 'campfire', label: 'Campfire Night' },
+  { id: 'stargazing', label: 'Stargazing' },
+  { id: 'grill-night', label: 'Grill Night' },
+  { id: 'campfire-stories', label: 'Storytelling Night' },
+  { id: 'night-games', label: 'Night Games' },
+  { id: 'firepit-devotional', label: 'Fire Pit Devotional' },
+  { id: 'barn-games', label: 'Barn Game Night' },
+  { id: 'teach-tools', label: 'Tool School' },
+  { id: 'build-something', label: 'Build Something Small' },
+  { id: 'bike-maintenance', label: 'Bike Maintenance Day' },
+  { id: 'car-basics', label: 'Car Basics Session' },
+  { id: 'barn-cookout', label: 'Barn Cookout' },
+  { id: 'board-games', label: 'Board Game Night' },
+  { id: 'movie-popcorn', label: 'Movie & Popcorn' },
+  { id: 'cook-together', label: 'Cook Something Together' },
+  { id: 'reading-night', label: 'Reading Night' },
+  { id: 'map-night', label: 'Map & Navigation Night' },
+  { id: 'stone-collection', label: 'Stone Collection Run' },
+  { id: 'planting-day', label: 'Planting Day' },
+  { id: 'path-work', label: 'Path Work Session' },
+  { id: 'yard-cleanup', label: 'Full Yard Cleanup' }
+];
+const VALID_FAMILY_NIGHT_ACTIVITY_IDS = new Set(FAMILY_NIGHT_ACTIVITY_CATALOG.map(a => a.id));
+
+// Real tonight's-activity + Super Family Night state, so Tink knows
+// whether something's already scheduled and — critically — whether Super
+// Family Night is actually unlocked before ever proposing a plan for it.
+// Returns { text, unlocked } — the handler uses `unlocked` as a second,
+// server-side gate on top of the prompt instruction below, the same
+// belt-and-suspenders pattern as VALID_PLAN_DAYS.
+async function fetchFamilyNightGrounding(todayStr) {
+  const monthKey = todayStr.slice(0, 7);
+  const [activitySnap, sfnSnap] = await Promise.all([
+    db.ref(`stewart/familynight/activities/${todayStr}`).once('value'),
+    db.ref(`stewart/superfamilynight/${monthKey}`).once('value')
+  ]);
+  const activity = activitySnap.val();
+  const sfn = sfnSnap.val() || {};
+  const activityLine = activity
+    ? `Tonight (${todayStr}) already has a family night activity set: ${activity.label}.`
+    : `No family night activity is set for tonight (${todayStr}) yet.`;
+  const sfnLine = sfn.unlocked
+    ? `Super Family Night is UNLOCKED this month — current plan: ${sfn.food ? 'food: ' + sfn.food : '(no food chosen yet)'}, ${sfn.activity ? 'activity: ' + sfn.activity : '(no activity chosen yet)'}.`
+    : `Super Family Night is NOT unlocked yet this month — it unlocks automatically once the family's weekly performance average hits 80%. Never propose a Super Family Night plan while it's locked; that's earned, not something to offer early.`;
+  return {
+    text: `Real data from the database — family night status:\n${activityLine}\n${sfnLine}`,
+    unlocked: !!sfn.unlocked
+  };
+}
+
+const TINK_FAMILY_NIGHT_SCHEMA = {
+  type: 'object',
+  properties: {
+    message: { type: 'string' },
+    proposeFamilyNightActivity: { type: 'boolean' },
+    familyNightActivityId: { type: 'string' },
+    proposeSuperFamilyNightPlan: { type: 'boolean' },
+    superFamilyNightFood: { type: 'string' },
+    superFamilyNightActivity: { type: 'string' }
+  },
+  required: ['message', 'proposeFamilyNightActivity', 'familyNightActivityId', 'proposeSuperFamilyNightPlan', 'superFamilyNightFood', 'superFamilyNightActivity'],
+  additionalProperties: false
+};
+
+// Tier 1 write-capable action: family night scheduling. Same confirm-
+// before-write boundary as the plan/shopping actions above — Tink only
+// ever proposes; the client performs the actual write after an explicit
+// Confirm tap. Appended to TINK_SYSTEM_PROMPT only for the family-night
+// call path.
+const TINK_FAMILY_NIGHT_INSTRUCTIONS = `
+
+You can propose setting tonight's Family Night activity (stewart/familynight/activities) — but you can't write it yourself. A proposal only becomes real once Dawn or John taps an explicit Confirm button. Set "proposeFamilyNightActivity" to true ONLY on a clear, explicit confirmation of ONE specific activity for tonight — e.g. "yes let's do campfire night," "let's do movie and popcorn tonight." Don't propose just because an activity was mentioned or discussed while deciding.
+
+"familyNightActivityId" must be exactly one of these real catalog ids (never invent one, never guess a close match) — id (label): ${FAMILY_NIGHT_ACTIVITY_CATALOG.map(a => `${a.id} (${a.label})`).join(', ')}. If what they want doesn't clearly match one of these, say so honestly and don't propose.
+
+You can also propose saving the Super Family Night takeout/activity plan (stewart/superfamilynight) — but ONLY if the grounding data says it's currently unlocked. If it's locked, never propose this — just explain honestly that it isn't unlocked yet (it unlocks automatically at 80% family average, not something you or they can trigger). When it is unlocked, set "proposeSuperFamilyNightPlan" true only on an explicit confirmation of specific choices, filling in "superFamilyNightFood" and/or "superFamilyNightActivity" (either can be left empty if only one was decided).
+
+If neither applies: leave proposeFamilyNightActivity and proposeSuperFamilyNightPlan false, familyNightActivityId empty, and both superFamilyNight fields empty.`;
 
 function formatLookupData(agentName, rows) {
   const lines = rows.map(r => {
@@ -644,6 +750,17 @@ async function extractLookupIntent(anthropic, { question, history, today }) {
 // Note: `context` here is the caller-supplied question context (e.g. which
 // boy/date range) — not to be confused with the callable's own invocation
 // context, named `callableContext` below to avoid shadowing it.
+//
+// WRITE BOUNDARY (tink-write-boundary-spec.md), enforced here in code, not
+// just in TINK_SYSTEM_PROMPT: this function is a hard Tier 3 block by
+// construction — it never calls .set()/.update()/.push()/.remove() on any
+// database ref, only .once('value') reads. Every real write (Tier 1:
+// stewart/plan, stewart/shopping, stewart/familynight/*,
+// stewart/superfamilynight/*) happens client-side, only after an explicit
+// human Confirm tap on a proposal this function returns. If you're adding
+// a new Tink capability and find yourself reaching for db.ref(...).set()
+// in here, stop — that's a boundary violation regardless of what the
+// system prompt says; the write belongs on the client, behind a confirm.
 exports.askTink = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
@@ -682,12 +799,19 @@ exports.askTink = functions
     // no context at all).
     const isPantryQuestion = !resolvedContext && mightBePantryQuestion(question, sanitizedHistory);
 
-    const model = (resolvedContext || isPantryQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+    // Mutually exclusive with isPantryQuestion by priority (branch order
+    // below), not by construction — a message could plausibly match both
+    // keyword sets, and pantry wins in that rare case. Not worth a more
+    // complex gate for how infrequently that overlap would actually happen.
+    const isFamilyNightQuestion = !resolvedContext && !isPantryQuestion && mightBeFamilyNightQuestion(question, sanitizedHistory);
+
+    const model = (resolvedContext || isPantryQuestion || isFamilyNightQuestion) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
 
     // Grounded data accumulates as separate parts (rather than one
     // overwritable value) so a boy-lookup and a pantry question could both
     // ground the same answer if a message somehow touches both.
     const groundedParts = [];
+    let familyNightUnlocked = false;
 
     // If context names a real boy, fetch real score/deduction data server-side
     // so the answer is grounded in fact rather than generated from nothing.
@@ -708,17 +832,26 @@ exports.askTink = functions
       groundedParts.push(await fetchPantryGrounding());
     }
 
+    if (isFamilyNightQuestion) {
+      const fnGrounding = await fetchFamilyNightGrounding(todayStr);
+      groundedParts.push(fnGrounding.text);
+      familyNightUnlocked = fnGrounding.unlocked;
+    }
+
     const groundedData = groundedParts.length ? groundedParts.join('\n\n---\n\n') : null;
     const userContent = buildTinkUserPrompt({ question, context: resolvedContext, groundedData });
 
-    // Two call shapes: the pantry-question path forces structured
-    // {message, proposeAddToPlan, ...} output so a plan-write proposal is
+    // Three call shapes: the pantry-question and family-night-question
+    // paths each force their own structured output so a write proposal is
     // always a real, validated field the server can check — never
     // something parsed back out of free-form prose. Every other Tink
     // question keeps the existing plain-text call completely unchanged,
-    // zero risk of the schema affecting an unrelated answer.
+    // zero risk of either schema affecting an unrelated answer.
     let text = '';
     let proposedPlanAction = null;
+    let proposedShoppingAction = null;
+    let proposedFamilyNightActivity = null;
+    let proposedSuperFamilyNightPlan = null;
 
     if (isPantryQuestion) {
       const response = await anthropic.messages.create({
@@ -752,6 +885,42 @@ exports.askTink = functions
           sides: (parsed.planSides || '').trim()
         };
       }
+      const shoppingItems = Array.isArray(parsed.shoppingItems)
+        ? parsed.shoppingItems.map(i => String(i || '').trim()).filter(Boolean)
+        : [];
+      if (parsed.proposeAddToShopping && shoppingItems.length) {
+        proposedShoppingAction = { items: shoppingItems };
+      }
+    } else if (isFamilyNightQuestion) {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: TINK_SYSTEM_PROMPT + TINK_FAMILY_NIGHT_INSTRUCTIONS,
+        output_config: { format: { type: 'json_schema', schema: TINK_FAMILY_NIGHT_SCHEMA } },
+        messages: [...sanitizedHistory, { role: 'user', content: userContent }]
+      });
+      await logTinkUsage(model, response.usage);
+
+      const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        throw new functions.https.HttpsError('internal', 'Could not parse Tink response.');
+      }
+      text = (parsed.message || '').trim();
+
+      if (parsed.proposeFamilyNightActivity && VALID_FAMILY_NIGHT_ACTIVITY_IDS.has(parsed.familyNightActivityId)) {
+        proposedFamilyNightActivity = { id: parsed.familyNightActivityId };
+      }
+      // Never trust the model's own judgment on unlock state — only the
+      // grounding data's real read of stewart/superfamilynight decides
+      // whether this proposal is even allowed through.
+      const sfnFood = (parsed.superFamilyNightFood || '').trim();
+      const sfnActivity = (parsed.superFamilyNightActivity || '').trim();
+      if (parsed.proposeSuperFamilyNightPlan && familyNightUnlocked && (sfnFood || sfnActivity)) {
+        proposedSuperFamilyNightPlan = { food: sfnFood, activity: sfnActivity };
+      }
     } else {
       const response = await anthropic.messages.create({
         model,
@@ -772,7 +941,7 @@ exports.askTink = functions
       throw new functions.https.HttpsError('internal', 'No text returned from Anthropic.');
     }
 
-    return { text, proposedPlanAction };
+    return { text, proposedPlanAction, proposedShoppingAction, proposedFamilyNightActivity, proposedSuperFamilyNightPlan };
   });
 
 // ════════════════════════════════════════════════════
