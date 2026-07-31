@@ -32,6 +32,20 @@ function parseLocalDate(dateStr){
   return new Date(parts[0], parts[1]-1, parts[2]);
 }
 
+// Strips the time-of-day off a Date, keeping only the local calendar date.
+// The day-count rotations below (dish team, bathroom, Officer of the Watch,
+// dinner side) all divide a raw millisecond difference by 24h — without this
+// normalization, the SAME calendar day produces a DIFFERENT rotation result
+// depending on whether the caller's Date object happened to be built at
+// midnight vs. noon (or any other time), because the extra hours shift which
+// integer day the floor() division lands on. This caused buildMissions() to
+// disagree with itself across call sites (e.g. parseLocalDate's midnight vs.
+// the week-grid's noon), silently drifting mission lists, scores, pay, and
+// eligible-counts apart for the exact same boy/day.
+function toMidnight(d){
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 function isLaundryDayFor(agentId, dayOfWeek){
   if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
   if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
@@ -47,9 +61,9 @@ function isLaundryDay(agentId, _d){
 // single week — e.g. Stephen & Daniel doing dishes Sun AND Mon back to back.
 // Do not go back to a day-of-week table; that's what caused the bug.)
 function getDishTeam(_d){
-  const now = _d ? new Date(_d) : new Date();
+  const now = toMidnight(_d ? new Date(_d) : new Date());
   const epoch = new Date(2024, 0, 1); // fixed reference point, arbitrary but stable
-  const daysSinceEpoch = Math.floor((now - epoch) / (24*60*60*1000));
+  const daysSinceEpoch = Math.round((now - epoch) / (24*60*60*1000));
   // Flipped 2026-07-28 per Dawn/John's request — Samuel & John Jr. on dishes today.
   return (daysSinceEpoch % 2 === 0) ? 'sd' : 'sj';
 }
@@ -66,16 +80,16 @@ function isWednesday(_d){
 }
 function getBathroomAgent(_d){
   const order = ['samuel','johnjr','stephen','daniel'];
-  const now = _d ? new Date(_d) : new Date();
+  const now = toMidnight(_d ? new Date(_d) : new Date());
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const weekNum = Math.floor((now - startOfYear) / (7*24*60*60*1000));
+  const weekNum = Math.round((now - startOfYear) / (7*24*60*60*1000));
   return order[weekNum % 4];
 }
 function getOfficerOfWatch(_d){
   const order = ['samuel','johnjr','stephen','daniel'];
-  const now = _d ? new Date(_d) : new Date();
+  const now = toMidnight(_d ? new Date(_d) : new Date());
   const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const dayNum = Math.floor((now - startOfYear) / (24*60*60*1000));
+  const dayNum = Math.round((now - startOfYear) / (24*60*60*1000));
   return order[dayNum % 4];
 }
 
@@ -91,11 +105,12 @@ function isDinnerSideDay(_d){
   return DINNER_SIDE_DAYS.includes((_d?new Date(_d):new Date()).getDay());
 }
 function getDinnerSideAssignment(dateOverride){
-  const date = dateOverride ? new Date(dateOverride) : new Date();
-  const dow = date.getDay();
+  const rawDate = dateOverride ? new Date(dateOverride) : new Date();
+  const dow = rawDate.getDay();
   if(!DINNER_SIDE_DAYS.includes(dow)) return null;
+  const date = toMidnight(rawDate);
   const epoch = new Date(2024, 0, 1);
-  const daysSinceEpoch = Math.floor((date - epoch) / (24*60*60*1000));
+  const daysSinceEpoch = Math.round((date - epoch) / (24*60*60*1000));
   const fullWeeks = Math.floor(daysSinceEpoch / 7);
   const remainderDays = daysSinceEpoch % 7;
   let cookingDayIndex = fullWeeks * 3;
