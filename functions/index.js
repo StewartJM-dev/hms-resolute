@@ -638,7 +638,7 @@ const TOM_BUDGET_CAP_USD = 1.00;
 // field to fall out of sync with a birthday.
 const AGENT_AGES = { samuel: 13, johnjr: 11, stephen: 9, daniel: 7 };
 
-function tomAgeGuidance(age) {
+function tomAgeGuidance(age, name) {
   let complexity;
   if (age <= 8) {
     complexity = "Keep sentences short and concrete, one idea at a time — avoid multi-clause reasoning or abstract concepts.";
@@ -647,7 +647,7 @@ function tomAgeGuidance(age) {
   } else {
     complexity = "Normal sentence complexity is fine — he can follow longer reasoning and more nuance.";
   }
-  return `The boy you're talking to is ${age} years old. ${complexity} Keep the exact same voice, humor, and every rule above — only sentence complexity and vocabulary should shift with age, never the personality.`;
+  return `The boy you're talking to is ${name}, age ${age}. Address him by name where it feels natural — not every line, don't force it. ${complexity} Keep the exact same voice, humor, and every rule above — only sentence complexity and vocabulary should shift with age, never the personality.`;
 }
 
 const TOM_VOICE = `You are Tom, the AI companion living under the Compass tab of HMS Resolute, a family chore-tracking app used by four boys. Diagnose what's actually going on before advising. Real stories/analogies over generic encouragement, but trimmed lean — don't over-explain. Dry, deadpan humor, not goofy. Quiet, assumed confidence in a boy before he's proven anything. Economical with words. Duty-bound phrasing where it fits ("that's the mission," not "please do this"). On devotional matters, steadiness never overrides humility — always point to Scripture and Dad as the real authority, never position yourself as final word.
@@ -745,6 +745,33 @@ async function logTomUsage(agentId, usage) {
   }
 }
 
+// Narrow, deliberately scoped context: ONLY this boy's own thread
+// (stewart/messages/{agentId}), ONLY entries Tom himself authored
+// (from === 'Tom' — pushTomModerationNudge is the sole writer of that
+// combination, so this is exclusively his own past moderation nudges,
+// never a sibling's conversation, the group chat, or another boy's
+// thread), and only the last 48 hours. Lets Tom answer "why'd you correct
+// me?" by referencing his own real, recent action instead of either
+// making something up or claiming no memory of it.
+const TOM_NUDGE_CONTEXT_WINDOW_MS = 48 * 60 * 60 * 1000;
+async function recentTomNudgesForAgent(agentId) {
+  const cutoff = Date.now() - TOM_NUDGE_CONTEXT_WINDOW_MS;
+  const snap = await db.ref(`stewart/messages/${agentId}`).once('value');
+  const all = snap.val() || {};
+  return Object.values(all)
+    .filter(e => e && e.from === 'Tom' && typeof e.timestamp === 'number' && e.timestamp >= cutoff)
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function tomNudgeContextBlock(nudges) {
+  if (!nudges.length) return '';
+  const lines = nudges.map(n => {
+    const when = new Date(n.timestamp).toLocaleString('en-US', { timeZone: FAMILY_TIMEZONE, weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    return `- ${when}: "${n.text}"`;
+  }).join('\n');
+  return `\n\nYour own recent moderation corrections to THIS boy, for your reference only — do not bring these up unprompted, but if he asks why you corrected him or references it, you can explain using exactly what's below and nothing else (no other boy's thread, no group chat, no sibling conversations):\n${lines}`;
+}
+
 // Answers a boy's question in Tom's voice, classified into exactly one
 // category. Devotional citations are grounded against the real local KJV
 // (never trusting the model's own quote), and interest/website suggestions
@@ -753,6 +780,17 @@ async function logTomUsage(agentId, usage) {
 // can't know the category (and therefore whether it's wish-costing) until
 // after classifying, and app-help questions must stay free even once the
 // wish-spend budget is exhausted.
+//
+// Moderation runs FIRST, inline, before any of that — same classifier
+// group/private chat already uses. Previously this path was only
+// moderated by a separate, asynchronous DB trigger watching
+// stewart/tomchat writes, which the client fires independently of (and
+// concurrently with) this very call — so gibberish/spam/unkindness sent
+// straight to Tom always burned a full paid Sonnet call and got a real
+// (if declined) response regardless, while group/private chat short-
+// circuited before spending anything. Classifying here first closes that
+// gap: same handling everywhere, and a bad-faith message costs one cheap
+// Haiku classification instead of a full Tom response.
 exports.askTom = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
@@ -764,17 +802,38 @@ exports.askTom = functions
       throw new functions.https.HttpsError('invalid-argument', 'question is required.');
     }
 
-    const sanitizedHistory = sanitizeHistory(history);
     const agentName = AGENT_DISPLAY_NAMES[agentId];
     const age = AGENT_AGES[agentId];
+
+    async function moderateAndRespond(category) {
+      const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', question);
+      const message = tomModerationNudgeText(category, count);
+      await pushTomModerationNudge(agentId, message);
+      if (category === 'unkind') {
+        await notifyParentsOfUnkindMessage(agentId, agentName, question, 'tomchat', String(Date.now()));
+      }
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, agentName);
+      return { type: 'declined', category, message };
+    }
+
+    if (BANNED_67_PATTERN.test(question)) {
+      return moderateAndRespond('banned_term');
+    }
+    const moderationCategory = await classifyChatMessage(question);
+    if (moderationCategory === 'gibberish_spam' || moderationCategory === 'unkind') {
+      return moderateAndRespond(moderationCategory);
+    }
+
+    const sanitizedHistory = sanitizeHistory(history);
     const overBudget = (await getMonthlyBudgetSpent(agentId)) >= TOM_BUDGET_CAP_USD;
+    const nudges = await recentTomNudgesForAgent(agentId);
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await anthropic.messages.create({
       model: TOM_MODEL,
       max_tokens: 500,
-      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age)}`,
+      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}${tomNudgeContextBlock(nudges)}`,
       output_config: { format: { type: 'json_schema', schema: TOM_RESPONSE_SCHEMA } },
       messages: [
         ...sanitizedHistory,
@@ -926,6 +985,25 @@ const TOM_MODERATION_NUDGE_GIBBERISH = "That's outside my orders, sailor — pul
 const TOM_MODERATION_NUDGE_UNKIND = "That's not how we treat each other, sailor — pull it back. I let Mom and Dad know so they've got the full picture.";
 const TOM_MODERATION_NUDGE_BANNED_TERM = "That number's off-limits in the chat, sailor — Dad's orders. Spell it out (\"sixty seven\") if you need it, and you're clear.";
 
+// Same threshold autoPauseForStrikes acts on — pulled into one constant so
+// the nudge text below can never drift out of sync with what the count
+// actually triggers.
+const AUTO_PAUSE_STRIKE_THRESHOLD = 3;
+
+// Appends the boy's live strike count to the base nudge so he knows exactly
+// where he stands in the moment ("that's strike 2 of 3 today"), not just
+// that he got corrected — makes the escalation legible instead of each
+// nudge feeling like an isolated, disconnected event.
+function tomModerationNudgeText(category, count) {
+  const base = category === 'banned_term' ? TOM_MODERATION_NUDGE_BANNED_TERM
+    : category === 'gibberish_spam' ? TOM_MODERATION_NUDGE_GIBBERISH
+    : TOM_MODERATION_NUDGE_UNKIND;
+  const strikeLine = count >= AUTO_PAUSE_STRIKE_THRESHOLD
+    ? `That's strike ${count} of ${AUTO_PAUSE_STRIKE_THRESHOLD} today, sailor — chat's paused for the rest of the day.`
+    : `That's strike ${count} of ${AUTO_PAUSE_STRIKE_THRESHOLD} today, sailor.`;
+  return `${base} ${strikeLine}`;
+}
+
 // A hard, deterministic ban — not an AI judgment call. "67" as digits is
 // blocked outright, even inside an otherwise real, coherent sentence
 // (unlike gibberish_spam, which only catches messages with no real content
@@ -1033,8 +1111,8 @@ exports.moderateGroupChatMessage = functions
     if (BANNED_67_PATTERN.test(m.text)) {
       await snap.ref.remove();
       const count = await recordStrike(m.agentId, easternDateStr(), 'banned_term', 'groupchat', m.text);
-      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_BANNED_TERM);
-      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
+      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('banned_term', count));
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       return null;
     }
 
@@ -1043,16 +1121,16 @@ exports.moderateGroupChatMessage = functions
     if (category === 'gibberish_spam') {
       await snap.ref.remove();
       const count = await recordStrike(m.agentId, easternDateStr(), category, 'groupchat', m.text);
-      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_GIBBERISH);
-      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
+      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('gibberish_spam', count));
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       return null;
     }
 
     if (category === 'unkind') {
       const count = await recordStrike(m.agentId, easternDateStr(), category, 'groupchat', m.text);
-      await pushTomModerationNudge(m.agentId, TOM_MODERATION_NUDGE_UNKIND);
+      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('unkind', count));
       await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
-      if (count === 3) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       await snap.ref.update({ moderation: category });
       return null;
     }
@@ -1077,8 +1155,8 @@ exports.moderatePrivateMessage = functions
     if (BANNED_67_PATTERN.test(m.text)) {
       await snap.ref.remove();
       const count = await recordStrike(agentId, easternDateStr(), 'banned_term', 'private', m.text);
-      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_BANNED_TERM);
-      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      await pushTomModerationNudge(agentId, tomModerationNudgeText('banned_term', count));
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       return null;
     }
 
@@ -1087,16 +1165,16 @@ exports.moderatePrivateMessage = functions
     if (category === 'gibberish_spam') {
       await snap.ref.remove();
       const count = await recordStrike(agentId, easternDateStr(), category, 'private', m.text);
-      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_GIBBERISH);
-      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      await pushTomModerationNudge(agentId, tomModerationNudgeText('gibberish_spam', count));
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       return null;
     }
 
     if (category === 'unkind') {
       const count = await recordStrike(agentId, easternDateStr(), category, 'private', m.text);
-      await pushTomModerationNudge(agentId, TOM_MODERATION_NUDGE_UNKIND);
+      await pushTomModerationNudge(agentId, tomModerationNudgeText('unkind', count));
       await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
-      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
+      if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       await snap.ref.update({ moderation: category });
       return null;
     }
@@ -1105,50 +1183,17 @@ exports.moderatePrivateMessage = functions
     return null;
   });
 
-// Tom's own chat (stewart/tomchat/{agentId}) was never moderated at all —
-// a real gap, since it's a live 1:1 conversation with an AI and a boy can
-// send it anything. Deliberately leaner than group/private moderation:
-// never deletes. A gibberish/rude message to Tom still gets a real,
-// in-voice reply from askTom in the moment (already visible in the
-// thread — that IS the natural "nudge" here, no need to inject a second
-// Tom message on top of it), so this only needs to record the strike (and
-// notify parents immediately for unkindness, same as everywhere else) —
-// deleting the boy's side would leave Tom's already-generated reply
-// looking like a non-sequitur, and there's no lightweight way to safely
-// find-and-remove its paired response given the two are written
-// independently and asynchronously by the client.
-exports.moderateTomChatMessage = functions
-  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
-  .database.ref('/stewart/tomchat/{agentId}/{msgId}')
-  .onCreate(async (snap, context) => {
-    const agentId = context.params.agentId;
-    const m = snap.val();
-    if (!m || !m.text || !ALLOWED_AGENT_IDS.includes(agentId)) return null;
-    if (m.agentId === 'tom') return null; // only the boy's own questions get classified
-
-    if (BANNED_67_PATTERN.test(m.text)) {
-      const count = await recordStrike(agentId, easternDateStr(), 'banned_term', 'tomchat', m.text);
-      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
-      return null;
-    }
-
-    const category = await classifyChatMessage(m.text);
-
-    if (category === 'gibberish_spam') {
-      const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', m.text);
-      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
-      return null;
-    }
-
-    if (category === 'unkind') {
-      const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', m.text);
-      await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'tomchat', context.params.msgId);
-      if (count === 3) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
-      return null;
-    }
-
-    return null; // 'clean' — nothing to do; Tom chat doesn't read a moderation field
-  });
+// Tom's own chat used to go completely unmoderated at the point that
+// mattered: this DB trigger classified stewart/tomchat/{agentId} writes,
+// but askTom (the callable that actually burns a real Sonnet call) ran
+// independently and concurrently — the client fires both the raw DB write
+// and the askTom call back-to-back with no ordering between them. So
+// gibberish/spam still always got a full paid AI call and a real (if
+// declined) response; this trigger only ever caught up afterward to record
+// the strike. Classification now happens INLINE inside askTom, before the
+// expensive call, so it can actually short-circuit — this whole trigger is
+// redundant with that (and would double-count every strike if left in
+// place, since both would classify the same text), so it's removed.
 
 // Step 6: weekly report card — pulls the FULL, unfiltered incident history
 // across 7 days (the daily strike counter's own date-scoped reset never
