@@ -278,7 +278,7 @@ Here is what actually exists in HMS Resolute today. Never invent functionality b
 - Compass: Tom, a live AI companion for the boys (built and deployed). Boys spend earned wishes to ask Tom interest/discovery, learning, or devotional questions (devotional answers cite a real KJV verse); app-help questions about the app itself are always free. Off-topic, sibling, discipline, and rule-bypass questions are declined in-voice, no wish spent. Each boy has a $1/month Anthropic budget cap; over the cap, wish-spend questions decline gracefully but app-help keeps working. If Tom suggests a website, it queues for parent approval the same way screen-time and Ship Account requests do.
 - Also linked from Agent HQ: Ship's Store (spend Ship Account balance on real prizes — currently a Chromebook contest), a Crew Deck Map, a read-only recipe browser, and an in-app Help page documenting all boys'-side mechanics.
 
-**The Galley (kitchen app):** a meal-readiness engine (not AI) with Meals (recipe browser), Planner (weekly plan generator with cook-time alerts and iCal export), Chains (tracks meals that reuse a protein/leftover), Pantry (inventory with low-stock flags), Shop (shopping list synced to low stock), Health (nutrition notes), and a parent-facing Dashboard view. On a pantry/recipe/meal-plan question, you're given real current inventory, the real saved meal plan, and every known meal scored for readiness against that inventory (same scoring the Galley's own engine uses) as a "Real data from the database" section — answer from those real numbers, never invent what's in stock or guess a readiness percentage.
+**The Galley (kitchen app):** a meal-readiness engine (not AI) with Meals (recipe browser), Planner (weekly plan generator with cook-time alerts and iCal export), Chains (tracks meals that reuse a protein/leftover), Pantry (inventory with low-stock flags), Shop (shopping list synced to low stock), Health (nutrition notes), and a parent-facing Dashboard view. On a pantry/recipe/meal-plan question, you're given real current inventory, the real saved meal plan, and every known meal scored for readiness against that inventory (same scoring the Galley's own engine uses) as a "Real data from the database" section — answer from those real numbers, never invent what's in stock or guess a readiness percentage. You can propose adding a specific meal to a specific day of the plan, but you can't write to it yourself — a proposal only becomes real once Dawn or John taps an explicit Confirm button in the app.
 
 **Bridge (Dad's command post):** Helm (today's focus, 7-day cycle, crew walkthrough status), Comms (private threads, family chat, moderation, Ship Account transfer approvals, Screen Time cash-out approvals), Instruments (per-crew gauges, Ship Accounts, a status board, weekly chore-log grid), Saga (writes Adamah Saga chapters and each boy's private Log story), Word (writes the weekly Family Devotional — scripture, narrative, discussion question, prayer prompt).
 
@@ -468,6 +468,44 @@ async function fetchPantryGrounding() {
 
   return `Real data from the database — current pantry inventory (stewart/inventory):\n${invLines}\n\nCurrent meal plan (stewart/plan):\n${planLines}\n\nEvery known meal scored for readiness against current inventory, best-first — same scoring the Galley kitchen app's own readiness engine uses (% of that meal's ingredients you have on hand right now):\n${readinessLines}`;
 }
+
+// Real, valid stewart/plan day keys — Kitchen's own plan entries are
+// always keyed by a day name (never a calendar date). Checked before
+// trusting a proposed write's "planDay" — a proposal that doesn't match
+// one of these is silently dropped rather than handed to the client.
+const VALID_PLAN_DAYS = new Set(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
+
+const TINK_PLAN_ACTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    message: { type: 'string' },
+    proposeAddToPlan: { type: 'boolean' },
+    planDay: { type: 'string' },
+    planType: { type: 'string' },
+    planMealName: { type: 'string' },
+    planSides: { type: 'string' }
+  },
+  required: ['message', 'proposeAddToPlan', 'planDay', 'planType', 'planMealName', 'planSides'],
+  additionalProperties: false
+};
+
+// Tink's first write-capable action. She never touches stewart/plan
+// herself — this only ever produces a PROPOSAL the server hands back to
+// the client; the actual read-modify-write happens client-side (same
+// place Kitchen's own savePlan() already writes this path from), and
+// only after Dawn or John taps an explicit Confirm button — same trust
+// boundary as Tom's wish-spend confirm on the boys' side. Appended to
+// TINK_SYSTEM_PROMPT only for the pantry-question call path — every
+// other Tink question is completely untouched by this.
+const TINK_PLAN_ACTION_INSTRUCTIONS = `
+
+You can propose adding a meal to the weekly meal plan (stewart/plan) — but you can't write to it yourself. A proposal only becomes real once Dawn or John taps an explicit Confirm button in the app; nothing is saved just because you said it. Set "proposeAddToPlan" to true ONLY when their MOST RECENT message is a clear, explicit confirmation that one specific meal should go on one specific day — e.g. "yes, add that to Tuesday," "let's do that," "sounds good, put it on the plan," "add Chicken Tacos to Wednesday."
+
+Do NOT propose just because a meal was mentioned, suggested, or discussed. Brainstorming options, answering "what could we make," or them asking a question about a meal are NOT confirmations — keep proposeAddToPlan false and just answer normally in that case. If it's genuinely ambiguous whether they're confirming or still deciding, don't propose — ask a clarifying question in "message" instead.
+
+When you DO propose: "planDay" must be exactly one of Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday — resolve relative references ("tomorrow," "tonight") against today's date. "planType" should be "Family" unless they specifically said the boys are cooking that day, in which case "Boys Cook". "planMealName" is the specific meal being added — never leave it vague ("dinner," "something") when proposing; if you don't know a specific enough name yet, don't propose, ask what to call it instead. "planSides" is optional — leave it an empty string if nothing was mentioned.
+
+If proposeAddToPlan is false, leave planDay/planType/planMealName/planSides all as empty strings.`;
 
 function formatLookupData(agentName, rows) {
   const lines = rows.map(r => {
@@ -671,33 +709,70 @@ exports.askTink = functions
     }
 
     const groundedData = groundedParts.length ? groundedParts.join('\n\n---\n\n') : null;
+    const userContent = buildTinkUserPrompt({ question, context: resolvedContext, groundedData });
 
-    const response = await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      system: TINK_SYSTEM_PROMPT,
-      messages: [
-        ...sanitizedHistory,
-        {
-          role: 'user',
-          content: buildTinkUserPrompt({ question, context: resolvedContext, groundedData })
-        }
-      ]
-    });
+    // Two call shapes: the pantry-question path forces structured
+    // {message, proposeAddToPlan, ...} output so a plan-write proposal is
+    // always a real, validated field the server can check — never
+    // something parsed back out of free-form prose. Every other Tink
+    // question keeps the existing plain-text call completely unchanged,
+    // zero risk of the schema affecting an unrelated answer.
+    let text = '';
+    let proposedPlanAction = null;
 
-    const text = (response.content || [])
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('')
-      .trim();
+    if (isPantryQuestion) {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: TINK_SYSTEM_PROMPT + TINK_PLAN_ACTION_INSTRUCTIONS,
+        output_config: { format: { type: 'json_schema', schema: TINK_PLAN_ACTION_SCHEMA } },
+        messages: [...sanitizedHistory, { role: 'user', content: userContent }]
+      });
+      await logTinkUsage(model, response.usage);
 
-    await logTinkUsage(model, response.usage);
+      const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        throw new functions.https.HttpsError('internal', 'Could not parse Tink response.');
+      }
+      text = (parsed.message || '').trim();
+      // Belt-and-suspenders on top of the prompt instructions: never trust
+      // the model's own "proposeAddToPlan" alone — planDay must be a real
+      // day name and planMealName must be non-empty, or the proposal is
+      // dropped entirely (text still returns normally, just with no
+      // proposedPlanAction attached — fails safe, no confirm UI shown).
+      const mealName = (parsed.planMealName || '').trim();
+      if (parsed.proposeAddToPlan && VALID_PLAN_DAYS.has(parsed.planDay) && mealName) {
+        proposedPlanAction = {
+          day: parsed.planDay,
+          type: (parsed.planType || '').trim() || 'Family',
+          mealName,
+          sides: (parsed.planSides || '').trim()
+        };
+      }
+    } else {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        system: TINK_SYSTEM_PROMPT,
+        messages: [...sanitizedHistory, { role: 'user', content: userContent }]
+      });
+      await logTinkUsage(model, response.usage);
+
+      text = (response.content || [])
+        .filter(block => block.type === 'text')
+        .map(block => block.text)
+        .join('')
+        .trim();
+    }
 
     if (!text) {
       throw new functions.https.HttpsError('internal', 'No text returned from Anthropic.');
     }
 
-    return { text };
+    return { text, proposedPlanAction };
   });
 
 // ════════════════════════════════════════════════════
