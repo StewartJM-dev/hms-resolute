@@ -491,6 +491,16 @@ body::before{
   cursor:pointer;transition:all .2s;
 }
 .word-mode-btn.active{background:var(--teal);border-color:var(--teal);color:var(--black);}
+.bib-word{border-bottom:1px dotted var(--gold);cursor:pointer;}
+.bib-word:active{background:rgba(232,184,74,.15);}
+.strongs-word-hdr{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--gold);margin-bottom:8px;}
+.strongs-entry{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12);}
+.strongs-entry:last-of-type{border-bottom:none;}
+.strongs-num{font-size:12px;font-weight:700;color:var(--teal3);margin-bottom:2px;}
+.strongs-orig{font-size:14px;color:var(--white);}
+.strongs-translit{font-style:italic;color:rgba(255,255,255,.55);font-weight:400;}
+.strongs-def{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.85);}
+.strongs-credit{font-size:9.5px;color:rgba(255,255,255,.4);margin-top:8px;line-height:1.4;}
 
 .word-crumb{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:11px;color:rgba(255,255,255,.5);flex-wrap:wrap;}
 .word-crumb button{background:none;border:none;color:var(--teal3);cursor:pointer;font-size:11px;padding:2px 0;font-family:'Exo 2',sans-serif;}
@@ -701,6 +711,15 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
       <div style="font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;margin-bottom:14px;">Save $45 in your Ship Account to claim one — four available. <b style="color:var(--gold2,#e8b84a);">Deadline: September 25.</b> After that, this contest is over for good. Check your progress on the Pay tab.</div>
       <button onclick="closeChromebookReminder()" style="width:100%;padding:12px;border-radius:24px;background:var(--gold);border:none;color:var(--black);font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">LET'S GO ⚓</button>
     </div>
+  </div>
+</div>
+
+<!-- STRONG'S CONCORDANCE POPOVER — tap-to-define for KJV words. See
+     bible-shared.js for data sourcing/licensing notes. -->
+<div id="strongs-popover" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9998;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeStrongsPopover()">
+  <div style="max-width:480px;width:100%;max-height:60vh;overflow-y:auto;background:#0d1b2a;border:1px solid var(--gold);border-radius:14px 14px 0 0;padding:18px 20px;">
+    <div class="strongs-popover-body"></div>
+    <button onclick="closeStrongsPopover()" style="width:100%;margin-top:10px;padding:9px;border:none;border-radius:8px;background:var(--gold);color:var(--black);font-weight:700;cursor:pointer;">Close</button>
   </div>
 </div>
 
@@ -1118,6 +1137,10 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
         <button class="word-mode-btn active" id="word-mode-btn-browse" onclick="setWordMode('browse')">Browse</button>
         <button class="word-mode-btn" id="word-mode-btn-search" onclick="setWordMode('search')">Search</button>
         <button class="word-mode-btn" id="word-mode-btn-myverses" onclick="setWordMode('myverses')">My Verses</button>
+      </div>
+      <div class="word-mode-row">
+        <button class="word-mode-btn active" id="word-translation-btn-kjv" onclick="setWordTranslation('kjv')">KJV</button>
+        <button class="word-mode-btn" id="word-translation-btn-geneva" onclick="setWordTranslation('geneva')">Geneva (1599)</button>
       </div>
 
       <div id="word-browse-view"><div class="empty">Loading Scripture...</div></div>
@@ -5112,18 +5135,38 @@ function setWordMode(mode){
   if(mode === 'myverses') renderWordMyVerses();
 }
 
+let _wordTranslation = 'kjv'; // 'kjv' | 'geneva' — book/chapter/verse keys are identical across both, only the source data differs
+
+function currentBibleData(){
+  return _wordTranslation === 'geneva' ? _genevaData : _kjvData;
+}
+
+// Geneva is loaded lazily, only once actually selected — no reason to
+// make every page load pay for a translation most visits won't use.
+function setWordTranslation(t){
+  if(t === _wordTranslation) return;
+  const load = t === 'geneva' ? loadGeneva() : loadKJV();
+  load.then(() => {
+    _wordTranslation = t;
+    document.getElementById('word-translation-btn-kjv').classList.toggle('active', t==='kjv');
+    document.getElementById('word-translation-btn-geneva').classList.toggle('active', t==='geneva');
+    renderWordBrowse();
+  });
+}
+
 // ── Browse: book grid -> chapter grid -> chapter verses ──
 
 function renderWordBrowse(){
   const el = document.getElementById('word-browse-view');
-  if(!el || !_kjvData) return;
+  const data = currentBibleData();
+  if(!el || !data) return;
   if(_wordNav.book && _wordNav.chapter) renderWordChapterView(el, _wordNav.book, _wordNav.chapter);
   else if(_wordNav.book) renderWordChapterGrid(el, _wordNav.book);
   else renderWordBookGrid(el);
 }
 
 function renderWordBookGrid(el){
-  const books = Object.keys(_kjvData);
+  const books = Object.keys(currentBibleData());
   const bookBtn = b => `<button class="word-book-btn" onclick="openWordBook('${b}')">${b}</button>`;
   el.innerHTML = `
     <div class="word-testament-label">Old Testament</div>
@@ -5146,7 +5189,7 @@ function backToWordBooks(){
 }
 
 function renderWordChapterGrid(el, book){
-  const chapters = Object.keys(_kjvData[book]).map(Number).sort((a,b) => a-b);
+  const chapters = Object.keys(currentBibleData()[book]).map(Number).sort((a,b) => a-b);
   el.innerHTML = `
     <div class="word-crumb"><button onclick="backToWordBooks()">&larr; Books</button><span class="sep">/</span><span>${book}</span></div>
     <div class="word-chapter-grid">${chapters.map(c => `<button class="word-chapter-btn" onclick="openWordChapter('${book}',${c})">${c}</button>`).join('')}</div>
@@ -5172,9 +5215,12 @@ function openWordChapter(book, chapter, opts){
 // trip each via bible-shared.js's prefix-range bulk fetchers, rather than
 // one read per verse.
 function renderWordChapterView(el, book, chapter){
-  const chapterData = _kjvData[book][chapter];
+  const chapterData = currentBibleData()[book][chapter];
   const verses = Object.keys(chapterData).map(Number).sort((a,b) => a-b);
   const agentId = currentAgent.id;
+  // Tap-to-define only exists for the KJV's exact wording (see
+  // bible-shared.js) — Geneva has no word-level Strong's tagging.
+  const wantStrongs = _wordTranslation === 'kjv';
 
   el.innerHTML = `
     <div class="word-crumb">
@@ -5189,7 +5235,8 @@ function renderWordChapterView(el, book, chapter){
   Promise.all([
     _db.ref(`stewart/bookmarks/${agentId}`).once('value'),
     getChapterHighlights(book, chapter),
-    getChapterNotes(book, chapter)
+    getChapterNotes(book, chapter),
+    wantStrongs ? loadStrongsDefs().then(() => loadStrongsTagsForBook(book)) : Promise.resolve(null)
   ]).then(([bmSnap, hlByVerse, notesByVerse]) => {
     const bookmarkKeys = new Set(Object.keys(bmSnap.val() || {}));
     const listEl = document.getElementById('word-verse-list');
@@ -5201,10 +5248,13 @@ function renderWordChapterView(el, book, chapter){
       const highlights = hlByVerse[key] || [];
       const notes = notesByVerse[key] || [];
       const myHl = highlights.some(h => h.personId === agentId);
+      const verseHtml = wantStrongs
+        ? renderVerseSegmentsHtml(book, chapter, v, text, 'onWordWordTap')
+        : escapeHtml(text);
       return `<div class="word-verse" data-vkey="${key}">
         <span class="word-verse-num">${v}</span>
         <div class="word-verse-body">
-          <div class="word-verse-text${myHl?' hl':''}" onclick="onWordVerseTap(this,'${book}',${chapter},${v})">${escapeHtml(text)}</div>
+          <div class="word-verse-text${myHl?' hl':''}" onclick="onWordVerseTap(this,'${book}',${chapter},${v})">${verseHtml}</div>
           <div class="word-hl-dots" id="word-dots-${key}">${wordHighlightDotsHtml(highlights)}</div>
           <div class="word-note-list" id="word-notes-${key}">${wordNoteListHtml(notes)}</div>
         </div>
@@ -5216,6 +5266,22 @@ function renderWordChapterView(el, book, chapter){
       </div>`;
     }).join('');
   });
+}
+
+// Strong's tap-to-define popover. stopPropagation keeps a word-tap from
+// also toggling the verse-level highlight (onWordVerseTap on the
+// containing .word-verse-text) — a tap on a WORD means "define this," a
+// tap anywhere else in the verse still means "highlight this verse."
+function onWordWordTap(event, strongsCsv, wordText){
+  event.stopPropagation();
+  const pop = document.getElementById('strongs-popover');
+  if(!pop) return;
+  pop.querySelector('.strongs-popover-body').innerHTML = strongsPopoverContentHtml(strongsCsv, wordText);
+  pop.style.display = 'flex';
+}
+function closeStrongsPopover(){
+  const pop = document.getElementById('strongs-popover');
+  if(pop) pop.style.display = 'none';
 }
 
 function scrollToWordVerse(verseNum){
@@ -5269,7 +5335,7 @@ function onWordVerseTap(el, book, chapter, verse){
 // personal, unlike highlights.
 function onWordBookmarkTap(btn, book, chapter, verse){
   if(!currentAgent) return;
-  const text = _kjvData[book][chapter][verse];
+  const text = currentBibleData()[book][chapter][verse];
   toggleBookmark(currentAgent.id, book, String(chapter), String(verse), text).then(isBm => {
     btn.classList.toggle('active', isBm);
   });

@@ -37,6 +37,131 @@ function loadKJV(){
   return _kjvLoadPromise;
 }
 
+// Second selectable translation (1599 Geneva Bible) — same {book:
+// {chapter: {verse: text}}} shape as KJV, same 66 book keys in the same
+// order, sourced and verified separately (see assets/geneva.json's own
+// provenance notes). Kept as a fully independent load/cache from KJV so
+// a page can show either without forcing both to load.
+let _genevaData = null;
+let _genevaLoadPromise = null;
+function loadGeneva(){
+  if(_genevaData) return Promise.resolve(_genevaData);
+  if(_genevaLoadPromise) return _genevaLoadPromise;
+  _genevaLoadPromise = fetch('../assets/geneva.json').then(r => r.json()).then(data => {
+    _genevaData = data;
+    return data;
+  });
+  return _genevaLoadPromise;
+}
+
+// ─── Strong's Concordance tap-to-define ───
+// Word-level Strong's-number tagging only exists for the KJV's exact
+// wording (see assets/strongs-tags/), not Geneva — so tap-to-define is
+// KJV-only; callers should simply not attempt it when Geneva is the
+// active translation.
+//
+// Two data sources, used as-is per family decision, license notices
+// kept attached rather than stripped or regenerated:
+//  - Word→Strong's-number tagging: CrossWire Bible Society's "KJV"
+//    SWORD module (the KJV2003 Project). Embedded grant: "CrossWire
+//    Bible Society hereby grants a general public license to use this
+//    text for any purpose."
+//  - Strong's-number→definition dictionary: openscriptures/strongs,
+//    "Unified Strong's Dictionaries of Greek and Hebrew in XML,
+//    Copyright (c) 2008, Open Scriptures. Freely released under GPL 3.0
+//    license." Both notices are surfaced in the definition popover
+//    itself (strongsPopoverContentHtml, below) — the credit stays
+//    attached to the feature that actually uses the data, not just
+//    buried in this comment.
+let _strongsDefs = null;
+let _strongsDefsPromise = null;
+function loadStrongsDefs(){
+  if(_strongsDefs) return Promise.resolve(_strongsDefs);
+  if(_strongsDefsPromise) return _strongsDefsPromise;
+  _strongsDefsPromise = fetch('../assets/strongs-defs.json').then(r => r.json()).then(data => {
+    _strongsDefs = data;
+    return data;
+  });
+  return _strongsDefsPromise;
+}
+
+function strongsBookSlug(book){
+  return book.toLowerCase().replace(/\s+/g, '-');
+}
+
+// One JSON file per book (23MB total split 66 ways, largest ~1.1MB)
+// rather than a single monolithic file — a chapter view only ever needs
+// its own book's data, and shipping the whole Bible's word-tagging on
+// every page load would be a real mobile-data/performance cost for no
+// benefit. Cached per book once fetched; a failed/missing fetch is
+// cached as `null` too so a book with no tag data doesn't get re-requested
+// every time its chapters are viewed.
+const _strongsTagsCache = {};
+const _strongsTagsPromises = {};
+function loadStrongsTagsForBook(book){
+  if(book in _strongsTagsCache) return Promise.resolve(_strongsTagsCache[book]);
+  if(_strongsTagsPromises[book]) return _strongsTagsPromises[book];
+  const slug = strongsBookSlug(book);
+  _strongsTagsPromises[book] = fetch(`../assets/strongs-tags/${slug}.json`).then(r => {
+    if(!r.ok) throw new Error('no strongs data for ' + book);
+    return r.json();
+  }).then(data => {
+    _strongsTagsCache[book] = data;
+    return data;
+  }).catch(() => {
+    _strongsTagsCache[book] = null;
+    return null;
+  });
+  return _strongsTagsPromises[book];
+}
+
+function _strongsEscHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Renders one verse's body as tappable word spans + plain text, using
+// Strong's segment data already loaded for this exact book (via
+// loadStrongsTagsForBook) — falls back to plain escaped text when no
+// tag data is available (any non-KJV translation, or the rare verse
+// this particular module didn't tag). onWordTapFn names a page-local
+// function — each surface renders its own popover with its own
+// styling/positioning, so the tap just hands the data off:
+// onWordTapFn(event, strongsCsv, wordText).
+function renderVerseSegmentsHtml(book, chapter, verse, fallbackText, onWordTapFn){
+  const bookData = _strongsTagsCache[book];
+  const segs = bookData && bookData[String(chapter)] && bookData[String(chapter)][String(verse)];
+  if(!segs) return _strongsEscHtml(fallbackText);
+  return segs.map(seg => {
+    if(seg.t === 'word' && seg.s && seg.s.length){
+      return `<span class="bib-word" onclick="${onWordTapFn}(event,'${seg.s.join(',')}','${_strongsEscHtml(seg.x)}')">${_strongsEscHtml(seg.x)}</span>`;
+    }
+    return _strongsEscHtml(seg.x);
+  }).join('');
+}
+
+// Shared popover CONTENT (each surface renders this into its own
+// page-local popover element, since chrome/positioning differs per
+// app's theme). A single tapped word can carry more than one Strong's
+// number — an English phrase translating one compound original word —
+// so every code gets its own definition block, in order.
+function strongsPopoverContentHtml(strongsCsv, wordText){
+  const codes = strongsCsv.split(',').filter(Boolean);
+  const defsHtml = codes.map(code => {
+    const entry = (_strongsDefs && _strongsDefs[code]) || null;
+    if(!entry){
+      return `<div class="strongs-entry"><div class="strongs-num">${code}</div><div class="strongs-def">No definition on file.</div></div>`;
+    }
+    const origHtml = entry.word ? ` — <span class="strongs-orig">${_strongsEscHtml(entry.word)}</span>` : '';
+    const translitHtml = entry.translit ? ` <span class="strongs-translit">(${_strongsEscHtml(entry.translit)})</span>` : '';
+    return `<div class="strongs-entry">
+      <div class="strongs-num">${code}${origHtml}${translitHtml}</div>
+      <div class="strongs-def">${_strongsEscHtml(entry.def || '')}</div>
+    </div>`;
+  }).join('');
+  return `<div class="strongs-word-hdr">${_strongsEscHtml(wordText)}</div>${defsHtml}` +
+    `<div class="strongs-credit">Word tagging: CrossWire Bible Society (KJV2003 Project), used for any purpose. Definitions: openscriptures.org, GPL 3.0.</div>`;
+}
+
 // Mirrors functions/index.js's normalizeBookName/BOOK_ALIASES exactly, so
 // a reference Tom or Tink cites server-side resolves to the same book
 // here that it did there. Keep these two in sync if either changes —
