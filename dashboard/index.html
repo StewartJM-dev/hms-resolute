@@ -490,6 +490,16 @@ body{
 .bib-verse.target{animation:bib-target-flash 2.2s ease-out;border-radius:6px;}
 @keyframes bib-target-flash{0%,35%{outline:2px solid var(--green2);outline-offset:3px;border-radius:6px;}100%{outline:2px solid transparent;outline-offset:3px;}}
 .bib-verse-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+.bib-word{border-bottom:1px dotted var(--green2);cursor:pointer;}
+.bib-word:active{background:rgba(45,106,71,.15);}
+.strongs-word-hdr{font-family:'Cinzel',serif;font-size:15px;font-weight:700;color:var(--brown);margin-bottom:8px;}
+.strongs-entry{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.strongs-entry:last-of-type{border-bottom:none;}
+.strongs-num{font-size:12px;font-weight:700;color:var(--green2);margin-bottom:2px;}
+.strongs-orig{font-size:14px;}
+.strongs-translit{font-style:italic;color:var(--muted);font-weight:400;}
+.strongs-def{font-size:12.5px;line-height:1.5;color:var(--ink);}
+.strongs-credit{font-size:9.5px;color:var(--muted);margin-top:8px;line-height:1.4;}
 .bib-bookmark-btn,.bib-note-btn{background:none;border:none;color:var(--border);font-size:15px;cursor:pointer;flex-shrink:0;padding:2px 4px;line-height:1;}
 .bib-bookmark-btn.active{color:var(--gold);}
 
@@ -616,6 +626,15 @@ body{
     </div>
 
     <button onclick="closeShipsDirectory()" style="width:100%;padding:13px;border-radius:8px;background:var(--brown);border:none;color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
+  </div>
+</div>
+
+<!-- ═══ STRONG'S CONCORDANCE POPOVER ═══ tap-to-define for KJV words.
+     See bible-shared.js for data sourcing/licensing notes. -->
+<div id="strongs-popover" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9998;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeStrongsPopover()">
+  <div style="max-width:480px;width:100%;max-height:60vh;overflow-y:auto;background:var(--card);border:1px solid var(--gold);border-radius:14px 14px 0 0;padding:18px 20px;">
+    <div class="strongs-popover-body"></div>
+    <button onclick="closeStrongsPopover()" style="width:100%;margin-top:10px;padding:9px;border:none;border-radius:8px;background:var(--gold);color:var(--black);font-weight:700;cursor:pointer;">Close</button>
   </div>
 </div>
 
@@ -970,6 +989,10 @@ body{
       <div class="bib-mode-row">
         <button class="bib-mode-btn active" id="bib-mode-btn-browse" onclick="setBibleMode('browse')">Browse</button>
         <button class="bib-mode-btn" id="bib-mode-btn-search" onclick="setBibleMode('search')">Search</button>
+      </div>
+      <div class="bib-mode-row" style="margin-top:6px;">
+        <button class="bib-mode-btn active" id="bib-translation-btn-kjv" onclick="setBibleTranslation('kjv')">KJV</button>
+        <button class="bib-mode-btn" id="bib-translation-btn-geneva" onclick="setBibleTranslation('geneva')">Geneva (1599)</button>
       </div>
       <div id="bib-browse-view"><div class="empty-state">Loading Scripture…</div></div>
       <div id="bib-search-view" style="display:none;">
@@ -1858,7 +1881,12 @@ function sendDashGroupMessage(){
 // ══════════════════════════════════════════════════════
 let _bibMode = 'browse';
 let _bibNav = { book: null, chapter: null };
+let _bibTranslation = 'kjv'; // 'kjv' | 'geneva' — book/chapter/verse keys are identical across both, only the source data differs
 const BIB_OT_BOOK_COUNT = 39; // Genesis..Malachi; the rest is New Testament
+
+function currentBibleData(){
+  return _bibTranslation === 'geneva' ? _genevaData : _kjvData;
+}
 
 function renderBibleTab(){
   loadKJV().then(() => {
@@ -1866,6 +1894,19 @@ function renderBibleTab(){
   }).catch(() => {
     const el = document.getElementById('bib-browse-view');
     if(el) el.innerHTML = '<div class="empty-state">Could not load Scripture — check your connection and reopen this tab.</div>';
+  });
+}
+
+// Geneva is loaded lazily, only once actually selected — no reason to
+// make every page load pay for a translation most visits won't use.
+function setBibleTranslation(t){
+  if(t === _bibTranslation) return;
+  const load = t === 'geneva' ? loadGeneva() : loadKJV();
+  load.then(() => {
+    _bibTranslation = t;
+    document.getElementById('bib-translation-btn-kjv').classList.toggle('active', t==='kjv');
+    document.getElementById('bib-translation-btn-geneva').classList.toggle('active', t==='geneva');
+    renderBibleBrowse();
   });
 }
 
@@ -1884,14 +1925,15 @@ function setBibleMode(mode){
 
 function renderBibleBrowse(){
   const el = document.getElementById('bib-browse-view');
-  if(!el || !_kjvData) return;
+  const data = currentBibleData();
+  if(!el || !data) return;
   if(_bibNav.book && _bibNav.chapter) renderBibleChapterView(el, _bibNav.book, _bibNav.chapter);
   else if(_bibNav.book) renderBibleChapterGrid(el, _bibNav.book);
   else renderBibleBookGrid(el);
 }
 
 function renderBibleBookGrid(el){
-  const books = Object.keys(_kjvData);
+  const books = Object.keys(currentBibleData());
   const bookBtn = b => `<button class="bib-book-btn" onclick="openBibleBook('${b}')">${b}</button>`;
   el.innerHTML = `
     <div class="bib-testament-label">Old Testament</div>
@@ -1914,7 +1956,7 @@ function backToBibleBooks(){
 }
 
 function renderBibleChapterGrid(el, book){
-  const chapters = Object.keys(_kjvData[book]).map(Number).sort((a,b) => a-b);
+  const chapters = Object.keys(currentBibleData()[book]).map(Number).sort((a,b) => a-b);
   el.innerHTML = `
     <div class="bib-crumb"><button onclick="backToBibleBooks()">&larr; Books</button><span class="sep">/</span><span>${book}</span></div>
     <div class="bib-chapter-grid">${chapters.map(c => `<button class="bib-chapter-btn" onclick="openBibleChapter('${book}',${c})">${c}</button>`).join('')}</div>
@@ -1936,9 +1978,12 @@ function openBibleChapter(book, chapter, opts){
 // note state is family-shared and fetched for the WHOLE chapter in one
 // round trip each via bible-shared.js's prefix-range bulk fetchers.
 function renderBibleChapterView(el, book, chapter){
-  const chapterData = _kjvData[book][chapter];
+  const chapterData = currentBibleData()[book][chapter];
   const verses = Object.keys(chapterData).map(Number).sort((a,b) => a-b);
   const personId = currentPersonId();
+  // Tap-to-define only exists for the KJV's exact wording (see
+  // bible-shared.js) — Geneva has no word-level Strong's tagging.
+  const wantStrongs = _bibTranslation === 'kjv';
 
   el.innerHTML = `
     <div class="bib-crumb">
@@ -1953,7 +1998,8 @@ function renderBibleChapterView(el, book, chapter){
   Promise.all([
     _db.ref(`stewart/bookmarks/${personId}`).once('value'),
     getChapterHighlights(book, chapter),
-    getChapterNotes(book, chapter)
+    getChapterNotes(book, chapter),
+    wantStrongs ? loadStrongsDefs().then(() => loadStrongsTagsForBook(book)) : Promise.resolve(null)
   ]).then(([bmSnap, hlByVerse, notesByVerse]) => {
     const bookmarkKeys = new Set(Object.keys(bmSnap.val() || {}));
     const listEl = document.getElementById('bib-verse-list');
@@ -1965,10 +2011,13 @@ function renderBibleChapterView(el, book, chapter){
       const highlights = hlByVerse[key] || [];
       const notes = notesByVerse[key] || [];
       const myHl = highlights.some(h => h.personId === personId);
+      const verseHtml = wantStrongs
+        ? renderVerseSegmentsHtml(book, chapter, v, text, 'onBibleWordTap')
+        : escapeHtml(text);
       return `<div class="bib-verse" data-vkey="${key}">
         <span class="bib-verse-num">${v}</span>
         <div class="bib-verse-body">
-          <div class="bib-verse-text${myHl?' hl':''}" onclick="onBibleVerseTap(this,'${book}',${chapter},${v})">${escapeHtml(text)}</div>
+          <div class="bib-verse-text${myHl?' hl':''}" onclick="onBibleVerseTap(this,'${book}',${chapter},${v})">${verseHtml}</div>
           <div class="bib-hl-dots" id="bib-dots-${key}">${bibleHighlightDotsHtml(highlights)}</div>
           <div class="bib-note-list" id="bib-notes-${key}">${bibleNoteListHtml(notes)}</div>
         </div>
@@ -1980,6 +2029,22 @@ function renderBibleChapterView(el, book, chapter){
       </div>`;
     }).join('');
   });
+}
+
+// Strong's tap-to-define popover. stopPropagation keeps a word-tap from
+// also toggling the verse-level highlight (onBibleVerseTap on the
+// containing .bib-verse-text) — a tap on a WORD means "define this," a
+// tap anywhere else in the verse still means "highlight this verse."
+function onBibleWordTap(event, strongsCsv, wordText){
+  event.stopPropagation();
+  const pop = document.getElementById('strongs-popover');
+  if(!pop) return;
+  pop.querySelector('.strongs-popover-body').innerHTML = strongsPopoverContentHtml(strongsCsv, wordText);
+  pop.style.display = 'flex';
+}
+function closeStrongsPopover(){
+  const pop = document.getElementById('strongs-popover');
+  if(pop) pop.style.display = 'none';
 }
 
 function scrollToBibleVerse(verseNum){
@@ -2026,7 +2091,7 @@ function onBibleVerseTap(el, book, chapter, verse){
 function onBibleBookmarkTap(btn, book, chapter, verse){
   if(!_db) return;
   const personId = currentPersonId();
-  const text = _kjvData[book][chapter][verse];
+  const text = currentBibleData()[book][chapter][verse];
   const ref = _db.ref(`stewart/bookmarks/${personId}/${verseKey(book,chapter,verse)}`);
   ref.once('value').then(snap => {
     if(snap.exists()) return ref.remove().then(() => false);
