@@ -1595,7 +1595,20 @@ function renderTeachMeApprovals(){
     if(!el) return;
     const websites = Object.entries(data.websiteSuggestions || {}).filter(([,w]) => w.status === 'pending');
     const familyDay = data.familyDaySuggestion && data.familyDaySuggestion.status === 'pending' ? data.familyDaySuggestion : null;
-    if(!websites.length && !familyDay){
+    // Family Day plan/verify/reflect (Part 10, mirrors the Galley Report
+    // pattern) — once approved, ask whether it actually happened and how
+    // it went. Gated on at least a day having passed since approval, same
+    // "give it time to actually happen first" reasoning as Galley's own
+    // "yesterday's dinner" timing, just without a fixed calendar date to
+    // anchor to here.
+    const ONE_DAY_MS = 24*60*60*1000;
+    const familyDayNeedsVerify = data.familyDaySuggestion
+      && data.familyDaySuggestion.status === 'approved'
+      && data.familyDaySuggestion.happened === undefined
+      && data.familyDaySuggestion.resolvedAt
+      && (Date.now() - data.familyDaySuggestion.resolvedAt) >= ONE_DAY_MS
+      ? data.familyDaySuggestion : null;
+    if(!websites.length && !familyDay && !familyDayNeedsVerify){
       el.innerHTML = '<div style="font-size:12px;opacity:.5;font-style:italic;">No pending suggestions.</div>';
       return;
     }
@@ -1619,8 +1632,23 @@ function renderTeachMeApprovals(){
         '<button onclick="resolveTeachMeFamilyDay(\''+weekKey+'\',\'denied\')" style="padding:6px 10px;border-radius:7px;border:1px solid #b5451b;background:none;color:#e08a6a;font-size:11px;cursor:pointer;margin-left:5px;">Deny</button>'+
         '</div></div>';
     }
+    if(familyDayNeedsVerify){
+      html += '<div style="padding:9px 0;border-bottom:1px solid rgba(200,146,42,.2);">'+
+        '<div style="font-weight:700;font-size:13px;color:var(--cream,#f7f2ea);">🎉 Did it happen? &mdash; '+esc(familyDayNeedsVerify.activity)+'</div>'+
+        '<textarea id="fd-reflect-input" placeholder="How did it go? (optional)" style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:12px;min-height:44px;"></textarea>'+
+        '<div style="margin-top:6px;">'+
+        '<button onclick="verifyTeachMeFamilyDay(\''+weekKey+'\',true)" style="padding:6px 10px;border-radius:7px;border:none;background:var(--green2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Yes, it happened</button>'+
+        '<button onclick="verifyTeachMeFamilyDay(\''+weekKey+'\',false)" style="padding:6px 10px;border-radius:7px;border:1px solid #b5451b;background:none;color:#e08a6a;font-size:11px;cursor:pointer;margin-left:5px;">Didn\'t happen</button>'+
+        '</div></div>';
+    }
     el.innerHTML = html;
   });
+}
+function verifyTeachMeFamilyDay(weekKey, happened){
+  if(!_db) return;
+  const reflectEl = document.getElementById('fd-reflect-input');
+  const reflection = reflectEl ? reflectEl.value.trim() : '';
+  _db.ref('stewart/teachvote/'+weekKey+'/familyDaySuggestion').update({ happened, reflection, verifiedAt: Date.now() });
 }
 function resolveTeachMeWebsite(weekKey, key, status){
   if(!_db) return;

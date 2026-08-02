@@ -2019,8 +2019,17 @@ async function fetchTeachMeWeekData(weekOf) {
   const winner = data.winner || null;
   const websiteSuggestions = Object.values(data.websiteSuggestions || {})
     .map(w => ({ website: w.website, status: w.status }));
+  // Part 10: the full loop (topic -> suggestion -> family day -> reflection)
+  // — happened/reflection are undefined until Bridge's verify prompt is
+  // actually answered, same "pending just means not reviewed yet, not a
+  // problem" framing as the website suggestions above.
   const familyDaySuggestion = data.familyDaySuggestion
-    ? { activity: data.familyDaySuggestion.activity, status: data.familyDaySuggestion.status }
+    ? {
+        activity: data.familyDaySuggestion.activity,
+        status: data.familyDaySuggestion.status,
+        happened: data.familyDaySuggestion.happened,
+        reflection: data.familyDaySuggestion.reflection || null
+      }
     : null;
   return {
     winnerTopic: winner ? (TEACH_ME_TOPICS[winner] || winner) : null,
@@ -2280,7 +2289,7 @@ Never invent a detail, a day, or an incident that isn't in the data you're given
 
 The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy, per room, or per day-of-week), use the pre-tallied numbers in whiteglove.summary.byBoy, whiteglove.summary.byRoom, and whiteglove.summary.byDayOfWeek directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic. byDayOfWeek is only worth mentioning if a real weekday clustering shows up (e.g. most failures landing on the same one or two weekdays) — that's a scheduling pattern worth naming, distinct from a general consistency problem; don't force a mention if the failures are just spread evenly across the week.
 
-"teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it.
+"teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it. The family day suggestion also carries "happened" (true/false/undefined) and "reflection" once John or Dawn has actually verified it — this is the full loop (topic won → suggestion approved → family day actually happened → how it went), worth closing the loop on in one sentence if "happened" is set: name whether it happened and, if there's a real reflection, a brief honest note of how it went. If "happened" is still undefined, that just means it hasn't been verified yet — don't treat that as a problem either.
 
 Galley Report is its own third section, separate from both boys and household — meal-plan planning and adherence for the week, from real Kitchen/Galley data. This is the first section aimed at long-range household planning rather than accountability, so the tone should read as a planning aid, not a grade.
 
