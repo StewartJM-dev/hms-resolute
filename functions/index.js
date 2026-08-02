@@ -2138,6 +2138,100 @@ async function fetchCrowsnestWeekData(weekStartMs, weekEndMs) {
   return { byBoy, household };
 }
 
+// Muster in the report card (muster-report-punchlist.md, Steps 1-2).
+// resolute/muster (index.html, boys/index.html, registry.html) logs every
+// login-adjacent event, keyed by push id, not by date — so unlike most of
+// this file's fetch* helpers, this one takes a raw ms window over the
+// WHOLE ref rather than per-date lookups keyed off `dates`.
+//
+// 'who' is a real agentId only for the boy's OWN login attempt (qr,
+// pin-fallback). Parent-assist events (assist-active from Boys HQ,
+// assist-start from the Gangway, parent-view) are logged under the
+// PARENT's id as 'who', with the boy they're viewing/assisting carried
+// separately in assist.as — so those are attributed to a boy via
+// assist.as, not who, and are kept in their own bucket rather than mixed
+// into the boy's own independent-login counts.
+const MUSTER_BOY_LOGIN_METHODS = ['qr', 'pin-fallback'];
+const MUSTER_ASSIST_METHODS = ['assist-active', 'assist-start', 'parent-view'];
+
+async function fetchMusterWeekData(weekStartMs, weekEndMs) {
+  const snap = await db.ref('resolute/muster').once('value');
+  const entries = Object.values(snap.val() || {})
+    .filter(e => e && typeof e.t === 'number' && e.t >= weekStartMs && e.t < weekEndMs);
+
+  const when = t => new Date(t).toLocaleString('en-US', { timeZone: FAMILY_TIMEZONE, weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  const dayOfWeek = t => new Date(t).toLocaleDateString('en-US', { weekday: 'long', timeZone: FAMILY_TIMEZONE });
+
+  const byBoy = {};
+  ALLOWED_AGENT_IDS.forEach(id => {
+    byBoy[id] = {
+      totalAttempts: 0, totalSuccess: 0, totalFailed: 0,
+      byMethod: { qr: 0, 'pin-fallback': 0 },
+      failedAttempts: [],
+      assistSessions: []
+    };
+  });
+
+  let householdFailedTotal = 0;
+  let householdUnknownFailed = 0;
+  const unknownFailedAttempts = [];
+  // Pre-tallied, not a raw list — 'parent-view' fires on every card a
+  // parent so much as glances at from the picker, so a real week can carry
+  // well over a hundred of these. A flat array of every instance doesn't
+  // scale and isn't what "how often" needs; counts do (same reasoning as
+  // White Glove's byBoy/byRoom/byDayOfWeek tallies above).
+  let assistSessionCount = 0;
+  const assistByParent = { john: 0, dawn: 0 };
+  const assistByDayOfWeek = {};
+  ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].forEach(d => { assistByDayOfWeek[d] = 0; });
+
+  entries.forEach(e => {
+    if (MUSTER_BOY_LOGIN_METHODS.includes(e.method) && ALLOWED_AGENT_IDS.includes(e.who)) {
+      const b = byBoy[e.who];
+      b.totalAttempts++;
+      if (e.ok) b.totalSuccess++; else { b.totalFailed++; b.failedAttempts.push({ when: when(e.t), method: e.method }); }
+      if (b.byMethod[e.method] !== undefined) b.byMethod[e.method]++;
+    }
+
+    if (e.ok === false) {
+      householdFailedTotal++;
+      // Literal who:'unknown' only — an identified officer's own failed
+      // password attempt (who:'john') is a different signal entirely from
+      // an unidentifiable attempt at the panel, and shouldn't be lumped in.
+      if (e.who === 'unknown') {
+        householdUnknownFailed++;
+        unknownFailedAttempts.push({ when: when(e.t), method: e.method, device: e.device });
+      }
+    }
+
+    if (MUSTER_ASSIST_METHODS.includes(e.method)) {
+      assistSessionCount++;
+      if (assistByParent[e.who] !== undefined) assistByParent[e.who]++;
+      assistByDayOfWeek[dayOfWeek(e.t)]++;
+      // Per-boy attribution only exists for assist-active/assist-start,
+      // which carry assist.as — parent-view (picker-screen clicks) never
+      // identifies which boy's card was viewed, so those only ever show
+      // up in the household-level counts above, never here.
+      const as = e.assist && e.assist.as;
+      if (ALLOWED_AGENT_IDS.includes(as)) {
+        byBoy[as].assistSessions.push({ parent: e.who, method: e.method, when: when(e.t) });
+      }
+    }
+  });
+
+  return {
+    byBoy,
+    household: {
+      totalFailed: householdFailedTotal,
+      unknownFailed: householdUnknownFailed,
+      unknownFailedAttempts,
+      assistSessionCount,
+      assistByParent,
+      assistByDayOfWeek
+    }
+  };
+}
+
 // ─── Galley Report (galley-report-punchlist.md, Step 4) ───
 // Two independent halves, deliberately not merged into one query: meal-
 // plan ADHERENCE (did each night's dinner happen as planned) and
@@ -2222,12 +2316,13 @@ async function aggregateWeeklyReportData(weekOf) {
 
   const exceptionsByDate = await fetchExceptionsByDate(dates);
 
-  const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming, teachMe] = await Promise.all([
+  const [boys, whiteglove, dawn, prayer, crowsnest, muster, galleyAdherence, galleyTiming, teachMe] = await Promise.all([
     Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates, exceptionsByDate))),
     fetchWhiteGloveWeekData(dates),
     fetchDawnWeekData(dates),
     fetchPrayerWeekData(weekStartMs, weekEndMs),
     fetchCrowsnestWeekData(weekStartMs, weekEndMs),
+    fetchMusterWeekData(weekStartMs, weekEndMs),
     fetchGalleyAdherence(dates),
     fetchGalleyPlanTiming(weekOf),
     fetchTeachMeWeekData(weekOf)
@@ -2242,6 +2337,7 @@ async function aggregateWeeklyReportData(weekOf) {
   ALLOWED_AGENT_IDS.forEach(id => {
     boysById[id].prayer = prayer.byBoy[id];
     boysById[id].crowsnest = crowsnest.byBoy[id];
+    boysById[id].muster = muster.byBoy[id];
   });
 
   const report = {
@@ -2253,6 +2349,7 @@ async function aggregateWeeklyReportData(weekOf) {
     whiteglove,
     dawn,
     prayerHousehold: prayer.household,
+    musterHousehold: muster.household,
     crowsnestHousehold: crowsnest.household,
     galley: { adherence: galleyAdherence, timing: galleyTiming },
     teachMe
@@ -2288,6 +2385,8 @@ Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
 The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy, per room, or per day-of-week), use the pre-tallied numbers in whiteglove.summary.byBoy, whiteglove.summary.byRoom, and whiteglove.summary.byDayOfWeek directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic. byDayOfWeek is only worth mentioning if a real weekday clustering shows up (e.g. most failures landing on the same one or two weekdays) — that's a scheduling pattern worth naming, distinct from a general consistency problem; don't force a mention if the failures are just spread evenly across the week.
+
+Also include a brief Muster summary in the household section — real specifics, not just a count. Each boy's own "muster" field (boys.{id}.muster) carries his week's login activity: "totalAttempts"/"totalSuccess"/"totalFailed", "byMethod" (qr vs pin-fallback counts), and "failedAttempts" (a list of {when, method} for his own failed logins, already pre-tallied — cite these directly rather than recounting). If a boy has 2+ failed attempts, or leans heavily on pin-fallback over qr, that's worth a specific, low-key mention (e.g. "Daniel had 3 failed login attempts Tuesday before succeeding — may be worth checking if his card or PIN is giving him trouble"); if failures are 0-1 and qr is his normal method, say nothing about him. "musterHousehold" carries "totalFailed" and "unknownFailed" (failed attempts not tied to any boy's identity, with "unknownFailedAttempts" giving {when, method, device} for each) — mention the unknown-failed count if it's nonzero, and name a specific one if something about it looks genuinely worth a glance (an odd hour, an unfamiliar device, a cluster of several in a short window) — but this is informational pattern-tracking, not an alarm system, so don't editorialize or imply a security incident from a single stray attempt. "musterHousehold" also carries pre-tallied parent-assist activity: "assistSessionCount" (total parent-assist/parent-view sessions all week), "assistByParent" ({john, dawn} counts), and "assistByDayOfWeek" (count per weekday — only worth mentioning if it clusters on one or two days). Use these counts directly rather than trying to reconstruct a timeline. boys.{id}.muster.assistSessions gives a specific, per-boy list ({parent, method, when}) ONLY for sessions where a parent was actively assisting or boarded as that specific boy (not general picker-screen viewing, which isn't attributed to one boy) — cite one of these directly if it's notable. Mention parent-assist activity briefly if it happened that week, as useful context distinct from the boys' own independent logins; say nothing if there was none. If nothing stands out anywhere in Muster this week (low failures, no unknowns, no assist sessions), a single plain sentence saying logins were routine is enough — don't manufacture texture that isn't there.
 
 "teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it. The family day suggestion also carries "happened" (true/false/undefined) and "reflection" once John or Dawn has actually verified it — this is the full loop (topic won → suggestion approved → family day actually happened → how it went), worth closing the loop on in one sentence if "happened" is set: name whether it happened and, if there's a real reflection, a brief honest note of how it went. If "happened" is still undefined, that just means it hasn't been verified yet — don't treat that as a problem either.
 
@@ -2329,7 +2428,7 @@ async function generateReportCardWriteup(reportData) {
     output_config: { format: { type: 'json_schema', schema: REPORT_WRITEUP_SCHEMA } },
     messages: [{
       role: 'user',
-      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, galley: reportData.galley, teachMe: reportData.teachMe })}`
+      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, musterHousehold: reportData.musterHousehold, galley: reportData.galley, teachMe: reportData.teachMe })}`
     }]
   });
 
