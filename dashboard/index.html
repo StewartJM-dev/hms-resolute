@@ -3439,6 +3439,9 @@ function renderReportCard(){
     const household = ((data.writeup.household)||'').replace(/</g,'&lt;');
     html += '<div class="card"><div class="card-hd"><span class="card-hd-icon">🏠</span><span class="card-hd-title">Household</span></div>'
       +'<div class="card-bd" style="font-family:\'Lato\',sans-serif;font-size:13px;line-height:1.55;">'+household+'</div></div>';
+    const galley = ((data.writeup.galley)||'').replace(/</g,'&lt;');
+    html += '<div class="card"><div class="card-hd"><span class="card-hd-icon">🍽️</span><span class="card-hd-title">Galley Report</span></div>'
+      +'<div class="card-bd" style="font-family:\'Lato\',sans-serif;font-size:13px;line-height:1.55;">'+galley+'</div></div>';
     html += '<div class="sec-hd" style="margin-top:14px;">Copy as Plain Text</div>';
     html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><button onclick="copyReportCardText()" class="btn-secondary" style="width:auto;padding:8px 14px;">📋 Copy</button><span id="rc-copy-status" style="font-size:12px;color:var(--muted);font-style:italic;"></span></div>';
     html += '<textarea id="rc-plaintext" readonly onclick="this.select()" style="width:100%;min-height:160px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical;">'+(data.plainText||'').replace(/</g,'&lt;')+'</textarea>';

@@ -2043,6 +2043,7 @@ function renderReportCard(){
       html += '<div class="rc-boy"><div class="rc-boy-name">'+a.icon+' '+a.name+'</div><div class="rc-boy-text">'+text.replace(/</g,'&lt;')+'</div></div>';
     });
     html += '<div class="rc-household"><div class="rc-boy-name">Household</div><div class="rc-boy-text">'+(data.writeup.household||'').replace(/</g,'&lt;')+'</div></div>';
+    html += '<div class="rc-household"><div class="rc-boy-name">&#127860; Galley Report</div><div class="rc-boy-text">'+(data.writeup.galley||'').replace(/</g,'&lt;')+'</div></div>';
     html += '<div class="shead" style="margin-top:18px;">Copy as Plain Text</div>';
     html += '<div class="rc-copy-row"><button class="rc-copy-btn" onclick="copyReportCardText()">📋 Copy</button><span class="rc-copy-status" id="rc-copy-status"></span></div>';
     html += '<textarea class="rc-plaintext" id="rc-plaintext" readonly onclick="this.select()">'+(data.plainText||'').replace(/</g,'&lt;')+'</textarea>';
