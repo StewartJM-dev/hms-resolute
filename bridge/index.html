@@ -605,6 +605,11 @@ body{
     <div class="shead" style="margin-top:22px;">Screen Time Approvals</div>
     <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Bonus screen time cashed out from missions — approving deducts it from the bank; denying leaves it untouched.</div>
     <div id="screentime-approvals" style="margin-bottom:8px;"></div>
+
+    <!-- TEACH ME — WEBSITE + FAMILY DAY SUGGESTIONS -->
+    <div class="shead" style="margin-top:22px;">Teach Me Suggestions</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Real website and family-day ideas generated once this week's Teach Me topic wins the vote — nothing shows up for the boys until you approve it.</div>
+    <div id="teachme-approvals" style="margin-bottom:8px;"></div>
   </div>
 
   <!-- ===== INSTRUMENTS TAB ===== -->
@@ -1328,7 +1333,7 @@ function showBTab(name, btn){
   document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); renderShipPending(); }
+  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); renderShipPending(); renderTeachMeApprovals(); }
   if(name==='helm'){ renderReportCard(); }
   if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
@@ -1564,6 +1569,66 @@ function resolveScreenTimeRequest(agentId, key, status){
       });
     }
   });
+}
+
+// ════════════════════════════════════════════
+// TEACH ME — website + family day suggestion approvals
+// (combined-batch-punchlist.md Part 3). Same Monday-anchored week key
+// boys/index.html's getVoteWeekKey() computes — duplicated here since
+// this page has no other reason to share code with the boys' app for
+// this one small date computation.
+// ════════════════════════════════════════════
+function bridgeVoteWeekKey(){
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateStr(monday);
+}
+
+function renderTeachMeApprovals(){
+  if(!_db) return;
+  const weekKey = bridgeVoteWeekKey();
+  _db.ref('stewart/teachvote/'+weekKey).on('value', s => {
+    const data = s.val() || {};
+    const el = document.getElementById('teachme-approvals');
+    if(!el) return;
+    const websites = Object.entries(data.websiteSuggestions || {}).filter(([,w]) => w.status === 'pending');
+    const familyDay = data.familyDaySuggestion && data.familyDaySuggestion.status === 'pending' ? data.familyDaySuggestion : null;
+    if(!websites.length && !familyDay){
+      el.innerHTML = '<div style="font-size:12px;opacity:.5;font-style:italic;">No pending suggestions.</div>';
+      return;
+    }
+    let html = '';
+    websites.forEach(([key,w]) => {
+      html += '<div style="padding:9px 0;border-bottom:1px solid rgba(200,146,42,.2);">'+
+        '<div style="font-weight:700;font-size:13px;color:var(--cream,#f7f2ea);">🌐 '+esc(w.website)+'</div>'+
+        (w.url ? '<div style="font-size:11px;opacity:.6;word-break:break-all;">'+esc(w.url)+'</div>' : '')+
+        '<div style="font-size:11px;opacity:.7;margin-top:2px;">'+esc(w.reason||'')+'</div>'+
+        '<div style="margin-top:6px;">'+
+        '<button onclick="resolveTeachMeWebsite(\''+weekKey+'\',\''+key+'\',\'approved\')" style="padding:6px 10px;border-radius:7px;border:none;background:var(--green2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Approve</button>'+
+        '<button onclick="resolveTeachMeWebsite(\''+weekKey+'\',\''+key+'\',\'denied\')" style="padding:6px 10px;border-radius:7px;border:1px solid #b5451b;background:none;color:#e08a6a;font-size:11px;cursor:pointer;margin-left:5px;">Deny</button>'+
+        '</div></div>';
+    });
+    if(familyDay){
+      html += '<div style="padding:9px 0;border-bottom:1px solid rgba(200,146,42,.2);">'+
+        '<div style="font-weight:700;font-size:13px;color:var(--cream,#f7f2ea);">🎉 '+esc(familyDay.activity)+'</div>'+
+        '<div style="font-size:11px;opacity:.7;margin-top:2px;">'+esc(familyDay.reason||'')+'</div>'+
+        '<div style="margin-top:6px;">'+
+        '<button onclick="resolveTeachMeFamilyDay(\''+weekKey+'\',\'approved\')" style="padding:6px 10px;border-radius:7px;border:none;background:var(--green2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Approve</button>'+
+        '<button onclick="resolveTeachMeFamilyDay(\''+weekKey+'\',\'denied\')" style="padding:6px 10px;border-radius:7px;border:1px solid #b5451b;background:none;color:#e08a6a;font-size:11px;cursor:pointer;margin-left:5px;">Deny</button>'+
+        '</div></div>';
+    }
+    el.innerHTML = html;
+  });
+}
+function resolveTeachMeWebsite(weekKey, key, status){
+  if(!_db) return;
+  _db.ref('stewart/teachvote/'+weekKey+'/websiteSuggestions/'+key).update({status, resolvedAt: Date.now()});
+}
+function resolveTeachMeFamilyDay(weekKey, status){
+  if(!_db) return;
+  _db.ref('stewart/teachvote/'+weekKey+'/familyDaySuggestion').update({status, resolvedAt: Date.now()});
 }
 
 // ════════════════════════════════════════════

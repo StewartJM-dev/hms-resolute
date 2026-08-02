@@ -1929,6 +1929,31 @@ async function fetchWhiteGloveWeekData(dates) {
   return { days, summary: { totalInspections, totalPassed, byBoy, byRoom } };
 }
 
+// Teach Me Vote fold-in (combined-batch-punchlist.md Part 3, last bullet).
+// stewart/teachvote/{weekKey} uses the same Monday-anchored week key the
+// report card's own weekOf already is — no cross-week-boundary reconciling
+// needed here, unlike the Galley Report's Sunday-start plan week.
+async function fetchTeachMeWeekData(weekOf) {
+  const snap = await db.ref(`stewart/teachvote/${weekOf}`).once('value');
+  const data = snap.val();
+  if (!data) return null;
+  const suggestions = data.suggestions || {};
+  const votes = data.votes || {};
+  const winner = data.winner || null;
+  const websiteSuggestions = Object.values(data.websiteSuggestions || {})
+    .map(w => ({ website: w.website, status: w.status }));
+  const familyDaySuggestion = data.familyDaySuggestion
+    ? { activity: data.familyDaySuggestion.activity, status: data.familyDaySuggestion.status }
+    : null;
+  return {
+    winnerTopic: winner ? (TEACH_ME_TOPICS[winner] || winner) : null,
+    suggestedByCount: Object.keys(suggestions).length,
+    votedByCount: Object.keys(votes).length,
+    websiteSuggestions,
+    familyDaySuggestion
+  };
+}
+
 async function fetchDawnWeekData(dates) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000;
@@ -2111,14 +2136,15 @@ async function aggregateWeeklyReportData(weekOf) {
 
   const exceptionsByDate = await fetchExceptionsByDate(dates);
 
-  const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming] = await Promise.all([
+  const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming, teachMe] = await Promise.all([
     Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates, exceptionsByDate))),
     fetchWhiteGloveWeekData(dates),
     fetchDawnWeekData(dates),
     fetchPrayerWeekData(weekStartMs, weekEndMs),
     fetchCrowsnestWeekData(weekStartMs, weekEndMs),
     fetchGalleyAdherence(dates),
-    fetchGalleyPlanTiming(weekOf)
+    fetchGalleyPlanTiming(weekOf),
+    fetchTeachMeWeekData(weekOf)
   ]);
 
   const boysById = {};
@@ -2142,7 +2168,8 @@ async function aggregateWeeklyReportData(weekOf) {
     dawn,
     prayerHousehold: prayer.household,
     crowsnestHousehold: crowsnest.household,
-    galley: { adherence: galleyAdherence, timing: galleyTiming }
+    galley: { adherence: galleyAdherence, timing: galleyTiming },
+    teachMe
   };
 
   await db.ref(`stewart/reportcards/${weekOf}`).set(report);
@@ -2173,6 +2200,8 @@ Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
 The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.
+
+"teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it.
 
 Galley Report is its own third section, separate from both boys and household — meal-plan planning and adherence for the week, from real Kitchen/Galley data. This is the first section aimed at long-range household planning rather than accountability, so the tone should read as a planning aid, not a grade.
 
@@ -2212,7 +2241,7 @@ async function generateReportCardWriteup(reportData) {
     output_config: { format: { type: 'json_schema', schema: REPORT_WRITEUP_SCHEMA } },
     messages: [{
       role: 'user',
-      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, galley: reportData.galley })}`
+      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, galley: reportData.galley, teachMe: reportData.teachMe })}`
     }]
   });
 
@@ -2303,6 +2332,112 @@ exports.autoGenerateWeeklyReportCard = functions
   .onRun(async () => {
     const weekOf = previousWeekMonday(easternDateStr());
     await buildFullWeeklyReportCard(weekOf);
+    return null;
+  });
+
+// ════════════════════════════════════════════════════
+// TEACH ME VOTE — website + family day suggestions when a topic wins
+// (combined-batch-punchlist.md Part 3). stewart/teachvote/{weekKey}
+// already exists (boys/index.html, dashboard/index.html):
+// {suggestions:{agentId:optionId}, votes:{agentId:optionId}, winner}.
+// This adds websiteSuggestions/{pushId} and familyDaySuggestion once a
+// winner is known — both start 'pending', needing a parent's approval
+// before they're treated as real (same pattern Tom's own interest-
+// suggestion flow already uses for stewart/tomWebsiteRequests: a
+// proposal only becomes real once a parent explicitly approves it).
+// ════════════════════════════════════════════════════
+const TEACH_ME_TOPICS = {
+  bike: 'Bike Maintenance — fix flats, adjust brakes, tune gears',
+  tools: 'Tool Basics — measure, cut, drill, build something',
+  car: 'Car Basics — oil, tires, jump starts, under the hood',
+  knots: 'Knots & Rope Work — Trail Life knots, lashing, rescue lines',
+  fire: 'Fire Building — tinder to fire, safely and fast',
+  firstaid: 'First Aid — cuts, burns, sprains, emergencies',
+  cooking: 'Campfire Cooking — cast iron, camp stove, open flame',
+  navigation: 'Map & Navigation — read a map, use a compass, find your way',
+  woodwork: 'Basic Woodworking — measure twice, cut once, build something real',
+  fishing: 'Fishing Basics — knots, bait, casting, cleaning a fish',
+  electrical: 'Basic Electrical — circuits, outlets, safe wiring basics',
+  plumbing: 'Basic Plumbing — shut-offs, fixing leaks, unclogging drains'
+};
+
+const TEACH_ME_SUGGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    websites: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, url: { type: 'string' }, reason: { type: 'string' } },
+        required: ['name', 'url', 'reason'],
+        additionalProperties: false
+      }
+    },
+    familyDayActivity: { type: 'string' },
+    familyDayReason: { type: 'string' }
+  },
+  required: ['websites', 'familyDayActivity', 'familyDayReason'],
+  additionalProperties: false
+};
+
+async function generateTeachMeSuggestions(topicDesc) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 700,
+    system: `You help a family of four boys (ages 7-13) plan a "Teach Me" learning week around a topic they voted on, plus a related family day activity. Suggest 1-2 REAL, well-known, kid-appropriate websites (real names and real URLs you're confident actually exist and are safe for kids — never invent a site) that would help them learn this topic. Also suggest ONE real, concrete family day activity idea tied to the same topic — something achievable in a single day, not vague ("visit a real bike shop for a tune-up class," not "learn about bikes together"). Keep each reason to one sentence.`,
+    output_config: { format: { type: 'json_schema', schema: TEACH_ME_SUGGEST_SCHEMA } },
+    messages: [{ role: 'user', content: `This week's Teach Me topic: ${topicDesc}` }]
+  });
+  await logTinkUsage('claude-sonnet-4-6', response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw);
+}
+
+// Fires Friday morning Eastern — the exact moment the client's own phase
+// computation (dow 1=suggest, 2-4=vote, 5-0=closed) already treats voting
+// as closed, so this doesn't preempt a vote still in progress.
+exports.closeTeachMeVote = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .pubsub.schedule('0 6 * * 5')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    const weekKey = mostRecentMonday(easternDateStr());
+    const ref = db.ref(`stewart/teachvote/${weekKey}`);
+    const snap = await ref.once('value');
+    const data = snap.val() || {};
+
+    // Idempotent — a real Anthropic call shouldn't fire twice for the same
+    // week even if this scheduled run somehow triggers more than once.
+    if (data.websiteSuggestions || data.familyDaySuggestion) return null;
+
+    let winner = data.winner;
+    if (!winner) {
+      const votes = data.votes || {};
+      const tally = {};
+      Object.values(votes).forEach(v => { tally[v] = (tally[v] || 0) + 1; });
+      const ranked = Object.keys(tally).sort((a, b) => tally[b] - tally[a]);
+      winner = ranked[0] || null;
+      if (winner) await ref.child('winner').set(winner);
+    }
+    if (!winner || !TEACH_ME_TOPICS[winner]) return null; // no votes cast this week — nothing to suggest against
+
+    let result;
+    try {
+      result = await generateTeachMeSuggestions(TEACH_ME_TOPICS[winner]);
+    } catch (e) {
+      console.error('generateTeachMeSuggestions failed:', e);
+      return null;
+    }
+
+    const now = Date.now();
+    const writes = (result.websites || []).slice(0, 2).map(w => ref.child('websiteSuggestions').push({
+      website: w.name, url: w.url, reason: w.reason, status: 'pending', timestamp: now
+    }));
+    writes.push(ref.child('familyDaySuggestion').set({
+      activity: result.familyDayActivity, reason: result.familyDayReason, status: 'pending', timestamp: now
+    }));
+    await Promise.all(writes);
     return null;
   });
 
