@@ -1368,6 +1368,8 @@ function renderDawnShipsOrders(){
   const devWeekKey = (typeof getDevotionalWeekKey === 'function') ? getDevotionalWeekKey() : weekStart;
   const officer = getOfficerOfWatch();
   const officerNames = {samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = localDateStr(yesterday);
 
   Promise.all([
     _db.ref(`stewart/dawnDailyOrders/${today}/vineyard`).once('value'),
@@ -1378,8 +1380,10 @@ function renderDawnShipsOrders(){
     _db.ref(`stewart/dawnDailyOrders/${weekStart}/lunchoptions`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/gracedare`).once('value'),
     _db.ref(`stewart/dawnDailyOrders/${today}/comms`).once('value'),
-    _db.ref(`stewart/dawnDailyOrders/${today}/laundry`).once('value')
-  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap, gdManual, commsSnap, laundrySnap]) => {
+    _db.ref(`stewart/dawnDailyOrders/${today}/laundry`).once('value'),
+    _db.ref('stewart/plan').once('value'),
+    _db.ref(`stewart/mealverification/${yStr}`).once('value')
+  ]).then(([vineSnap, potsSnap, mealSnap, warRoomSnap, crowsNestSnap, lunchSnap, gdManual, commsSnap, laundrySnap, planSnap, mealVerifySnap]) => {
     const checks = [];
     if(!vineSnap.val()) checks.push({text:'Tend to the Vineyard', key:'vineyard', scope:today});
     if(!potsSnap.val()) checks.push({text:'Wash dinner pots and pans', key:'pots', scope:today});
@@ -1390,6 +1394,28 @@ function renderDawnShipsOrders(){
     if(!commsSnap.val()) checks.push({text:'Check Comms — group chat, private threads, pending approvals', key:'comms', scope:today});
     const dow = new Date().getDay(); // 1=Mon, 4=Thu — the two laundry days
     if((dow===1||dow===4) && !laundrySnap.val()) checks.push({text:'Check on today\'s laundry', key:'laundry', scope:today});
+
+    // Galley Report (galley-report-punchlist.md, Step 3): surface only
+    // when yesterday actually had a real planned dinner AND it hasn't
+    // been verified yet — the real "done" signal here is
+    // stewart/mealverification/{date} existing, checked fresh on every
+    // render, not a stewart/dawnDailyOrders flag like the items above
+    // (see goToDawnOrderItem's mealverify special-case below for why).
+    // MEAL_VERIFY_SKIP_NAMES mirrors kitchen/index.html's own
+    // checkMealVerificationPrompt() skip list exactly, so Dawn never
+    // sees this for a night nothing was really planned.
+    if(!mealVerifySnap.val()){
+      const plan = planSnap.val();
+      if(Array.isArray(plan)){
+        const MEAL_VERIFY_SKIP_NAMES = ['No Meal -- not cooking', 'Open -- choose from library'];
+        const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        const yDayName = dayNames[yesterday.getDay()];
+        const slot = plan.find(s => s.day === yDayName);
+        if(slot && slot.mealName && !MEAL_VERIFY_SKIP_NAMES.includes(slot.mealName)){
+          checks.push({text:'Verify last night\'s dinner ('+slot.mealName+')', key:'mealverify', scope:yStr});
+        }
+      }
+    }
 
     // Grace Dare completion needs the current day number first
     _db.ref('stewart/gracedare/progress/currentDay').once('value', gdDaySnap => {
@@ -1422,9 +1448,25 @@ const DAWN_ORDER_DESTINATIONS = {
   lunchoptions: {type:'tab', tab:'lunch'},
   gracedare:  {type:'tab', tab:'dawn'},
   comms:      {type:'tab', tab:'messenger'},
-  laundry:    {type:'tab', tab:'missions'}
+  laundry:    {type:'tab', tab:'missions'},
+  // ?screen=planner (kitchen/index.html, Galley Report Step 3) jumps
+  // straight to the Weekly Planner screen where the verification
+  // prompt lives, instead of landing on Meals and making her navigate
+  // there herself.
+  mealverify: {type:'link', href:'../kitchen/?screen=planner'}
 };
 function goToDawnOrderItem(key, scope){
+  if(key === 'mealverify'){
+    // Deliberately skips toggleDawnOrderItem's stewart/dawnDailyOrders
+    // write — this item's real "done" state is
+    // stewart/mealverification/{date} existing (see renderDawnShipsOrders
+    // above), checked fresh every render. Marking it done here on tap
+    // alone would let it silently disappear from the list even if she
+    // backs out of the Galley without ever answering Yes/No.
+    closeDawnShipsOrders();
+    window.location.href = DAWN_ORDER_DESTINATIONS.mealverify.href;
+    return;
+  }
   toggleDawnOrderItem(key, scope).then(() => {
     const dest = DAWN_ORDER_DESTINATIONS[key];
     closeDawnShipsOrders();

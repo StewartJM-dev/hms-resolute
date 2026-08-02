@@ -2116,6 +2116,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHelp();
   initFirebase();
   setTimeout(()=>{ updateShopBadge(); }, 1500);
+
+  // Deep-link support: ?screen=planner (used by dashboard/index.html's
+  // "Verify last night's dinner" Ship's Orders item, Galley Report
+  // Step 3) jumps straight to the Weekly Planner screen where the
+  // verification prompt lives, instead of landing on Meals.
+  const deepLinkScreen = new URLSearchParams(location.search).get('screen');
+  if(deepLinkScreen){
+    const btn = document.querySelector('.nb[onclick*="\''+deepLinkScreen+'\'"]');
+    if(btn) showScreen(deepLinkScreen, btn);
+  }
 });
 
 </script>
