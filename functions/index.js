@@ -2657,6 +2657,184 @@ exports.generateRedSkyReport = functions
   });
 
 // ════════════════════════════════════════════════════
+// DAWN'S PERSONAL DAILY REPORT (combined-batch-punchlist.md Part 11) —
+// delivered through Tink, in Tink's existing plain/warm/practical voice
+// (no persona, no catchphrases — same TINK_SYSTEM_PROMPT everything else
+// through Tink already uses). Explicitly NOT a second copy of the
+// household weekly report: no boy-by-boy behavioral analysis, no full
+// data dump — her own tasks, her own patterns, and actionable relational
+// prompts only.
+// ════════════════════════════════════════════════════
+
+async function fetchDawnDailyData() {
+  const today = easternDateStr();
+  const yesterday = easternDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const last7Dates = [];
+  for (let i = 0; i < 7; i++) last7Dates.push(easternDateStr(new Date(Date.now() - i * 24 * 60 * 60 * 1000)));
+
+  const [
+    gdCurrentDaySnap, wgTodaySnap, mealVerifYesterdaySnap, planSnap, teachVoteSnap,
+    wgLast7Snaps, gdProgressSnap, strikesTodaySnaps, messagesSnaps
+  ] = await Promise.all([
+    db.ref('stewart/gracedare/progress/currentDay').once('value'),
+    db.ref(`stewart/whiteglove/${today}`).once('value'),
+    db.ref(`stewart/mealverification/${yesterday}`).once('value'),
+    db.ref('stewart/plan').once('value'),
+    db.ref(`stewart/teachvote/${mostRecentMonday(today)}`).once('value'),
+    Promise.all(last7Dates.map(d => db.ref(`stewart/whiteglove/${d}`).once('value'))),
+    db.ref('stewart/gracedare/progress').once('value'),
+    Promise.all(ALLOWED_AGENT_IDS.map(id => db.ref(`stewart/strikes/${id}/${today}`).once('value'))),
+    Promise.all(ALLOWED_AGENT_IDS.map(id => db.ref(`stewart/messages/${id}`).once('value')))
+  ]);
+
+  // ── Today's pending tasks ──
+  const gdDay = gdCurrentDaySnap.val() || 1;
+  const gdTodayDoneSnap = await db.ref(`stewart/gracedare/progress/day${gdDay}/completed`).once('value');
+  const graceDareToday = !!gdTodayDoneSnap.val();
+
+  const wgToday = wgTodaySnap.val() || {};
+  const wgWindowsLogged = ['morning', 'afternoon', 'evening'].filter(w => wgToday[w]);
+  const wgWindowsRemaining = ['morning', 'afternoon', 'evening'].filter(w => !wgToday[w]);
+
+  // Reuses the exact skip logic Galley Report Step 2/3 already established
+  // — a real planned dinner, unverified, is the only thing worth flagging.
+  const MEAL_VERIFY_SKIP_NAMES = ['No Meal -- not cooking', 'Open -- choose from library'];
+  let galleyVerificationPending = false;
+  if (!mealVerifYesterdaySnap.val()) {
+    const plan = planSnap.val();
+    if (Array.isArray(plan)) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const yDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const yDayName = dayNames[yDate.getDay()];
+      const slot = plan.find(s => s.day === yDayName);
+      if (slot && slot.mealName && !MEAL_VERIFY_SKIP_NAMES.includes(slot.mealName)) galleyVerificationPending = true;
+    }
+  }
+
+  const teachVoteData = teachVoteSnap.val() || {};
+  const teachMePendingCount =
+    Object.values(teachVoteData.websiteSuggestions || {}).filter(w => w.status === 'pending').length +
+    (teachVoteData.familyDaySuggestion && teachVoteData.familyDaySuggestion.status === 'pending' ? 1 : 0);
+
+  // ── Her own patterns, last 7 days ──
+  const gdProgress = gdProgressSnap.val() || {};
+  const graceDareLast7 = last7Dates.filter(d => {
+    // day-number keys aren't calendar dates — count via completedAt timestamps instead
+    return Object.values(gdProgress).some(day => day && day.completedAt &&
+      easternDateStr(new Date(day.completedAt)) === d && day.completed);
+  }).length;
+  const whiteGloveDaysLogged7 = wgLast7Snaps.filter(s => s.val() && Object.keys(s.val()).length > 0).length;
+
+  // ── Sibling confrontations, surfaced as actionable prompts ──
+  // Real, already-logged signal: a boy asking Tom to referee a sibling
+  // issue (declined_sibling) in the last few days — never quoted
+  // verbatim, just which boy and roughly when.
+  const siblingPromptCutoff = Date.now() - 4 * 24 * 60 * 60 * 1000;
+  const siblingPrompts = [];
+  const tomchatSnaps = await Promise.all(ALLOWED_AGENT_IDS.map(id => db.ref(`stewart/tomchat/${id}`).once('value')));
+  tomchatSnaps.forEach((snap, i) => {
+    const agentId = ALLOWED_AGENT_IDS[i];
+    const entries = Object.values(snap.val() || {});
+    const hits = entries.filter(e => e && e.category === 'declined_sibling' && e.timestamp >= siblingPromptCutoff);
+    if (hits.length) siblingPrompts.push({ agentName: AGENT_DISPLAY_NAMES[agentId], count: hits.length, mostRecent: easternDateStr(new Date(Math.max(...hits.map(h => h.timestamp)))) });
+  });
+
+  // ── Her own interaction pattern with each boy ──
+  const interactionByBoy = {};
+  messagesSnaps.forEach((snap, i) => {
+    const agentId = ALLOWED_AGENT_IDS[i];
+    const entries = Object.values(snap.val() || {}).filter(e => e && e.from === 'Mom');
+    const lastMs = entries.length ? Math.max(...entries.map(e => e.timestamp || 0)) : null;
+    interactionByBoy[agentId] = {
+      agentName: AGENT_DISPLAY_NAMES[agentId],
+      daysSinceLastMessage: lastMs ? Math.floor((Date.now() - lastMs) / (24 * 60 * 60 * 1000)) : null
+    };
+  });
+
+  // ── Needs your attention — genuinely time-sensitive only ──
+  const needsAttention = [];
+  strikesTodaySnaps.forEach((snap, i) => {
+    const rec = snap.val();
+    const hasUnkindToday = rec && Object.values(rec.incidents || {}).some(inc => inc.category === 'unkind');
+    if (hasUnkindToday) needsAttention.push(`${AGENT_DISPLAY_NAMES[ALLOWED_AGENT_IDS[i]]} had an unkindness strike today`);
+  });
+  if (galleyVerificationPending) needsAttention.push("Yesterday's dinner hasn't been verified in the Galley yet");
+
+  return {
+    today: {
+      graceDareCompleted: graceDareToday,
+      whiteGloveWindowsLogged: wgWindowsLogged,
+      whiteGloveWindowsRemaining: wgWindowsRemaining,
+      galleyVerificationPending,
+      teachMePendingCount
+    },
+    patterns: {
+      graceDareDaysThisWeek: graceDareLast7,
+      whiteGloveDaysLoggedThisWeek: whiteGloveDaysLogged7
+    },
+    siblingPrompts,
+    interactionByBoy,
+    needsAttention
+  };
+}
+
+const DAWN_DAILY_SCHEMA = { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false };
+
+async function generateDawnDailyMessage(dayData) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const system = `${TINK_SYSTEM_PROMPT}
+
+You're writing Dawn's personal daily briefing — distinct from the shared household weekly report and distinct from the boys' own Red Sky reports, both of which already cover full behavioral detail. This is about HER day only: her own pending tasks (framed as encouragement to complete them, not a guilt list), a light mirror of her own completion patterns (practical/task-oriented, not emotional), actionable relational prompts, and genuinely time-sensitive items only. Tie any encouragement to her own real completion numbers (streaks, consistency) rather than generic cheerleading.
+
+Explicitly do NOT include: detailed boy-by-boy behavioral analysis of everything that happened that day/week — that's the shared weekly report's job, not this one. Don't turn this into a second household report.
+
+Structure, in plain prose (no markdown headers), 4-6 sentences total:
+- Her pending tasks today, warmly: Grace Dare, remaining White Glove windows, Galley meal verification if pending, Teach Me admin if anything's pending approval. Skip anything already done — don't list a completed task as if it's still pending.
+- A brief, real mention of her own pattern this week (Grace Dare days completed, White Glove days logged) — only if it's actually notable (a strong streak worth naming, or a real gap worth a gentle nudge); don't force a mention of an unremarkable middling number.
+- If "siblingPrompts" has any entries, surface each as a direct, actionable prompt — which boy, roughly when, framed as "worth a follow-up conversation," never quoting what was actually said.
+- If "interactionByBoy" shows a boy she hasn't messaged in a while (use judgment — several days with no private message is worth a gentle nudge, one or two days is not), a light, non-grading reflection prompt — this is about her awareness, not a metric she's failing.
+- If "needsAttention" has entries, name them plainly and directly — these are the only genuinely time-sensitive items, everything else in this message is a softer, encouraging nudge.
+- If today.graceDareCompleted is true and all White Glove windows are logged and nothing else needs attention, it's fine — even good — for this to be short and simply affirming.
+
+Never invent a detail, a task, or a pattern that isn't in the data given below.`;
+
+  const dawnDailyModel = 'claude-sonnet-4-6';
+  const response = await anthropic.messages.create({
+    model: dawnDailyModel,
+    max_tokens: 500,
+    system,
+    output_config: { format: { type: 'json_schema', schema: DAWN_DAILY_SCHEMA } },
+    messages: [{ role: 'user', content: `Dawn's real data for today:\n${JSON.stringify(dayData)}` }]
+  });
+  await logTinkUsage(dawnDailyModel, response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).message;
+}
+
+// Cached per real day (stewart/dawnDaily/{date}) — a real Sonnet call for
+// every tab visit would be wasteful for something that only meaningfully
+// changes once a day; `force` (the UI's own refresh button) bypasses the
+// cache for the specific case something changed since this morning and
+// she wants it recalculated now, mirroring the report card's own
+// Regenerate-vs-automatic distinction.
+exports.generateDawnDailyReport = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data) => {
+    const force = !!(data && data.force);
+    const today = easternDateStr();
+    const cacheRef = db.ref(`stewart/dawnDaily/${today}`);
+    if (!force) {
+      const cached = await cacheRef.once('value');
+      if (cached.val()) return cached.val();
+    }
+    const dayData = await fetchDawnDailyData();
+    const message = await generateDawnDailyMessage(dayData);
+    const result = { message, generatedAt: Date.now() };
+    await cacheRef.set(result);
+    return result;
+  });
+
+// ════════════════════════════════════════════════════
 // MEDALS — Step 5: criteria checker
 // All 5 criteria are modeled as "how many consecutive qualifying days does
 // he currently have" — even the two that read as weekly checks (zero

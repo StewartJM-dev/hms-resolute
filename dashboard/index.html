@@ -1007,6 +1007,16 @@ body{
     <div class="tab" id="tab-tink">
       <div class="sec-hd">Tink</div>
       <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Ask about running Resolute, look up a boy's week, get recipe help, or draft something. No persona — just a straight answer.</p>
+
+      <!-- DAWN'S DAILY BRIEFING (combined-batch-punchlist.md Part 11) -->
+      <div id="dawn-daily-briefing" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-family:'Cinzel',serif;font-weight:700;font-size:12.5px;color:var(--brown);">Today, from Tink</div>
+          <button onclick="loadDawnDailyBriefing(true)" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;">&#8635; refresh</button>
+        </div>
+        <div id="dawn-daily-briefing-content" style="font-size:13px;line-height:1.55;color:var(--ink);">Loading…</div>
+      </div>
+
       <div class="dash-chat-thread">
         <div class="dash-chat-messages" id="tink-messages"></div>
         <div class="dash-chat-compose">
@@ -2293,11 +2303,31 @@ const TINK_TIER1_ACTIONS = [
 ];
 
 function initTinkChat(){
-  if(!_db || _tinkListenerAttached) return;
+  if(!_db) return;
+  loadDawnDailyBriefing();
+  if(_tinkListenerAttached) return;
   _tinkListenerAttached = true;
   _db.ref('stewart/tinkchat').limitToLast(60).on('value', snap => {
     renderTinkMessages(snap.val() || {});
   });
+}
+
+// Dawn's Personal Daily Report (combined-batch-punchlist.md Part 11) —
+// server-side cached per real day; the refresh link passes force:true to
+// bypass that cache for the specific case something changed since this
+// morning. Delivered in Tink's own voice (no persona), distinct from the
+// household weekly report and the boys' own Red Sky reports.
+async function loadDawnDailyBriefing(force){
+  const el = document.getElementById('dawn-daily-briefing-content');
+  if(!el) return;
+  el.textContent = 'Loading…';
+  try{
+    const res = await callFunction('generateDawnDailyReport', force ? {force:true} : {});
+    const message = res && res.data && res.data.message;
+    el.textContent = message || "Couldn't put today's briefing together — try refresh.";
+  }catch(e){
+    el.textContent = "Couldn't load today's briefing — try refresh.";
+  }
 }
 
 function renderTinkMessages(msgs){
