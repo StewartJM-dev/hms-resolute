@@ -7,6 +7,14 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const Anthropic = require('@anthropic-ai/sdk');
+// The single shared mission list/scoring engine (repo root, also loaded
+// client-side via <script> in boys/index.html and dashboard/index.html).
+// Copied into functions/ by the predeploy hook in firebase.json right
+// before every deploy — see that file's comment — so this stays the one
+// real copy, not a duplicate that can drift the way this file's own
+// header comment warns against.
+const { parseLocalDate, morningLunchComplete } = require('./mission-engine.js');
+const { NEXTDNS_RECREATION_DOMAINS } = require('./nextdns-config.js');
 admin.initializeApp();
 
 const db = admin.database();
@@ -176,6 +184,128 @@ exports.notifyShipAccountResolved = functions.database
     }
 
     await sendToPerson(agentId, title, body, 'boys/');
+    return null;
+  });
+
+// ════════════════════════════════════════════════════
+// NextDNS Website Lockdown — unlock on completion
+// (nextdns-lockdown-punchlist.md, Step 2)
+//
+// Each boy's Chromebook DNS points at his own NextDNS profile, denylisted
+// to Resolute-only by default (Step 1, John's manual NextDNS setup —
+// this code never touches that initial deny configuration). The moment a
+// boy's morning+lunch missions are ALL done for the day (mission-engine.js
+// morningLunchComplete — the single shared definition of what "done"
+// means here, confirmed mission-by-mission with John, not inferred), his
+// recreation sites move to his profile's allowlist for the rest of the
+// day. Nightly reset (Step 3) puts everyone back to locked the next
+// morning regardless of what happened the day before.
+//
+// CONFIG — fill in before this can actually call NextDNS. Profile IDs are
+// data, not something to hardcode inline into the trigger logic below, so
+// a profile change later is a one-line edit here, not a code change.
+// NEXTDNS_API_KEY is a Cloud Functions secret (same pattern as
+// ANTHROPIC_API_KEY), never committed to source.
+const NEXTDNS_PROFILE_IDS = {
+  samuel: 'f4d5a2',
+  johnjr: '1e7d2d',
+  stephen: 'cc245e',
+  daniel: '14f911'
+};
+
+// The recreation/allowed-sites list (NEXTDNS_RECREATION_DOMAINS) is
+// required at the top of this file from nextdns-config.js — shared with
+// the client (a boy can see the real list of sites that unlock for him on
+// his own HQ page) via the same copy-on-predeploy pattern as
+// mission-engine.js, one definition instead of a duplicate that could
+// drift between what's shown and what actually unlocks.
+
+// TODO (needs John's input before this is real): confirm whether the
+// profiles use NextDNS's "allowlist-only" mode (deny everything except
+// what's allowlisted) or explicit broad denylisting — determines whether
+// unlocking needs BOTH a denylist DELETE and an allowlist POST per domain,
+// or just the allowlist POST. Shaped for the denylist+allowlist pair per
+// the punch list's own description; adjust once that's confirmed.
+// POST adds to the list with the domain in the BODY, against the bare
+// list URL. DELETE is the opposite shape — domain in the URL PATH, no
+// body at all. Live-verified against the real NextDNS API before this was
+// fixed: DELETE with the domain in the body (matching POST's shape)
+// returned 404/"notFound" and silently deleted nothing — caught by
+// unlockRecreationSites' own .catch(), so it never crashed anything, but
+// it also never actually cleaned up a denylist entry. Doesn't break the
+// unlock itself (NextDNS's own docs: "Allowing takes precedence over
+// everything else, including security features," confirmed by testing —
+// the allowlist POST alone unlocks regardless of the denylist DELETE's
+// outcome) but was worth fixing properly rather than leaving a
+// permanently-failing best-effort cleanup call in place.
+async function nextDnsRequest(method, profileId, listType, domain) {
+  const apiKey = process.env.NEXTDNS_API_KEY;
+  const url = method === 'DELETE'
+    ? `https://api.nextdns.io/profiles/${profileId}/${listType}/${encodeURIComponent(domain)}`
+    : `https://api.nextdns.io/profiles/${profileId}/${listType}`;
+  const resp = await fetch(url, {
+    method,
+    headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
+    ...(method === 'POST' ? { body: JSON.stringify({ id: domain, active: true }) } : {})
+  });
+  if (!resp.ok) {
+    throw new Error(`NextDNS ${method} ${listType} (${domain}) failed: ${resp.status} ${await resp.text()}`);
+  }
+}
+
+// Returns true only if the unlock actually happened — the caller uses
+// this to decide whether it's honest to record stewart/nextdnsUnlock as
+// unlocked:true. Returning true from a no-op (missing profile ID) would
+// let that status node claim a boy's sites are unlocked when nothing
+// actually changed at NextDNS, AND would block any future retry once a
+// profile ID does get configured, since the idempotency check above
+// would see the day as already "handled."
+async function unlockRecreationSites(agentId) {
+  const profileId = NEXTDNS_PROFILE_IDS[agentId];
+  if (!profileId) {
+    console.error(`nextdns: no profile ID configured for ${agentId} — cannot unlock. Fails safe (stays locked), does not throw.`);
+    return false;
+  }
+  const domains = NEXTDNS_RECREATION_DOMAINS[agentId] || [];
+  for (const domain of domains) {
+    await nextDnsRequest('DELETE', profileId, 'denylist', domain).catch(e => console.error('nextdns denylist delete failed:', e.message));
+    await nextDnsRequest('POST', profileId, 'allowlist', domain).catch(e => console.error('nextdns allowlist add failed:', e.message));
+  }
+  return true;
+}
+
+// Fires on every write to any mission checkbox for any boy on any date —
+// onWrite (not onCreate) because unchecking a box is a DELETE in RTDB
+// (toggleMission sets the value to null), and re-checking it is a fresh
+// CREATE; either direction needs a fresh completion check.
+exports.checkNextDnsUnlock = functions
+  .runWith({ secrets: ['NEXTDNS_API_KEY'] })
+  .database.ref('/stewart/missions/{agentId}/{date}/{missionId}')
+  .onWrite(async (change, context) => {
+    const { agentId, date } = context.params;
+    if (!ALLOWED_AGENT_IDS.includes(agentId)) return null;
+    // Only ever act on a write to TODAY's missions — correcting a past
+    // day's checkbox (a parent fixing a mistake) must never trigger a
+    // real-time unlock call; that day is already over.
+    if (date !== easternDateStr()) return null;
+
+    const doneSnap = await db.ref(`stewart/missions/${agentId}/${date}`).once('value');
+    const doneMap = doneSnap.val() || {};
+    const complete = morningLunchComplete(agentId, parseLocalDate(date), doneMap);
+    if (!complete) return null;
+
+    // Idempotency — once unlocked, stays unlocked for the day regardless
+    // of what else happens (Behavior section: "the unlock persists for
+    // the rest of that day"). Never re-call NextDNS for a day already
+    // marked unlocked, and never re-lock mid-day if something later gets
+    // unchecked — only the nightly reset (Step 3) re-locks.
+    const statusRef = db.ref(`stewart/nextdnsUnlock/${agentId}/${date}`);
+    const statusSnap = await statusRef.once('value');
+    if (statusSnap.val() && statusSnap.val().unlocked) return null;
+
+    const unlocked = await unlockRecreationSites(agentId);
+    if (!unlocked) return null; // no profile configured yet — stay silent, don't record a false unlocked status
+    await statusRef.set({ unlocked: true, unlockedAt: Date.now() });
     return null;
   });
 
