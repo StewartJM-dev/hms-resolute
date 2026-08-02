@@ -730,7 +730,7 @@ body{
       </div>
 
       <div class="sec-hd">Weekly Report Card</div>
-      <button onclick="checkInReportCard()" class="btn-primary" id="rc-checkin-btn">Check In — Generate Now</button>
+      <button onclick="regenerateReportCard()" class="btn-primary" id="rc-checkin-btn">🔄 Regenerate Now</button>
       <div id="rc-status" class="rc-status"></div>
       <div id="rc-content"><div class="empty-state">Loading…</div></div>
 
@@ -1007,6 +1007,16 @@ body{
     <div class="tab" id="tab-tink">
       <div class="sec-hd">Tink</div>
       <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Ask about running Resolute, look up a boy's week, get recipe help, or draft something. No persona — just a straight answer.</p>
+
+      <!-- DAWN'S DAILY BRIEFING (combined-batch-punchlist.md Part 11) -->
+      <div id="dawn-daily-briefing" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-family:'Cinzel',serif;font-weight:700;font-size:12.5px;color:var(--brown);">Today, from Tink</div>
+          <button onclick="loadDawnDailyBriefing(true)" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;">&#8635; refresh</button>
+        </div>
+        <div id="dawn-daily-briefing-content" style="font-size:13px;line-height:1.55;color:var(--ink);">Loading…</div>
+      </div>
+
       <div class="dash-chat-thread">
         <div class="dash-chat-messages" id="tink-messages"></div>
         <div class="dash-chat-compose">
@@ -1115,7 +1125,7 @@ let _db = null;
 // timeoutMs guards against a fetch that never settles at all (observed on
 // iOS: the connection stalls silently — no error, no response — typically
 // when the app gets backgrounded mid-request). Without this, an awaiting
-// caller like checkInReportCard() hangs forever: the button stays stuck on
+// caller like regenerateReportCard() hangs forever: the button stays stuck on
 // "Generating…" for the rest of that page's life even though the Cloud
 // Function finishes fine server-side. AbortController turns that silent
 // stall into an actual rejection the caller's retry/error logic can react to.
@@ -2293,11 +2303,31 @@ const TINK_TIER1_ACTIONS = [
 ];
 
 function initTinkChat(){
-  if(!_db || _tinkListenerAttached) return;
+  if(!_db) return;
+  loadDawnDailyBriefing();
+  if(_tinkListenerAttached) return;
   _tinkListenerAttached = true;
   _db.ref('stewart/tinkchat').limitToLast(60).on('value', snap => {
     renderTinkMessages(snap.val() || {});
   });
+}
+
+// Dawn's Personal Daily Report (combined-batch-punchlist.md Part 11) —
+// server-side cached per real day; the refresh link passes force:true to
+// bypass that cache for the specific case something changed since this
+// morning. Delivered in Tink's own voice (no persona), distinct from the
+// household weekly report and the boys' own Red Sky reports.
+async function loadDawnDailyBriefing(force){
+  const el = document.getElementById('dawn-daily-briefing-content');
+  if(!el) return;
+  el.textContent = 'Loading…';
+  try{
+    const res = await callFunction('generateDawnDailyReport', force ? {force:true} : {});
+    const message = res && res.data && res.data.message;
+    el.textContent = message || "Couldn't put today's briefing together — try refresh.";
+  }catch(e){
+    el.textContent = "Couldn't load today's briefing — try refresh.";
+  }
 }
 
 function renderTinkMessages(msgs){
@@ -3033,14 +3063,23 @@ const WG_OFFICERS = [
 let wgPending = {}; // in-progress selections before saving, keyed by room -> {trash,dishes,clothing,floor,counters,officer,metStandard}
 
 function wgBlankRoom(){
-  return {trash:null, dishes:null, clothing:null, floor:null, counters:null, officer:null, metStandard:null};
+  return {trash:null, dishes:null, clothing:null, floor:null, counters:null, officer:null, metStandard:null, na:false, naReason:null};
 }
+// Exception Days (combined-batch-punchlist.md Part 2d): an N/A room is
+// complete on its own — no category/officer/standard ratings required,
+// since there's nothing to rate against an exception day.
 function wgRoomComplete(r){
+  if(r.na) return true;
   return WG_CATEGORIES.every(c => r[c.id] !== null) && r.officer !== null && r.metStandard !== null;
 }
 function wgRoomPassed(r){
+  if(r.na) return false; // never counts as passed...
   return WG_CATEGORIES.every(c => r[c.id] === true);
 }
+// ...and callers computing pass/fail tallies should exclude na rooms
+// entirely first (neither passed nor failed) — this is the actual
+// "doesn't count as missed/failed" behavior; wgRoomPassed alone only
+// answers "is this specifically a clean pass."
 
 function getWGWindow(){
   const hr = new Date().getHours();
@@ -3083,13 +3122,18 @@ function renderWhiteGlove(){
 
     if(already){
       const roomVals = WG_ROOMS.map(r => already.rooms && already.rooms[r.id]).filter(Boolean);
-      const passCount = roomVals.filter(r => wgRoomPassed(r)).length;
-      const metCount = roomVals.filter(r => r.metStandard === true).length;
+      // Exception Days (Part 2d): N/A rooms are excluded from BOTH the
+      // numerator and denominator \u2014 not counted as missed/failed, not
+      // just left out of the pass count.
+      const ratedRooms = roomVals.filter(r => !r.na);
+      const naCount = roomVals.length - ratedRooms.length;
+      const passCount = ratedRooms.filter(r => wgRoomPassed(r)).length;
+      const metCount = ratedRooms.filter(r => r.metStandard === true).length;
       const time = already.loggedAt ? new Date(already.loggedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
       el.innerHTML = `<div class="card" style="border:1px solid #2d6a47;">
         <div class="card-bd" style="padding:12px 14px;">
           <div style="font-family:'Cinzel',serif;font-weight:700;font-size:13px;color:#2d6a47;">\u2713 ${win.label} Inspection Logged \u2014 ${time}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${passCount} of ${WG_ROOMS.length} compartments fully clear \u2014 ${metCount} of ${WG_ROOMS.length} officers met standard.</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${passCount} of ${ratedRooms.length} compartments fully clear \u2014 ${metCount} of ${ratedRooms.length} officers met standard.${naCount?' ('+naCount+' N/A \u2014 exception day)':''}</div>
           ${wgDetailBreakdown(already)}
           <button onclick="startWhiteGloveInspection()" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer;">Log again</button>
         </div>
@@ -3111,6 +3155,11 @@ function wgDetailBreakdown(inspection){
   const rows = WG_ROOMS.map(r => {
     const d = inspection.rooms && inspection.rooms[r.id];
     if(!d) return '';
+    if(d.na){
+      return `<div style="font-size:11px;padding:4px 0;border-top:1px solid var(--border);">
+        <b>${r.icon} ${r.label}</b> — <span style="color:var(--brown);">N/A (exception day)</span>
+      </div>`;
+    }
     const failedCats = WG_CATEGORIES.filter(c => d[c.id] === false).map(c => c.label);
     const officerLabel = (WG_OFFICERS.find(o => o.id === d.officer)||{}).label || '\u2014';
     const standardTxt = d.metStandard ? 'met standard' : 'did not meet standard';
@@ -3129,11 +3178,12 @@ function renderWGHistory(dayData, excludeKey){
   const rows = others.map(k => {
     const d = dayData[k];
     const roomVals = WG_ROOMS.map(r => d.rooms && d.rooms[r.id]).filter(Boolean);
-    const passCount = roomVals.filter(r => wgRoomPassed(r)).length;
+    const ratedRooms = roomVals.filter(r => !r.na);
+    const passCount = ratedRooms.filter(r => wgRoomPassed(r)).length;
     const time = d.loggedAt ? new Date(d.loggedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
     const label = k.charAt(0).toUpperCase()+k.slice(1);
     return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11.5px;">
-      <span>${label} \u2014 ${time}</span><span style="color:${passCount===WG_ROOMS.length?'#2d6a47':'#b5451b'};font-weight:700;">${passCount}/${WG_ROOMS.length}</span>
+      <span>${label} \u2014 ${time}</span><span style="color:${passCount===ratedRooms.length?'#2d6a47':'#b5451b'};font-weight:700;">${passCount}/${ratedRooms.length}</span>
     </div>`;
   }).join('');
   return `<div style="margin-top:8px;padding:0 4px;">${rows}</div>`;
@@ -3148,10 +3198,46 @@ function startWhiteGloveInspection(){
     <div class="card-bd" style="padding:14px;">
       <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);margin-bottom:10px;">\u26F5 ${win.label} Inspection</div>
       <div id="wg-room-rows"></div>
+      <div id="wg-behavior-section"></div>
       <button onclick="saveWhiteGloveInspection()" id="wg-save-btn" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--border);color:var(--muted);font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:not-allowed;" disabled>Log Inspection (finish every compartment)</button>
     </div>
   </div>`;
   renderWGRoomRows();
+}
+
+// Behavior tracker inside White Glove (combined-batch-punchlist.md Part
+// 6) \u2014 Dawn likes these buttons but forgets them since they live
+// separately from her actual routine. Surfaced right here, once per
+// distinct boy actually assigned a room in THIS inspection (not once per
+// room \u2014 the same boy is often responsible for more than one room, and
+// showing his buttons four times would just be visual noise), reusing
+// applyDeduction/removeDeduction exactly as the Overview cards already
+// do. Additive only \u2014 the standalone Overview access is untouched.
+function renderWGBehaviorSection(){
+  const el = document.getElementById('wg-behavior-section');
+  if(!el || !_db) return;
+  const officers = Array.from(new Set(WG_ROOMS.map(r => wgPending[r.id] && wgPending[r.id].officer).filter(o => o && o !== 'all')));
+  if(!officers.length){ el.innerHTML = ''; return; }
+  const today = localDateStr();
+  Promise.all(officers.map(id => _db.ref(`stewart/deductions/${id}/${today}`).once('value')))
+    .then(snaps => {
+      const html = officers.map((id, i) => {
+        const deductions = snaps[i].val() || {};
+        const name = (WG_OFFICERS.find(o => o.id === id) || {}).label || id;
+        const buttons = BEHAVIOR_REASONS.map(r => {
+          const active = !!deductions[r.key];
+          return `<button onclick="${active?'removeDeduction':'applyDeduction'}('${id}','${today}','${r.key}');setTimeout(renderWGBehaviorSection,300);" style="font-size:10px;padding:5px 9px;border-radius:6px;border:1px solid ${active?'#b5451b':'var(--border)'};background:${active?'rgba(181,69,27,.12)':'var(--card)'};color:${active?'#b5451b':'var(--muted)'};cursor:pointer;">${r.label}${active?' \u2713':''} (-${r.points})</button>`;
+        }).join('');
+        return `<div style="margin-top:10px;">
+          <div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;">${name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">${buttons}</div>
+        </div>`;
+      }).join('');
+      el.innerHTML = `<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Behavior \u2014 while you're already here</div>
+        ${html}
+      </div>`;
+    });
 }
 
 function renderWGRoomRows(){
@@ -3159,6 +3245,13 @@ function renderWGRoomRows(){
   if(!el) return;
   el.innerHTML = WG_ROOMS.map(r => {
     const state = wgPending[r.id];
+    if(state.na){
+      return `<div style="border:1px solid var(--gold);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:rgba(232,184,74,.08);">
+        <div style="font-family:'Cinzel',serif;font-weight:700;font-size:12.5px;margin-bottom:6px;"><span style="margin-right:6px;">${r.icon}</span>${r.label} — <span style="color:var(--brown);">N/A (Exception Day)</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Skipped — not counted as passed or failed.</div>
+        <button onclick="clearWGNA('${r.id}')" style="padding:5px 11px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:10.5px;font-weight:700;cursor:pointer;">Undo — rate this room normally</button>
+      </div>`;
+    }
     const catRows = WG_CATEGORIES.map(c => {
       const v = state[c.id];
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;">
@@ -3175,7 +3268,10 @@ function renderWGRoomRows(){
     ).join('');
 
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
-      <div style="font-family:'Cinzel',serif;font-weight:700;font-size:12.5px;margin-bottom:4px;"><span style="margin-right:6px;">${r.icon}</span>${r.label}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-family:'Cinzel',serif;font-weight:700;font-size:12.5px;"><span style="margin-right:6px;">${r.icon}</span>${r.label}</div>
+        <button onclick="setWGNA('${r.id}')" style="padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:9.5px;cursor:pointer;">Mark N/A</button>
+      </div>
       ${catRows}
       <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px;">
         <div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;">Responsible today:</div>
@@ -3191,6 +3287,7 @@ function renderWGRoomRows(){
     </div>`;
   }).join('');
   updateWGSaveButton();
+  renderWGBehaviorSection();
 }
 
 function updateWGSaveButton(){
@@ -3217,6 +3314,14 @@ function setWGStandard(roomId, val){
   wgPending[roomId].metStandard = val;
   renderWGRoomRows();
 }
+function setWGNA(roomId){
+  wgPending[roomId] = {...wgBlankRoom(), na:true};
+  renderWGRoomRows();
+}
+function clearWGNA(roomId){
+  wgPending[roomId] = wgBlankRoom();
+  renderWGRoomRows();
+}
 
 function saveWhiteGloveInspection(){
   if(!_db) return;
@@ -3231,6 +3336,15 @@ function saveWhiteGloveInspection(){
     loggedAt: Date.now()
   }).then(() => {
     renderWhiteGlove();
+    // White Glove -> pay accountability (Part 5): recalculate every boy
+    // named as responsible for a room this inspection (or all four, if
+    // any room was "All Hands") right away, rather than waiting for some
+    // unrelated later action to happen to trigger it.
+    const officers = new Set(WG_ROOMS.map(r => roomsCopy[r.id].officer).filter(Boolean));
+    const agentIds = officers.has('all') ? AGENTS.map(a=>a.id) : Array.from(officers).filter(o => o !== 'all');
+    if(typeof recalculateScore === 'function'){
+      agentIds.forEach(id => recalculateScore(id, today));
+    }
   });
 }
 
@@ -3402,9 +3516,10 @@ function saveReadingGoals(){
 // ════════════════════════════════════════════
 // WEEKLY REPORT CARD
 // Reads stewart/reportcards/{weekOf} — the same shared record Bridge
-// reads, written by either the Monday auto-run or the Check In button
-// below (generateWeeklyReportCard, which always targets the CURRENT
-// week via the server's mostRecentMonday logic, mirrored here).
+// reads, written by the nightly auto-refresh, the Monday completed-week
+// auto-run, or the manual Regenerate button below (generateWeeklyReportCard,
+// which always targets the CURRENT week via the server's mostRecentMonday
+// logic, mirrored here).
 // ════════════════════════════════════════════
 function mostRecentMondayStr(){
   const d = new Date();
@@ -3425,7 +3540,7 @@ function renderReportCard(){
     const el = document.getElementById('rc-content');
     if(!el) return;
     if(!data || !data.writeup){
-      el.innerHTML = '<div class="empty-state">No report yet for the week of '+weekOf+'. Tap Check In to generate one.</div>';
+      el.innerHTML = '<div class="empty-state">No report yet for the week of '+weekOf+'. It refreshes automatically overnight, or tap Regenerate Now to build it immediately.</div>';
       return;
     }
     const metaLine = 'Week of '+data.weekOf+(data.isPartialWeek ? ' — in progress' : ' — complete')
@@ -3479,7 +3594,14 @@ function copyReportCardText(){
 // fires moments later with the real content. Writing the error into a
 // separate status line means that success can never get clobbered by a
 // stale failure message, in either order.
-async function checkInReportCard(){
+//
+// Manual trigger only — the report now also refreshes automatically every
+// night (autoGenerateDailyReportCard, functions/index.js). This button is
+// for the specific case John or Dawn fixed a data issue and want the
+// report recalculated right now instead of waiting for the next
+// automatic refresh; it calls the exact same generateWeeklyReportCard
+// Cloud Function the nightly job does, just on demand.
+async function regenerateReportCard(){
   const btn = document.getElementById('rc-checkin-btn');
   const status = document.getElementById('rc-status');
   if(btn){ btn.dataset.orig = btn.dataset.orig || btn.textContent; }
@@ -3497,19 +3619,19 @@ async function checkInReportCard(){
       await callFunction('generateWeeklyReportCard', {});
       ok = true;
     }catch(err){
-      console.error('Check In attempt '+attempt+' failed:', err);
+      console.error('Regenerate attempt '+attempt+' failed:', err);
       if(attempt === 1 && btn) btn.textContent = 'Generating… (retrying)';
     }
   }
 
-  if(btn){ btn.disabled = false; btn.textContent = orig || 'Check In — Generate Now'; }
+  if(btn){ btn.disabled = false; btn.textContent = orig || '🔄 Regenerate Now'; }
   if(status){
     if(ok){
       status.className = 'rc-status';
       status.innerHTML = '';
     }else{
       status.className = 'rc-status rc-status-error';
-      status.textContent = "Lost the connection waiting for a response. If it finished on the server, the report below will update on its own — otherwise, tap Check In again.";
+      status.textContent = "Lost the connection waiting for a response. If it finished on the server, the report below will update on its own — otherwise, tap Regenerate again.";
     }
   }
 }

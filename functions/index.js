@@ -1104,6 +1104,8 @@ Catchphrases — use naturally where they genuinely fit, don't force more than o
 
 T.O.M. reveal: if a boy directly asks what "Tom" or "T.O.M." stands for, or who/what you are, tell him exactly: "T.O.M.? Today's On-Call Mate — and tomorrow's too, if you want to know the truth. I don't take a day off, sailor." Never volunteer this unprompted — only on a direct ask.
 
+Grace and reconciliation (combined-batch-punchlist.md Part 8b) — a real, recurring theme in who you are, grounded in Matthew 7:12 and Luke 6:31 (treat others as you'd want treated) and Matthew 22:36-40 (love God, love your neighbor — "on these two commandments hang all the law and the prophets"). When a boy brings you a real conflict, a moment he handled badly, or guilt over something he did — devotional territory, not sibling-referee territory — grace is a genuine lens you reach for: he's not defined by the worst thing he did today, making it right matters more than being right, and forgiveness (received and given) is real and available, not just a nice idea. Cite an actual verse when one is genuinely relevant, same standard as your devotional grounding elsewhere — never invented, never paraphrased as if it were a direct quote. This is a theme in your character, not a new free-standing feature — it shows up naturally inside devotional conversations he already brings you, the same wish-spend rules as any other devotional question.
+
 What actually exists in HMS Resolute today, for app-help questions — never invent functionality beyond this:
 - Daily missions/chores, weekdays only. Completing them earns points, which become pay and game time.
 - Wishes: completing 1/3 of a day's chores earns 1 wish, 2/3 earns 2, all of it earns 3. Wishes earned today can be spent starting TOMORROW, not the same day — and unused wishes stack up.
@@ -1222,6 +1224,42 @@ function tomNudgeContextBlock(nudges) {
   return `\n\nYour own recent moderation corrections to THIS boy, for your reference only — do not bring these up unprompted, but if he asks why you corrected him or references it, you can explain using exactly what's below and nothing else (no other boy's thread, no group chat, no sibling conversations):\n${lines}`;
 }
 
+// White Glove pattern coaching (combined-batch-punchlist.md Part 9) —
+// his own real results only, last two weeks, rooms he was actually the
+// assigned officer for (or "All Hands"). Day-of-week is included on
+// purpose: a room that fails the same weekday repeatedly reads as a
+// scheduling problem, not a character one, and Tom can only coach that
+// distinction accurately if he can see the real pattern, not just guess.
+const TOM_WG_CONTEXT_WINDOW_DAYS = 14;
+async function recentWhiteGloveForAgent(agentId) {
+  const dates = [];
+  for (let i = 0; i < TOM_WG_CONTEXT_WINDOW_DAYS; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(easternDateStr(d));
+  }
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/whiteglove/${date}`).once('value')));
+  const entries = [];
+  dates.forEach((date, i) => {
+    const windows = snaps[i].val() || {};
+    Object.values(windows).forEach(win => {
+      Object.entries(win.rooms || {}).forEach(([roomId, room]) => {
+        if (!room || room.na) return;
+        if (room.officer !== agentId && room.officer !== 'all') return;
+        const dayOfWeek = parseDateStr(date).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+        entries.push({ date, dayOfWeek, room: WG_ROOM_LABELS[roomId] || roomId, passed: !!room.metStandard });
+      });
+    });
+  });
+  return entries.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function tomWhiteGloveContextBlock(entries) {
+  if (!entries.length) return '';
+  const lines = entries.map(e => `- ${e.date} (${e.dayOfWeek}): ${e.room} — ${e.passed ? 'passed' : 'did not pass'}`).join('\n');
+  return `\n\nHis own real White Glove inspection results from the last two weeks, for your reference only — do not bring this up unprompted, but if he asks why he keeps failing inspection, or a devotional/discipline-adjacent conversation genuinely touches on it, you can coach from exactly this list. A room that fails the same day of the week repeatedly is a scheduling pattern worth naming as such, not a character flaw — notice the difference if it's there. Never reference another boy's rooms or results, and never invent a pattern beyond what's actually in this list:\n${lines}`;
+}
+
 // Answers a boy's question in Tom's voice, classified into exactly one
 // category. Devotional citations are grounded against the real local KJV
 // (never trusting the model's own quote), and interest/website suggestions
@@ -1268,7 +1306,7 @@ exports.askTom = functions
     async function moderateAndRespond(category) {
       const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', question);
       const message = tomModerationNudgeText(category, count);
-      await pushTomModerationNudge(agentId, message);
+      await pushTomModerationNudge(agentId, message, category);
       if (category === 'unkind') {
         await notifyParentsOfUnkindMessage(agentId, agentName, question, 'tomchat', String(Date.now()));
       }
@@ -1286,7 +1324,10 @@ exports.askTom = functions
 
     const sanitizedHistory = sanitizeHistory(history);
     const overBudget = (await getMonthlyBudgetSpent(agentId)) >= TOM_BUDGET_CAP_USD;
-    const nudges = await recentTomNudgesForAgent(agentId);
+    const [nudges, wgPattern] = await Promise.all([
+      recentTomNudgesForAgent(agentId),
+      recentWhiteGloveForAgent(agentId)
+    ]);
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -1297,7 +1338,7 @@ exports.askTom = functions
     const response = await anthropic.messages.create({
       model: TOM_MODEL,
       max_tokens: 500,
-      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}${tomNudgeContextBlock(nudges)}`,
+      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}${tomNudgeContextBlock(nudges)}${tomWhiteGloveContextBlock(wgPattern)}`,
       output_config: { format: { type: 'json_schema', schema: TOM_RESPONSE_SCHEMA } },
       messages: [
         ...sanitizedHistory,
@@ -1511,13 +1552,28 @@ async function recordStrike(agentId, date, category, source, text) {
   return result.snapshot.val();
 }
 
+// Grace & reconciliation (combined-batch-punchlist.md Part 8a) — after an
+// UNKINDNESS strike specifically, a genuinely separate follow-up message
+// (never appended to the nudge itself, so it reads as its own thought,
+// not a qualifier softening the correction above it) inviting him to make
+// it right with the other person. An offer, never a requirement — not
+// tracked anywhere, not gated behind, doesn't touch or erase the strike
+// or the parent notification that already happened. Fixed, static text
+// rather than AI-generated — a carefully-worded, pre-approved invitation
+// is safer here than letting a model freelance grace language to a kid
+// mid-moderation-event.
+const TOM_RECONCILIATION_NUDGE = "No pressure here, sailor — but if there's someone on the other end of that, making it right with them is always open to you. Not because you have to. Because it's who you actually want to be.";
+
 // Lands in the same private thread parents use (stewart/messages/{agentId})
 // rather than Tom's own separate Compass chat, so John/Dawn naturally see
 // it too without a dedicated notification for every Category A incident.
 // No `agentId` field on purpose — that's what tells moderatePrivateMessage
 // to skip re-classifying Tom's own nudge when this write re-triggers it.
-async function pushTomModerationNudge(agentId, text) {
+async function pushTomModerationNudge(agentId, text, category) {
   await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text, timestamp: Date.now() });
+  if (category === 'unkind') {
+    await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text: TOM_RECONCILIATION_NUDGE, timestamp: Date.now() + 1 });
+  }
 }
 
 // Unlike gibberish/spam, unkindness is never deleted — it stays visible in
@@ -1612,7 +1668,7 @@ exports.moderateGroupChatMessage = functions
 
     if (category === 'unkind') {
       const count = await recordStrike(m.agentId, easternDateStr(), category, 'groupchat', m.text);
-      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('unkind', count));
+      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('unkind', count), 'unkind');
       await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
       if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       await snap.ref.update({ moderation: category });
@@ -1656,7 +1712,7 @@ exports.moderatePrivateMessage = functions
 
     if (category === 'unkind') {
       const count = await recordStrike(agentId, easternDateStr(), category, 'private', m.text);
-      await pushTomModerationNudge(agentId, tomModerationNudgeText('unkind', count));
+      await pushTomModerationNudge(agentId, tomModerationNudgeText('unkind', count), 'unkind');
       await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
       if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       await snap.ref.update({ moderation: category });
@@ -1776,11 +1832,29 @@ async function fetchTomChatWeekData(agentId, weekStartMs, weekEndMs) {
   return conversations;
 }
 
-async function fetchBoyWeekData(agentId, dates) {
+// Exception Days (combined-batch-punchlist.md Part 2e). Mirrors mission-
+// engine.js's findExceptionForAgent() exactly but duplicated here in plain
+// Node — that file is browser-only (relies on a global _db already on the
+// page) and isn't loaded by Cloud Functions at all.
+function findExceptionForAgent(exceptionsForDate, agentId) {
+  if (!exceptionsForDate) return null;
+  const entries = Object.values(exceptionsForDate);
+  return entries.find(e => e && Array.isArray(e.affectedAgents) &&
+    (e.affectedAgents.includes('all') || e.affectedAgents.includes(agentId))) || null;
+}
+
+async function fetchExceptionsByDate(dates) {
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/exceptions/${date}`).once('value')));
+  const byDate = {};
+  dates.forEach((date, i) => { byDate[date] = snaps[i].val(); });
+  return byDate;
+}
+
+async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
 
-  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations] = await Promise.all([
+  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations, reflectionSnaps] = await Promise.all([
     Promise.all(dates.map(date => db.ref(`stewart/scores/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/eligible/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/deductions/${agentId}/${date}`).once('value'))),
@@ -1788,7 +1862,11 @@ async function fetchBoyWeekData(agentId, dates) {
     Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value'))),
     db.ref(`stewart/couragedare/progress/${agentId}`).once('value'),
     db.ref(`stewart/growth/boynotes/${agentId}`).once('value'),
-    fetchTomChatWeekData(agentId, weekStartMs, weekEndMs)
+    fetchTomChatWeekData(agentId, weekStartMs, weekEndMs),
+    // Today's Reflection (Part 4) — distinct from the 40-day Courage Dare,
+    // date-keyed (not program-day-numbered) so it reads the same way
+    // scores/deductions/etc. above already do, straight across `dates`.
+    Promise.all(dates.map(date => db.ref(`stewart/selfassessment/${agentId}/${date}`).once('value')))
   ]);
 
   const days = dates.map((date, i) => {
@@ -1798,8 +1876,15 @@ async function fetchBoyWeekData(agentId, dates) {
     const wishes = wishSnaps[i].val() || {};
     const strikeRec = strikeSnaps[i].val() || {};
     const strikeIncidents = Object.values(strikeRec.incidents || {}).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    // Exception Days: a real, planned reason score/eligible are null this
+    // day that ISN'T a weekend — the write-up must cite this explicitly
+    // instead of reading a null/low day as a performance dip. null when
+    // no exception applies, same shape mission-engine.js's own reader uses.
+    const exception = findExceptionForAgent(exceptionsByDate && exceptionsByDate[date], agentId);
     return {
       date,
+      exceptionType: exception ? exception.type : null,
+      exceptionNote: exception ? (exception.note || '') : null,
       score: (score === undefined || score === null) ? null : score,
       // Same "eligible" definition as pay: excludes Computer Missions and
       // Officer of the Watch checks. Real completed/total counts, not a
@@ -1835,7 +1920,8 @@ async function fetchBoyWeekData(agentId, dates) {
     totalWishesUsed: days.reduce((a, d) => a + d.wishesUsed, 0),
     totalStrikes: days.reduce((a, d) => a + d.strikeCount, 0),
     unkindDays: days.filter(d => d.strikeIncidents.some(inc => inc.category === 'unkind')).length,
-    daysOutOfTime: days.filter(d => d.ranOutOfTime).length
+    daysOutOfTime: days.filter(d => d.ranOutOfTime).length,
+    daysException: days.filter(d => d.exceptionType).length
   };
 
   // Courage Dare is program-day-numbered, not calendar-date-keyed, so
@@ -1846,12 +1932,20 @@ async function fetchBoyWeekData(agentId, dates) {
     .filter(entry => entry && typeof entry.completedAt === 'number' && entry.completedAt >= weekStartMs && entry.completedAt < weekEndMs)
     .sort((a, b) => a.completedAt - b.completedAt);
 
+  // Today's Reflection (Part 4) — only real, non-empty entries, in order,
+  // so the write-up can cite specifics without wading through blank days.
+  const reflections = dates
+    .map((date, i) => ({ date, ...(reflectionSnaps[i].val() || {}) }))
+    .filter(r => r.strength || r.mission || r.step || r.practice || r.tomorrow);
+
   return {
     agentId,
     agentName: AGENT_DISPLAY_NAMES[agentId] || agentId,
     days,
     totals,
     couragedareCompletedThisWeek: couragedareThisWeek.length,
+    reflectionCompletedThisWeek: reflections.length,
+    reflections,
     growthNote: growthNoteSnap.val() || null,
     tomConversations
   };
@@ -1871,6 +1965,12 @@ async function fetchWhiteGloveWeekData(dates) {
   ALLOWED_AGENT_IDS.forEach(id => { byBoy[id] = { assigned: 0, passed: 0 }; });
   const byRoom = {};
   Object.keys(WG_ROOM_LABELS).forEach(id => { byRoom[id] = { label: WG_ROOM_LABELS[id], assigned: 0, passed: 0 }; });
+  // Day-of-week clustering (Part 9) — a room/boy failing the same
+  // weekday repeatedly reads as a scheduling problem, not a character
+  // one, and that distinction only shows up if it's broken out this way
+  // rather than folded into one flat weekly total.
+  const byDayOfWeek = {};
+  ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].forEach(d => { byDayOfWeek[d] = { assigned: 0, passed: 0 }; });
 
   let totalInspections = 0;
   let totalPassed = 0;
@@ -1879,6 +1979,7 @@ async function fetchWhiteGloveWeekData(dates) {
   dates.forEach((date, i) => {
     const windows = snaps[i].val() || {};
     days[date] = windows;
+    const dayOfWeek = parseDateStr(date).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
     Object.values(windows).forEach(win => {
       Object.entries(win.rooms || {}).forEach(([roomId, room]) => {
         totalInspections++;
@@ -1887,6 +1988,8 @@ async function fetchWhiteGloveWeekData(dates) {
           byRoom[roomId].assigned++;
           if (room.metStandard) byRoom[roomId].passed++;
         }
+        byDayOfWeek[dayOfWeek].assigned++;
+        if (room.metStandard) byDayOfWeek[dayOfWeek].passed++;
         // 'all' ("All Hands") and unassigned rooms aren't attributed to one boy.
         if (ALLOWED_AGENT_IDS.includes(room.officer)) {
           byBoy[room.officer].assigned++;
@@ -1900,7 +2003,41 @@ async function fetchWhiteGloveWeekData(dates) {
   // directly instead of manually counting nested per-day/per-window JSON —
   // that manual counting is exactly what produced a wrong "0 for 4" claim
   // about the berths during testing.
-  return { days, summary: { totalInspections, totalPassed, byBoy, byRoom } };
+  return { days, summary: { totalInspections, totalPassed, byBoy, byRoom, byDayOfWeek } };
+}
+
+// Teach Me Vote fold-in (combined-batch-punchlist.md Part 3, last bullet).
+// stewart/teachvote/{weekKey} uses the same Monday-anchored week key the
+// report card's own weekOf already is — no cross-week-boundary reconciling
+// needed here, unlike the Galley Report's Sunday-start plan week.
+async function fetchTeachMeWeekData(weekOf) {
+  const snap = await db.ref(`stewart/teachvote/${weekOf}`).once('value');
+  const data = snap.val();
+  if (!data) return null;
+  const suggestions = data.suggestions || {};
+  const votes = data.votes || {};
+  const winner = data.winner || null;
+  const websiteSuggestions = Object.values(data.websiteSuggestions || {})
+    .map(w => ({ website: w.website, status: w.status }));
+  // Part 10: the full loop (topic -> suggestion -> family day -> reflection)
+  // — happened/reflection are undefined until Bridge's verify prompt is
+  // actually answered, same "pending just means not reviewed yet, not a
+  // problem" framing as the website suggestions above.
+  const familyDaySuggestion = data.familyDaySuggestion
+    ? {
+        activity: data.familyDaySuggestion.activity,
+        status: data.familyDaySuggestion.status,
+        happened: data.familyDaySuggestion.happened,
+        reflection: data.familyDaySuggestion.reflection || null
+      }
+    : null;
+  return {
+    winnerTopic: winner ? (TEACH_ME_TOPICS[winner] || winner) : null,
+    suggestedByCount: Object.keys(suggestions).length,
+    votedByCount: Object.keys(votes).length,
+    websiteSuggestions,
+    familyDaySuggestion
+  };
 }
 
 async function fetchDawnWeekData(dates) {
@@ -2083,14 +2220,17 @@ async function aggregateWeeklyReportData(weekOf) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000;
 
-  const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming] = await Promise.all([
-    Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates))),
+  const exceptionsByDate = await fetchExceptionsByDate(dates);
+
+  const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming, teachMe] = await Promise.all([
+    Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates, exceptionsByDate))),
     fetchWhiteGloveWeekData(dates),
     fetchDawnWeekData(dates),
     fetchPrayerWeekData(weekStartMs, weekEndMs),
     fetchCrowsnestWeekData(weekStartMs, weekEndMs),
     fetchGalleyAdherence(dates),
-    fetchGalleyPlanTiming(weekOf)
+    fetchGalleyPlanTiming(weekOf),
+    fetchTeachMeWeekData(weekOf)
   ]);
 
   const boysById = {};
@@ -2114,7 +2254,8 @@ async function aggregateWeeklyReportData(weekOf) {
     dawn,
     prayerHousehold: prayer.household,
     crowsnestHousehold: crowsnest.household,
-    galley: { adherence: galleyAdherence, timing: galleyTiming }
+    galley: { adherence: galleyAdherence, timing: galleyTiming },
+    teachMe
   };
 
   await db.ref(`stewart/reportcards/${weekOf}`).set(report);
@@ -2136,13 +2277,19 @@ Each day has BOTH a "score" (0-100%, weighted by how many points each chore is w
 
 Each day also carries a "ranOutOfTime" flag (true/false) — set from the Bridge tab when a boy ran out of time before finishing his chores that day. This is explicitly NOT a behavior issue or punishment (it carries no point penalty and is separate from deductionReasons) — it's pure pattern-tracking. Don't mention it at all if it happened zero or one day this week; that's normal and not worth a sentence. If totals.daysOutOfTime is 2+ for a boy, note it once, neutrally, as a scheduling/pacing pattern worth John/Dawn knowing about (e.g. "ran out of time before finishing chores twice this week") — never frame it as a fault or lump it in with deductions/strikes.
 
+CRITICAL — Exception Days: a day can carry "exceptionType" (e.g. "Travel/Campout", "Sick Day", "Doctor's Visit", "Holiday", or a custom type) and "exceptionNote". On that day, score/eligibleCompleted/eligibleTotal are null — same as a weekend — because normal chore expectations were deliberately lifted, NOT because he underperformed. This is the single most important rule in this whole prompt: NEVER read an exception day as a slump, a bad day, or a gap in the data to explain away — name it plainly and matter-of-factly instead, the same way you'd note a weekend ("Friday was a planned campout, no chores were expected" — not "chores dropped off Friday" or any phrasing that implies something went wrong). If totals.daysException is 0, say nothing about it. If a boy had a rough-looking stretch of low scores or missed strikes RIGHT AROUND an exception day, check whether the exception explains it before characterizing it as a pattern — an exception day breaks a streak calculation, it doesn't represent a bad one.
+
 Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
+
+Each boy's data also carries "couragedareCompletedThisWeek" (a count — the 40-day Courage Dare devotional) and, separately, "reflectionCompletedThisWeek"/"reflections" (Today's Reflection, a distinct 5-question private daily form — strength/mission/step/practice/tomorrow — NOT the same thing as Courage Dare, don't conflate them). Mention completion counts for both briefly if either is 0 for the week (say so plainly, don't pad) or notably strong (most/all weekdays). "reflections" holds the actual entries for days he filled one out — if something in a specific field stands out as worth John/Dawn knowing (a real struggle named in "step," a genuine goal in "tomorrow"), you may reference it gently and non-judgmentally, the same restraint you'd use for a Tom conversation — this is his own private self-reflection, not a behavior log.
 
 Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{forWho,txt,how}]}) and "crowsnest" ([{txt}]) — prayer requests attributed to him (either he submitted it himself, or someone else's request was clearly for him by name) and Crow's Nest praise/gratitude entries he personally logged that week. These are genuine spiritual-life signals worth a brief, warm mention if present — a boy bringing a real prayer request, one of his being answered, or him logging something he saw God do all say something worth John/Dawn knowing, distinct from the chore/behavior data. Don't force a mention if both are empty; one clause at most, don't dwell on it. Don't quote a prayer request or praise entry verbatim if it's sensitive-sounding — summarize gently, the same restraint you'd use for a Tom conversation.
 
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
-The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.
+The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy, per room, or per day-of-week), use the pre-tallied numbers in whiteglove.summary.byBoy, whiteglove.summary.byRoom, and whiteglove.summary.byDayOfWeek directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic. byDayOfWeek is only worth mentioning if a real weekday clustering shows up (e.g. most failures landing on the same one or two weekdays) — that's a scheduling pattern worth naming, distinct from a general consistency problem; don't force a mention if the failures are just spread evenly across the week.
+
+"teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it. The family day suggestion also carries "happened" (true/false/undefined) and "reflection" once John or Dawn has actually verified it — this is the full loop (topic won → suggestion approved → family day actually happened → how it went), worth closing the loop on in one sentence if "happened" is set: name whether it happened and, if there's a real reflection, a brief honest note of how it went. If "happened" is still undefined, that just means it hasn't been verified yet — don't treat that as a problem either.
 
 Galley Report is its own third section, separate from both boys and household — meal-plan planning and adherence for the week, from real Kitchen/Galley data. This is the first section aimed at long-range household planning rather than accountability, so the tone should read as a planning aid, not a grade.
 
@@ -2182,7 +2329,7 @@ async function generateReportCardWriteup(reportData) {
     output_config: { format: { type: 'json_schema', schema: REPORT_WRITEUP_SCHEMA } },
     messages: [{
       role: 'user',
-      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, galley: reportData.galley })}`
+      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, galley: reportData.galley, teachMe: reportData.teachMe })}`
     }]
   });
 
@@ -2211,8 +2358,9 @@ function buildPlainTextReportCard(reportData, writeup) {
 }
 
 // Runs Step 1's aggregation, then Step 2's write-up, and stores both
-// together at stewart/reportcards/{weekOf} — the one shared record both
-// the Check In button and the Monday auto-run produce and both UIs read.
+// together at stewart/reportcards/{weekOf} — the one shared record the
+// manual Regenerate button, the nightly current-week auto-refresh, and
+// the Monday completed-week auto-run all produce, and both UIs read.
 async function buildFullWeeklyReportCard(weekOf) {
   const reportData = await aggregateWeeklyReportData(weekOf);
   const writeup = await generateReportCardWriteup(reportData);
@@ -2223,8 +2371,13 @@ async function buildFullWeeklyReportCard(weekOf) {
   return { ...reportData, writeup, plainText };
 }
 
-// On-demand "Check In" — defaults to the CURRENT week (a live, possibly
-// partial snapshot), distinct from the auto-run's completed-week report.
+// On-demand "Regenerate" (combined-batch-punchlist.md Part 1) — the report
+// now refreshes automatically every night (autoGenerateDailyReportCard,
+// below), so this button is no longer how a report gets its first
+// generation; it's for the specific case John or Dawn fixed a data issue
+// and wants immediate recalculation rather than waiting for the next
+// automatic refresh. Defaults to the CURRENT week (a live, possibly
+// partial snapshot) — same target the nightly job uses.
 exports.generateWeeklyReportCard = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
@@ -2233,10 +2386,33 @@ exports.generateWeeklyReportCard = functions
     return buildFullWeeklyReportCard(mostRecentMonday(targetDate));
   });
 
+// Keeps the CURRENT week's report fresh every night without a manual tap
+// (combined-batch-punchlist.md Part 1) — so opening Bridge or Officers'
+// Country any day shows real data through today, not stale data from
+// whenever someone last hit Regenerate. Targets exactly what the
+// Regenerate button targets: mostRecentMonday(easternDateStr()). On a
+// Monday this runs at the same hour as autoGenerateWeeklyReportCard below
+// but writes a DIFFERENT key — this one the brand-new week that just
+// started, that one the week that just ended — so there's no conflict
+// between the two, they're not duplicating each other's work.
+exports.autoGenerateDailyReportCard = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .pubsub.schedule('0 6 * * *')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    const weekOf = mostRecentMonday(easternDateStr());
+    await buildFullWeeklyReportCard(weekOf);
+    return null;
+  });
+
 // Fires every Monday morning Eastern, and now also RESOLVES "today" in
 // Eastern time (easternDateStr), not just fires at an Eastern hour — so
 // this is correct right at the boundary too, not just "comfortably clear"
-// of it.
+// of it. Distinct purpose from autoGenerateDailyReportCard above: this
+// one finalizes the week that just ENDED (previousWeekMonday) once it's
+// actually complete, giving a stable "final" report for a finished week
+// rather than leaving its last snapshot wherever the daily job left it
+// the morning before Sunday was even over.
 exports.autoGenerateWeeklyReportCard = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .pubsub.schedule('0 6 * * 1')
@@ -2245,6 +2421,417 @@ exports.autoGenerateWeeklyReportCard = functions
     const weekOf = previousWeekMonday(easternDateStr());
     await buildFullWeeklyReportCard(weekOf);
     return null;
+  });
+
+// ════════════════════════════════════════════════════
+// TEACH ME VOTE — website + family day suggestions when a topic wins
+// (combined-batch-punchlist.md Part 3). stewart/teachvote/{weekKey}
+// already exists (boys/index.html, dashboard/index.html):
+// {suggestions:{agentId:optionId}, votes:{agentId:optionId}, winner}.
+// This adds websiteSuggestions/{pushId} and familyDaySuggestion once a
+// winner is known — both start 'pending', needing a parent's approval
+// before they're treated as real (same pattern Tom's own interest-
+// suggestion flow already uses for stewart/tomWebsiteRequests: a
+// proposal only becomes real once a parent explicitly approves it).
+// ════════════════════════════════════════════════════
+const TEACH_ME_TOPICS = {
+  bike: 'Bike Maintenance — fix flats, adjust brakes, tune gears',
+  tools: 'Tool Basics — measure, cut, drill, build something',
+  car: 'Car Basics — oil, tires, jump starts, under the hood',
+  knots: 'Knots & Rope Work — Trail Life knots, lashing, rescue lines',
+  fire: 'Fire Building — tinder to fire, safely and fast',
+  firstaid: 'First Aid — cuts, burns, sprains, emergencies',
+  cooking: 'Campfire Cooking — cast iron, camp stove, open flame',
+  navigation: 'Map & Navigation — read a map, use a compass, find your way',
+  woodwork: 'Basic Woodworking — measure twice, cut once, build something real',
+  fishing: 'Fishing Basics — knots, bait, casting, cleaning a fish',
+  electrical: 'Basic Electrical — circuits, outlets, safe wiring basics',
+  plumbing: 'Basic Plumbing — shut-offs, fixing leaks, unclogging drains'
+};
+
+const TEACH_ME_SUGGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    websites: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, url: { type: 'string' }, reason: { type: 'string' } },
+        required: ['name', 'url', 'reason'],
+        additionalProperties: false
+      }
+    },
+    familyDayActivity: { type: 'string' },
+    familyDayReason: { type: 'string' }
+  },
+  required: ['websites', 'familyDayActivity', 'familyDayReason'],
+  additionalProperties: false
+};
+
+async function generateTeachMeSuggestions(topicDesc) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 700,
+    system: `You help a family of four boys (ages 7-13) plan a "Teach Me" learning week around a topic they voted on, plus a related family day activity. Suggest 1-2 REAL, well-known, kid-appropriate websites (real names and real URLs you're confident actually exist and are safe for kids — never invent a site) that would help them learn this topic. Also suggest ONE real, concrete family day activity idea tied to the same topic — something achievable in a single day, not vague ("visit a real bike shop for a tune-up class," not "learn about bikes together"). Keep each reason to one sentence.`,
+    output_config: { format: { type: 'json_schema', schema: TEACH_ME_SUGGEST_SCHEMA } },
+    messages: [{ role: 'user', content: `This week's Teach Me topic: ${topicDesc}` }]
+  });
+  await logTinkUsage('claude-sonnet-4-6', response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw);
+}
+
+// Fires Friday morning Eastern — the exact moment the client's own phase
+// computation (dow 1=suggest, 2-4=vote, 5-0=closed) already treats voting
+// as closed, so this doesn't preempt a vote still in progress.
+exports.closeTeachMeVote = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .pubsub.schedule('0 6 * * 5')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    const weekKey = mostRecentMonday(easternDateStr());
+    const ref = db.ref(`stewart/teachvote/${weekKey}`);
+    const snap = await ref.once('value');
+    const data = snap.val() || {};
+
+    // Idempotent — a real Anthropic call shouldn't fire twice for the same
+    // week even if this scheduled run somehow triggers more than once.
+    if (data.websiteSuggestions || data.familyDaySuggestion) return null;
+
+    let winner = data.winner;
+    if (!winner) {
+      const votes = data.votes || {};
+      const tally = {};
+      Object.values(votes).forEach(v => { tally[v] = (tally[v] || 0) + 1; });
+      const ranked = Object.keys(tally).sort((a, b) => tally[b] - tally[a]);
+      winner = ranked[0] || null;
+      if (winner) await ref.child('winner').set(winner);
+    }
+    if (!winner || !TEACH_ME_TOPICS[winner]) return null; // no votes cast this week — nothing to suggest against
+
+    let result;
+    try {
+      result = await generateTeachMeSuggestions(TEACH_ME_TOPICS[winner]);
+    } catch (e) {
+      console.error('generateTeachMeSuggestions failed:', e);
+      return null;
+    }
+
+    const now = Date.now();
+    const writes = (result.websites || []).slice(0, 2).map(w => ref.child('websiteSuggestions').push({
+      website: w.name, url: w.url, reason: w.reason, status: 'pending', timestamp: now
+    }));
+    writes.push(ref.child('familyDaySuggestion').set({
+      activity: result.familyDayActivity, reason: result.familyDayReason, status: 'pending', timestamp: now
+    }));
+    await Promise.all(writes);
+    return null;
+  });
+
+// ════════════════════════════════════════════════════
+// RED SKY AT MORNING / RED SKY AT NIGHT (combined-batch-punchlist.md
+// Part 7) — Matthew 16:2-3, "When it is evening, ye say, It will be fair
+// weather... can ye not discern the signs of the times?" Two personal
+// daily reports per boy, Tom's voice, live in Compass — zero sibling
+// data, ever. Reuses the parent report card's scoping discipline (one
+// boy's own real numbers, nothing invented) but for a single day, not a
+// week, and in Tom's voice, not a parent-facing summary.
+// ════════════════════════════════════════════════════
+
+// Own White Glove rooms only for the given day — whichever room(s) he
+// was the assigned officer for (or "All Hands"), across any inspection
+// window, pass/fail. Never another boy's room. Mirrors mission-engine.js's
+// wgFailedRoomsForAgent()'s officer-scoping exactly, but returns pass AND
+// fail (Red Sky at Night needs to celebrate a real pass, not just flag
+// failures) rather than only failures.
+function ownWhiteGloveRoomsForDay(wgDay, agentId) {
+  const rooms = [];
+  if (!wgDay) return rooms;
+  ['morning', 'afternoon', 'evening'].forEach(win => {
+    const winRooms = (wgDay[win] && wgDay[win].rooms) || {};
+    Object.entries(winRooms).forEach(([roomId, r]) => {
+      if (!r || r.na) return;
+      if (r.officer !== agentId && r.officer !== 'all') return;
+      const passed = ['trash', 'dishes', 'clothing', 'floor', 'counters'].every(k => r[k] === true);
+      rooms.push({ room: WG_ROOM_LABELS[roomId] || roomId, window: win, passed });
+    });
+  });
+  return rooms;
+}
+
+async function fetchRedSkyDayData(agentId, dateStr) {
+  const [scoreSnap, eligibleSnap, deductionSnap, wishSnap, strikeSnap, wgSnap] = await Promise.all([
+    db.ref(`stewart/scores/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/eligible/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/wishes/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/strikes/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/whiteglove/${dateStr}`).once('value')
+  ]);
+  const deductions = deductionSnap.val() || {};
+  const wishes = wishSnap.val() || {};
+  const strikeRec = strikeSnap.val() || {};
+  return {
+    date: dateStr,
+    score: scoreSnap.val(),
+    eligible: eligibleSnap.val(),
+    deductionReasons: Object.keys(deductions).filter(k => k !== 'outOfTime'),
+    ranOutOfTime: deductions.outOfTime !== undefined,
+    wishesEarned: wishes.earned || 0,
+    wishesUsed: wishes.used || 0,
+    strikeCount: strikeRec.count || 0,
+    strikeIncidents: Object.values(strikeRec.incidents || {}),
+    ownWhiteGloveRooms: ownWhiteGloveRoomsForDay(wgSnap.val(), agentId)
+  };
+}
+
+const RED_SKY_MATTHEW_INTRO = `This is his FIRST time ever seeing a Red Sky report. Open by referencing Matthew 16:2-3 naturally, briefly (one or two sentences woven in, not a sermon) — Jesus's own words: "When it is evening, ye say, It will be fair weather: for the sky is red. And in the morning, It will be foul weather to day: for the sky is red and lowering... can ye not discern the signs of the times?" Tie it to how a sailor learns to read the sky as warning or promise — that's what these two reports are for him now.`;
+
+const RED_SKY_SCHEMA = {
+  type: 'object',
+  properties: { message: { type: 'string' } },
+  required: ['message'],
+  additionalProperties: false
+};
+
+async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const roleInstructions = type === 'morning'
+    ? `This is RED SKY AT MORNING — he's just opened it, reviewing YESTERDAY. Forward-looking and gentle: name what actually went rough yesterday if anything did (a low score, a strike, a failed White Glove room, running out of time) plainly but without dwelling — then pivot firmly to today as a fresh start, "let's not repeat yesterday's mistakes," never a scolding. If yesterday was genuinely clean (good score, no strikes, rooms passed), say so plainly and warmly — don't manufacture a rough patch that isn't in the data. 2-4 sentences.`
+    : `This is RED SKY AT NIGHT — today's good report, only ever shown after every one of today's missions is actually done, so this IS a real earned moment. Celebrate today specifically and concretely (real numbers, real specifics — which rooms he passed, wishes earned, a clean conduct day) — warm, proud, earned, not generic cheerleading. If something today wasn't perfect despite finishing all missions (a strike, a failed room) still be honest about it, but the overall frame stays a genuine win — he finished the mission. 2-4 sentences.`;
+  const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
+
+  const response = await anthropic.messages.create({
+    model: TOM_MODEL,
+    max_tokens: 400,
+    system,
+    output_config: { format: { type: 'json_schema', schema: RED_SKY_SCHEMA } },
+    messages: [{ role: 'user', content: `${agentName}'s real data for ${dayData.date}:\n${JSON.stringify(dayData)}` }]
+  });
+  await logTomUsage(agentId, response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).message;
+}
+
+exports.generateRedSkyReport = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data, callableContext) => {
+    const { agentId, type } = data || {};
+    if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
+    }
+    if (type !== 'morning' && type !== 'night') {
+      throw new functions.https.HttpsError('invalid-argument', 'type must be "morning" or "night".');
+    }
+
+    const agentName = AGENT_DISPLAY_NAMES[agentId];
+    const age = AGENT_AGES[agentId];
+
+    let targetDate;
+    if (type === 'morning') {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      targetDate = easternDateStr(y);
+    } else {
+      targetDate = easternDateStr();
+      // Night is gated on full chore completion, server-side — a real
+      // earned moment, not just a client-side hide a boy could route
+      // around by calling the function directly.
+      const eligSnap = await db.ref(`stewart/eligible/${agentId}/${targetDate}`).once('value');
+      const elig = eligSnap.val();
+      const allDone = !!(elig && elig.total > 0 && elig.completed >= elig.total);
+      if (!allDone) {
+        return { locked: true, message: "Not tonight, sailor — finish today's missions first. This one's earned." };
+      }
+    }
+
+    const dayData = await fetchRedSkyDayData(agentId, targetDate);
+    const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
+    const seenSnap = await seenRef.once('value');
+    const isFirstTime = !seenSnap.val();
+    if (isFirstTime) await seenRef.set(true);
+
+    const message = await generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime);
+    return { locked: false, message, date: targetDate };
+  });
+
+// ════════════════════════════════════════════════════
+// DAWN'S PERSONAL DAILY REPORT (combined-batch-punchlist.md Part 11) —
+// delivered through Tink, in Tink's existing plain/warm/practical voice
+// (no persona, no catchphrases — same TINK_SYSTEM_PROMPT everything else
+// through Tink already uses). Explicitly NOT a second copy of the
+// household weekly report: no boy-by-boy behavioral analysis, no full
+// data dump — her own tasks, her own patterns, and actionable relational
+// prompts only.
+// ════════════════════════════════════════════════════
+
+async function fetchDawnDailyData() {
+  const today = easternDateStr();
+  const yesterday = easternDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const last7Dates = [];
+  for (let i = 0; i < 7; i++) last7Dates.push(easternDateStr(new Date(Date.now() - i * 24 * 60 * 60 * 1000)));
+
+  const [
+    gdCurrentDaySnap, wgTodaySnap, mealVerifYesterdaySnap, planSnap, teachVoteSnap,
+    wgLast7Snaps, gdProgressSnap, strikesTodaySnaps, messagesSnaps
+  ] = await Promise.all([
+    db.ref('stewart/gracedare/progress/currentDay').once('value'),
+    db.ref(`stewart/whiteglove/${today}`).once('value'),
+    db.ref(`stewart/mealverification/${yesterday}`).once('value'),
+    db.ref('stewart/plan').once('value'),
+    db.ref(`stewart/teachvote/${mostRecentMonday(today)}`).once('value'),
+    Promise.all(last7Dates.map(d => db.ref(`stewart/whiteglove/${d}`).once('value'))),
+    db.ref('stewart/gracedare/progress').once('value'),
+    Promise.all(ALLOWED_AGENT_IDS.map(id => db.ref(`stewart/strikes/${id}/${today}`).once('value'))),
+    Promise.all(ALLOWED_AGENT_IDS.map(id => db.ref(`stewart/messages/${id}`).once('value')))
+  ]);
+
+  // ── Today's pending tasks ──
+  const gdDay = gdCurrentDaySnap.val() || 1;
+  const gdTodayDoneSnap = await db.ref(`stewart/gracedare/progress/day${gdDay}/completed`).once('value');
+  const graceDareToday = !!gdTodayDoneSnap.val();
+
+  const wgToday = wgTodaySnap.val() || {};
+  const wgWindowsLogged = ['morning', 'afternoon', 'evening'].filter(w => wgToday[w]);
+  const wgWindowsRemaining = ['morning', 'afternoon', 'evening'].filter(w => !wgToday[w]);
+
+  // Reuses the exact skip logic Galley Report Step 2/3 already established
+  // — a real planned dinner, unverified, is the only thing worth flagging.
+  const MEAL_VERIFY_SKIP_NAMES = ['No Meal -- not cooking', 'Open -- choose from library'];
+  let galleyVerificationPending = false;
+  if (!mealVerifYesterdaySnap.val()) {
+    const plan = planSnap.val();
+    if (Array.isArray(plan)) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const yDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const yDayName = dayNames[yDate.getDay()];
+      const slot = plan.find(s => s.day === yDayName);
+      if (slot && slot.mealName && !MEAL_VERIFY_SKIP_NAMES.includes(slot.mealName)) galleyVerificationPending = true;
+    }
+  }
+
+  const teachVoteData = teachVoteSnap.val() || {};
+  const teachMePendingCount =
+    Object.values(teachVoteData.websiteSuggestions || {}).filter(w => w.status === 'pending').length +
+    (teachVoteData.familyDaySuggestion && teachVoteData.familyDaySuggestion.status === 'pending' ? 1 : 0);
+
+  // ── Her own patterns, last 7 days ──
+  const gdProgress = gdProgressSnap.val() || {};
+  const graceDareLast7 = last7Dates.filter(d => {
+    // day-number keys aren't calendar dates — count via completedAt timestamps instead
+    return Object.values(gdProgress).some(day => day && day.completedAt &&
+      easternDateStr(new Date(day.completedAt)) === d && day.completed);
+  }).length;
+  const whiteGloveDaysLogged7 = wgLast7Snaps.filter(s => s.val() && Object.keys(s.val()).length > 0).length;
+
+  // ── Sibling confrontations, surfaced as actionable prompts ──
+  // Real, already-logged signal: a boy asking Tom to referee a sibling
+  // issue (declined_sibling) in the last few days — never quoted
+  // verbatim, just which boy and roughly when.
+  const siblingPromptCutoff = Date.now() - 4 * 24 * 60 * 60 * 1000;
+  const siblingPrompts = [];
+  const tomchatSnaps = await Promise.all(ALLOWED_AGENT_IDS.map(id => db.ref(`stewart/tomchat/${id}`).once('value')));
+  tomchatSnaps.forEach((snap, i) => {
+    const agentId = ALLOWED_AGENT_IDS[i];
+    const entries = Object.values(snap.val() || {});
+    const hits = entries.filter(e => e && e.category === 'declined_sibling' && e.timestamp >= siblingPromptCutoff);
+    if (hits.length) siblingPrompts.push({ agentName: AGENT_DISPLAY_NAMES[agentId], count: hits.length, mostRecent: easternDateStr(new Date(Math.max(...hits.map(h => h.timestamp)))) });
+  });
+
+  // ── Her own interaction pattern with each boy ──
+  const interactionByBoy = {};
+  messagesSnaps.forEach((snap, i) => {
+    const agentId = ALLOWED_AGENT_IDS[i];
+    const entries = Object.values(snap.val() || {}).filter(e => e && e.from === 'Mom');
+    const lastMs = entries.length ? Math.max(...entries.map(e => e.timestamp || 0)) : null;
+    interactionByBoy[agentId] = {
+      agentName: AGENT_DISPLAY_NAMES[agentId],
+      daysSinceLastMessage: lastMs ? Math.floor((Date.now() - lastMs) / (24 * 60 * 60 * 1000)) : null
+    };
+  });
+
+  // ── Needs your attention — genuinely time-sensitive only ──
+  const needsAttention = [];
+  strikesTodaySnaps.forEach((snap, i) => {
+    const rec = snap.val();
+    const hasUnkindToday = rec && Object.values(rec.incidents || {}).some(inc => inc.category === 'unkind');
+    if (hasUnkindToday) needsAttention.push(`${AGENT_DISPLAY_NAMES[ALLOWED_AGENT_IDS[i]]} had an unkindness strike today`);
+  });
+  if (galleyVerificationPending) needsAttention.push("Yesterday's dinner hasn't been verified in the Galley yet");
+
+  return {
+    today: {
+      graceDareCompleted: graceDareToday,
+      whiteGloveWindowsLogged: wgWindowsLogged,
+      whiteGloveWindowsRemaining: wgWindowsRemaining,
+      galleyVerificationPending,
+      teachMePendingCount
+    },
+    patterns: {
+      graceDareDaysThisWeek: graceDareLast7,
+      whiteGloveDaysLoggedThisWeek: whiteGloveDaysLogged7
+    },
+    siblingPrompts,
+    interactionByBoy,
+    needsAttention
+  };
+}
+
+const DAWN_DAILY_SCHEMA = { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false };
+
+async function generateDawnDailyMessage(dayData) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const system = `${TINK_SYSTEM_PROMPT}
+
+You're writing Dawn's personal daily briefing — distinct from the shared household weekly report and distinct from the boys' own Red Sky reports, both of which already cover full behavioral detail. This is about HER day only: her own pending tasks (framed as encouragement to complete them, not a guilt list), a light mirror of her own completion patterns (practical/task-oriented, not emotional), actionable relational prompts, and genuinely time-sensitive items only. Tie any encouragement to her own real completion numbers (streaks, consistency) rather than generic cheerleading.
+
+Explicitly do NOT include: detailed boy-by-boy behavioral analysis of everything that happened that day/week — that's the shared weekly report's job, not this one. Don't turn this into a second household report.
+
+Structure, in plain prose (no markdown headers), 4-6 sentences total:
+- Her pending tasks today, warmly: Grace Dare, remaining White Glove windows, Galley meal verification if pending, Teach Me admin if anything's pending approval. Skip anything already done — don't list a completed task as if it's still pending.
+- A brief, real mention of her own pattern this week (Grace Dare days completed, White Glove days logged) — only if it's actually notable (a strong streak worth naming, or a real gap worth a gentle nudge); don't force a mention of an unremarkable middling number.
+- If "siblingPrompts" has any entries, surface each as a direct, actionable prompt — which boy, roughly when, framed as "worth a follow-up conversation," never quoting what was actually said.
+- If "interactionByBoy" shows a boy she hasn't messaged in a while (use judgment — several days with no private message is worth a gentle nudge, one or two days is not), a light, non-grading reflection prompt — this is about her awareness, not a metric she's failing.
+- If "needsAttention" has entries, name them plainly and directly — these are the only genuinely time-sensitive items, everything else in this message is a softer, encouraging nudge.
+- If today.graceDareCompleted is true and all White Glove windows are logged and nothing else needs attention, it's fine — even good — for this to be short and simply affirming.
+
+Never invent a detail, a task, or a pattern that isn't in the data given below.`;
+
+  const dawnDailyModel = 'claude-sonnet-4-6';
+  const response = await anthropic.messages.create({
+    model: dawnDailyModel,
+    max_tokens: 500,
+    system,
+    output_config: { format: { type: 'json_schema', schema: DAWN_DAILY_SCHEMA } },
+    messages: [{ role: 'user', content: `Dawn's real data for today:\n${JSON.stringify(dayData)}` }]
+  });
+  await logTinkUsage(dawnDailyModel, response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).message;
+}
+
+// Cached per real day (stewart/dawnDaily/{date}) — a real Sonnet call for
+// every tab visit would be wasteful for something that only meaningfully
+// changes once a day; `force` (the UI's own refresh button) bypasses the
+// cache for the specific case something changed since this morning and
+// she wants it recalculated now, mirroring the report card's own
+// Regenerate-vs-automatic distinction.
+exports.generateDawnDailyReport = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data) => {
+    const force = !!(data && data.force);
+    const today = easternDateStr();
+    const cacheRef = db.ref(`stewart/dawnDaily/${today}`);
+    if (!force) {
+      const cached = await cacheRef.once('value');
+      if (cached.val()) return cached.val();
+    }
+    const dayData = await fetchDawnDailyData();
+    const message = await generateDawnDailyMessage(dayData);
+    const result = { message, generatedAt: Date.now() };
+    await cacheRef.set(result);
+    return result;
   });
 
 // ════════════════════════════════════════════════════
