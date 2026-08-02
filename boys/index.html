@@ -867,6 +867,17 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
     <div class="topbar-sync" id="sync-status">&#9675; Connecting...</div>
   </div>
 
+  <!-- Persistent session-timer bar (session-timer-punchlist.md, Step 2) —
+       lives outside the tab content so it's visible no matter which tab
+       is open, same as the sync-status row above. Only populated for the
+       boy's own login (initSessionTimerDisplay), never for parent
+       assist/oversight views. -->
+  <div id="session-timer-bar" style="margin:2px 14px 10px;"></div>
+  <!-- Step 3: Hans's end-of-session prompt — its own dismissible banner,
+       not the Ship's Orders modal, since it needs to appear the instant
+       the active window hits 0:00 no matter which tab is open. -->
+  <div id="session-hans-prompt" style="margin:0 14px 10px;"></div>
+
   <!-- CONTENT -->
   <div class="content">
 
@@ -1395,6 +1406,306 @@ function selectAgent(id, codename, name, rank, theme, icon){
   renderCourageDare();
   setTimeout(() => checkCelebrations(), 2000);
   setTimeout(() => showTutorialOrWalkthrough(), 1200);
+}
+
+// ══════════════════════════════════════════════════════
+// SESSION TIMER — three fixed 30-min daily windows
+// (session-timer-punchlist.md v2, Step 1)
+//
+// stewart/sessiontime/{agentId}/{date}/{session1|session2|session3} stores
+// ELAPSED seconds used in that window, not a countdown — elapsed is safe
+// to persist and resume from (just read back whatever's already there);
+// a stored countdown would need its own separate reset logic instead.
+//
+// Only ever started for the boy's OWN authenticated login. Never for a
+// parent boarding as him (assist-as from the Gangway) or a parent's
+// picker-screen glance (parent-view) — same exclusion the muster log
+// itself already draws between a boy's own activity and a parent
+// looking at/assisting with his account. Enforced by only ever calling
+// startSessionTimer() from the one call site that follows the identity-
+// lock IIFE's own currentSession.role==='boy' check, below.
+// ══════════════════════════════════════════════════════
+
+// Device-local time throughout, matching localDateStr() (mission-engine.js)
+// and every other "today"/"now" boundary already used in this file — this
+// app assumes device-local time is house time, never Eastern-anchored
+// client-side (that's a server/Cloud-Function-only concern).
+function currentSessionWindowKey(d){
+  d = d || new Date();
+  const mins = d.getHours() * 60 + d.getMinutes();
+  if(mins < 11 * 60 + 30) return 'session1';
+  if(mins < 15 * 60) return 'session2';
+  return 'session3';
+}
+
+// Ms timestamp of the moment windowKey's own window ENDS, on the same
+// calendar day as referenceDate — used to cap a window's elapsed time
+// exactly at its boundary when a live session crosses into the next
+// window, instead of crediting a few stray seconds to the wrong one.
+function sessionWindowEndMs(windowKey, referenceDate){
+  const d = new Date(referenceDate);
+  if(windowKey === 'session1') d.setHours(11, 30, 0, 0);
+  else if(windowKey === 'session2') d.setHours(15, 0, 0, 0);
+  else d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+const SESSION_HEARTBEAT_MS = 15000;
+let _sessionTimer = null; // {agentId, date, window, baseElapsed, sinceMs, intervalId}
+
+function _sessionTimeRef(agentId, date, windowKey){
+  return _db.ref(`stewart/sessiontime/${agentId}/${date}/${windowKey}`);
+}
+
+// Persists elapsed accrued from sinceMs through capMs into the currently-
+// tracked window, folds it into baseElapsed, and resets sinceMs to capMs —
+// so the next tick's delta doesn't double-count what was just written.
+function _sessionTimerFlush(capMs){
+  if(!_sessionTimer) return;
+  const now = typeof capMs === 'number' ? capMs : Date.now();
+  const deltaSec = Math.max(0, Math.floor((now - _sessionTimer.sinceMs) / 1000));
+  const newElapsed = _sessionTimer.baseElapsed + deltaSec;
+  _sessionTimeRef(_sessionTimer.agentId, _sessionTimer.date, _sessionTimer.window)
+    .update({ elapsedSeconds: newElapsed })
+    .catch(() => {});
+  _sessionTimer.baseElapsed = newElapsed;
+  _sessionTimer.sinceMs = now;
+}
+
+// One heartbeat tick. If the wall clock has crossed into a new window
+// since the last tick, finalize the OLD window exactly at its own
+// boundary (not "now" — the boundary is the correct cutoff even though
+// this tick itself fires a few seconds after it), then start the new
+// window fresh at 0 elapsed for the sliver of time since the boundary.
+// A single tick can only ever cross ONE boundary — windows run 3+ hours
+// and heartbeats fire every 15s, so this doesn't need to handle hopping
+// two boundaries in one tick (the visibilitychange resume path below
+// handles the "backgrounded across multiple boundaries" case instead, by
+// restarting fresh rather than ticking through them).
+function _sessionTimerTick(){
+  if(!_sessionTimer) return;
+  const now = Date.now();
+  const liveWindow = currentSessionWindowKey(new Date(now));
+  if(liveWindow !== _sessionTimer.window){
+    const boundaryMs = sessionWindowEndMs(_sessionTimer.window, new Date(now));
+    _sessionTimerFlush(Math.min(now, boundaryMs));
+    _sessionTimer.window = liveWindow;
+    _sessionTimer.baseElapsed = 0;
+    _sessionTimer.sinceMs = boundaryMs;
+  }
+  _sessionTimerFlush(now);
+}
+
+// Starts (or resumes) the timer for the boy's own login — reads whatever
+// elapsed value is already stored for the current window and resumes
+// from there rather than resetting to 0, so logging out and back in
+// within the same window never grants a fresh 30 minutes.
+function startSessionTimer(agentId){
+  if(!agentId || !_db) return;
+  if(_sessionTimer && _sessionTimer.agentId === agentId) return; // already running
+  stopSessionTimer();
+  const date = localDateStr();
+  const windowKey = currentSessionWindowKey();
+  _sessionTimeRef(agentId, date, windowKey).once('value').then(snap => {
+    const existing = snap.val() || {};
+    _sessionTimer = {
+      agentId, date, window: windowKey,
+      baseElapsed: typeof existing.elapsedSeconds === 'number' ? existing.elapsedSeconds : 0,
+      sinceMs: Date.now(),
+      intervalId: null
+    };
+    _sessionTimer.intervalId = setInterval(_sessionTimerTick, SESSION_HEARTBEAT_MS);
+  });
+}
+
+function stopSessionTimer(){
+  if(!_sessionTimer) return;
+  _sessionTimerFlush(Date.now());
+  if(_sessionTimer.intervalId) clearInterval(_sessionTimer.intervalId);
+  _sessionTimer = null;
+}
+
+// Pausing on hidden (not just on close) avoids crediting screen time while
+// the boy isn't actually looking at the app — the same "real usage, not
+// just a valid session token" spirit as the 12-hour session TTL used
+// elsewhere. Resuming re-runs startSessionTimer() from scratch rather than
+// just un-pausing, which is the simplest correct behavior if the window
+// boundary was crossed while the tab sat hidden in the background.
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){
+    if(_sessionTimer) _sessionTimerFlush(Date.now());
+  } else if(_sessionTimer){
+    // Already flushed correctly at the moment we WENT hidden, above — must
+    // NOT flush again here via stopSessionTimer(), which caps at Date.now()
+    // and would wrongly credit the entire backgrounded gap (sinceMs is
+    // stale, still pointing at the hide-time) as active elapsed time. Just
+    // discard the stale in-memory timer and start fresh, which re-reads
+    // whatever window is current now and its real stored elapsed value.
+    const agentId = _sessionTimer.agentId;
+    if(_sessionTimer.intervalId) clearInterval(_sessionTimer.intervalId);
+    _sessionTimer = null;
+    startSessionTimer(agentId);
+  }
+});
+
+// Best-effort final flush — Firebase writes issued this late in the page
+// lifecycle aren't guaranteed to complete, but the 15s heartbeat already
+// keeps the stored value within one tick of live, so the worst case here
+// is losing a few seconds off the tail, not the whole session.
+window.addEventListener('pagehide', () => { if(_sessionTimer) _sessionTimerFlush(Date.now()); });
+
+// ── SESSION TIMER — Step 2: persistent visual display ──
+// Shows the ACTIVE window's remaining time (color-coded) plus a compact
+// used/remaining/not-started summary of all three sessions, so a boy can
+// see the whole day's picture without leaving whatever tab he's on.
+const SESSION_WINDOW_KEYS = ['session1', 'session2', 'session3'];
+const SESSION_WINDOW_LABELS = { session1: 'Session 1', session2: 'Session 2', session3: 'Session 3' };
+const SESSION_CAP_SECONDS = 30 * 60;
+
+// Same green/yellow/red hexes renderGameTime() already uses for its own
+// earned/partial/missed states, so "good/caution/bad" reads consistently
+// across the app rather than introducing a second color language.
+function sessionColorForRemaining(remainingSec){
+  if(remainingSec > 20 * 60) return '#2d6a47';
+  if(remainingSec > 10 * 60) return '#c8922a';
+  return '#b5451b';
+}
+
+function formatMinSec(totalSec){
+  const s = Math.max(0, Math.round(totalSec));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+let _sessionDisplayData = null; // {session1:{elapsedSeconds}, session2:{...}, session3:{...}} for TODAY
+let _sessionDisplayLastWindow = null;
+let _sessionDisplayIntervalId = null;
+
+function _refreshSessionDisplayData(agentId){
+  return _db.ref(`stewart/sessiontime/${agentId}/${localDateStr()}`).once('value').then(snap => {
+    _sessionDisplayData = snap.val() || {};
+  });
+}
+
+// The active window's number comes from the live in-memory timer (ticks
+// every render, no DB read needed) so it counts up smoothly; the other two
+// windows aren't currently changing, so their last-read DB snapshot is
+// already correct — no need to re-fetch them every second too.
+function liveElapsedForWindow(agentId, windowKey){
+  if(_sessionTimer && _sessionTimer.agentId === agentId && _sessionTimer.window === windowKey){
+    return _sessionTimer.baseElapsed + Math.max(0, Math.floor((Date.now() - _sessionTimer.sinceMs) / 1000));
+  }
+  const stored = _sessionDisplayData && _sessionDisplayData[windowKey];
+  return stored && typeof stored.elapsedSeconds === 'number' ? stored.elapsedSeconds : 0;
+}
+
+function renderSessionTimerBar(){
+  if(!currentAgent || !_sessionDisplayData) return;
+  const el = document.getElementById('session-timer-bar');
+  if(!el) return;
+
+  const liveWindow = currentSessionWindowKey();
+  // A boundary was just crossed since the last render — re-fetch so the
+  // window that just went inactive shows its real finalized number instead
+  // of a stale pre-boundary snapshot, then re-render once that lands.
+  if(_sessionDisplayLastWindow && _sessionDisplayLastWindow !== liveWindow){
+    _refreshSessionDisplayData(currentAgent.id).then(() => renderSessionTimerBar());
+  }
+  _sessionDisplayLastWindow = liveWindow;
+
+  const liveElapsed = liveElapsedForWindow(currentAgent.id, liveWindow);
+  const remaining = Math.max(0, SESSION_CAP_SECONDS - liveElapsed);
+  const color = sessionColorForRemaining(remaining);
+  const liveIdx = SESSION_WINDOW_KEYS.indexOf(liveWindow);
+
+  maybeShowSessionEndPrompt(currentAgent.id, liveWindow, remaining);
+
+  const summaryParts = SESSION_WINDOW_KEYS.map((key, idx) => {
+    const label = SESSION_WINDOW_LABELS[key];
+    if(key === liveWindow){
+      return `<span style="color:${color};font-weight:700;">${label}: ${formatMinSec(remaining)} left</span>`;
+    }
+    const elapsed = liveElapsedForWindow(currentAgent.id, key);
+    if(elapsed <= 0){
+      // A future window (idx > liveIdx) genuinely hasn't opened yet today;
+      // a past window (idx < liveIdx) with 0 elapsed was simply never
+      // logged into. Both read as plain "not started"/"not used" here —
+      // Step 3b's missed-session flag is what actually distinguishes a
+      // skipped morning as worth flagging, not this display.
+      return `<span style="color:rgba(255,255,255,.4);">${label}: ${idx > liveIdx ? 'not started yet' : 'not used'}</span>`;
+    }
+    const usedMin = Math.round(elapsed / 60);
+    const done = elapsed >= SESSION_CAP_SECONDS;
+    return `<span style="color:rgba(255,255,255,.55);">${label}: used ${usedMin}/30${done ? ' <span style="color:var(--teal2);">&#10003;</span>' : ''}</span>`;
+  });
+
+  el.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--dark2),#0a1a1a);border:1px solid ${color}66;border-radius:10px;padding:10px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,.45);">${SESSION_WINDOW_LABELS[liveWindow].toUpperCase()} &mdash; TIME LEFT</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;color:${color};">${formatMinSec(remaining)}</div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
+        ${summaryParts.join('')}
+      </div>
+    </div>`;
+}
+
+// session-timer-punchlist.md, Step 3 — Hans's end-of-session prompt.
+// remaining===0 here specifically means the boy is LIVE in this window
+// right now and has genuinely used the whole 30 minutes (liveElapsedForWindow
+// sources from the in-memory _sessionTimer for whichever window is active),
+// not just a stale display of some past completed window.
+const _sessionEndPromptShown = {}; // in-memory guard against a double-fire within one page load
+function maybeShowSessionEndPrompt(agentId, windowKey, remaining){
+  if(remaining > 0) return;
+  const date = localDateStr();
+  const key = 'sessionend-' + agentId + '-' + date + '-' + windowKey;
+  if(_sessionEndPromptShown[key]) return;
+  let seen = false;
+  try { seen = localStorage.getItem(key) === '1'; } catch(e){}
+  if(seen) return;
+  _sessionEndPromptShown[key] = true;
+  try { localStorage.setItem(key, '1'); } catch(e){}
+
+  _db.ref(`stewart/missions/${agentId}/${date}`).once('value').then(snap => {
+    const done = snap.val() || {};
+    const missions = buildMissions(agentId);
+    const total = missions.length;
+    const completed = missions.filter(m => done[m.id]).length;
+    const contextNote = `${SESSION_WINDOW_LABELS[windowKey]}'s 30-minute window just ran out while he was actively using it — informational only, not a forced logout.`;
+    getHansLine('sessionEnd', currentAgent.name, completed, total, { contextNote }).then(renderSessionHansPrompt);
+  });
+}
+
+function renderSessionHansPrompt(text){
+  const el = document.getElementById('session-hans-prompt');
+  if(!el) return;
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(200,146,42,.14);border:1.5px solid rgba(200,146,42,.4);border-radius:12px;padding:10px 12px;">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(200,146,42,.14);border:2px solid rgba(200,146,42,.4);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+        <img src="assets/hans.png" alt="Hans" style="width:100%;height:100%;object-fit:contain;">
+      </div>
+      <div style="flex:1;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:var(--gold);margin-bottom:3px;">HANS</div>
+        <div style="font-size:12.5px;color:rgba(255,255,255,.9);line-height:1.5;">${text}</div>
+      </div>
+      <button onclick="document.getElementById('session-hans-prompt').innerHTML=''" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:16px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0;" title="Dismiss">&times;</button>
+    </div>`;
+}
+
+// Starts the 1s visual tick — a UI-only refresh distinct from the 15s
+// heartbeat that actually persists elapsed time (Step 1); this just reads
+// whatever the current in-memory/DB state is, it never writes.
+function initSessionTimerDisplay(agentId){
+  const ready = _refreshSessionDisplayData(agentId).then(() => {
+    _sessionDisplayLastWindow = currentSessionWindowKey();
+    renderSessionTimerBar();
+  });
+  if(_sessionDisplayIntervalId) clearInterval(_sessionDisplayIntervalId);
+  _sessionDisplayIntervalId = setInterval(renderSessionTimerBar, 1000);
+  return ready;
 }
 
 // ── FIRST-LOGIN WALKTHROUGH ──
@@ -2934,6 +3245,27 @@ const HANS_LINES = {
     "{NAME}! Reporting for duty, I see. HQ is proud of you already, and it's not even done yet.",
     "Well if it isn't Agent {NAME}. Back in Gimmelshtump we had a saying — actually never mind, just go do great things today.",
     "There you are, {NAME}! Every great mission starts with showing up. You've already done that part!"
+  ],
+  // session-timer-punchlist.md, Step 3: fires when a session window's 30
+  // minutes run out while it's actively being used.
+  sessionEnd: [
+    "Agent {NAME}, that session clock just hit zero! Might be a good moment to log off and bank the rest of your day. Purely a suggestion — I once ignored every clock I ever owned and look how THAT turned out.",
+    "Time's up on this one, {NAME}! No alarms, no sirens, just a friendly nudge from HQ: probably a good time to step away for now. You can always come back next session!",
+    "Beep beep, Agent {NAME} — session's out of runway. Nothing forced, just Hans being Hans: maybe log off for a bit? Worked wonders for my blood pressure, allegedly."
+  ],
+  // session-timer-punchlist.md, Step 3b: an honest, non-alarming nudge when
+  // this morning's session window passed with no login at all.
+  missedSession: [
+    "Agent {NAME}, HQ noticed this morning's session came and went without a check-in. No big speech here — just wanted you to know you're a little behind on the day's missions. Plenty of day left. Let's get after it!",
+    "{NAME}! Looks like the morning window slipped by unused. Happens to the best of us — I once missed an ENTIRE evil scheme because I overslept. Nothing lost that can't be caught up. Let's go!",
+    "Heads up, Agent {NAME} — this morning's session passed by without you. Just letting you know, honestly, no fuss. Today's still very much winnable. Onward!"
+  ],
+  // session-timer-punchlist.md, Step 3b: a genuine compliment for finishing
+  // early, with real session time still on the clock.
+  efficiency: [
+    "Agent {NAME}! Every mission done, and with real time STILL on the clock?! That's not luck, that's skill. I once finished an evil scheme early and it turned out I'd skipped a step. You didn't skip anything. Impressive!",
+    "{NAME}, look at you — finished with time to spare! That's genuine efficiency, Agent, the kind I've been chasing my whole career and never once caught. Take the win!",
+    "Whoa, Agent {NAME} — all done AND time left over? That's the good kind of surprising. HQ is officially impressed. Go enjoy the rest of your session!"
   ]
 };
 
@@ -3097,7 +3429,8 @@ async function getHansLine(triggerType, name, completed, total, extra){
     total,
     missionNames: extra.missionNames || [],
     deductionReason: extra.deductionReason || null,
-    streak: typeof extra.streak === 'number' ? extra.streak : null
+    streak: typeof extra.streak === 'number' ? extra.streak : null,
+    contextNote: extra.contextNote || null
   };
   for(let attempt = 1; attempt <= 2; attempt++){
     try {
@@ -3157,12 +3490,28 @@ function runHansEngine(){
     _db.ref(`stewart/scores/${agentId}/${yesterday}`).once('value'),
     _db.ref(`stewart/deductions/${agentId}/${yesterday}`).once('value'),
     _db.ref(`stewart/missions/${agentId}/${yesterday}`).once('value'),
-    calculateStreak(agentId)
-  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap, streak]) => {
+    calculateStreak(agentId),
+    _db.ref(`stewart/sessiontime/${agentId}/${today}`).once('value')
+  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap, streak, stSnap]) => {
     const done = mSnap.val() || {};
     const missions = buildMissions(agentId);
     const total = missions.length;
     const completed = missions.filter(m => done[m.id]).length;
+
+    // Session-timer context (session-timer-punchlist.md, Step 3b) — a
+    // fresh read here rather than reusing Step 2's display cache, since
+    // this can run before that cache is populated and the two have no
+    // guaranteed ordering relative to each other.
+    const sessionData = stSnap.val() || {};
+    const liveSessionWindow = currentSessionWindowKey();
+    const session1Elapsed = (sessionData.session1 && sessionData.session1.elapsedSeconds) || 0;
+    // "Missed" means the window has already closed (we're logging in
+    // during session2 or session3) with zero recorded use — not simply
+    // "session1 isn't the live window," which would also be true for a
+    // perfectly normal session2/session3 login on a day session1 WAS used.
+    const missedSession1 = liveSessionWindow !== 'session1' && session1Elapsed <= 0;
+    const liveWindowElapsed = (sessionData[liveSessionWindow] && sessionData[liveSessionWindow].elapsedSeconds) || 0;
+    const sessionRemainingSeconds = Math.max(0, SESSION_CAP_SECONDS - liveWindowElapsed);
 
     const deductions = dSnap.val() || {};
     const deductionTotal = Object.values(deductions).reduce((a,b)=>a+b,0);
@@ -3210,10 +3559,31 @@ function runHansEngine(){
       state.evening = true;
     }
 
-    // 3. MILESTONE: all done (Hans, once per day) — always good
+    // 3. EFFICIENCY (session-timer-punchlist.md, Step 3b) — a more specific
+    // version of the plain MILESTONE right below: all missions done AND
+    // real time still left in the active session window (not just finished
+    // in the window's last few seconds). Checked first so it wins whenever
+    // both are true, and marks state.allDone too so the generic milestone
+    // check doesn't also fire for the same moment.
+    const SESSION_EFFICIENCY_THRESHOLD_SEC = 60;
+    if(completed >= total && total > 0 && !state.allDone && !state.efficiencyShown && sessionRemainingSeconds > SESSION_EFFICIENCY_THRESHOLD_SEC){
+      toPost.push({persona:'hans', triggerType:'efficiency', contextNote:`He just finished every mission for the day with about ${Math.round(sessionRemainingSeconds/60)} minutes still left in ${SESSION_WINDOW_LABELS[liveSessionWindow]}.`});
+      state.allDone = true;
+      state.efficiencyShown = true;
+    }
+
+    // 3b. MILESTONE: all done (Hans, once per day) — always good
     if(completed >= total && total > 0 && !state.allDone){
       toPost.push({persona:'hans', triggerType:'allDone'});
       state.allDone = true;
+    }
+
+    // 3c. MISSED SESSION 1 (session-timer-punchlist.md, Step 3b) — noted
+    // honestly, once per day, on the first login that happens after
+    // session1's window has already closed with none of it used.
+    if(missedSession1 && !state.missedSessionShown){
+      toPost.push({persona:'hans', triggerType:'missedSession', contextNote:"He had no login at all before 11:30am, so this morning's session window passed with none of it used."});
+      state.missedSessionShown = true;
     }
 
     // 4. DEDUCTION NOTED (once per day) — fire if a deduction appeared
@@ -3252,7 +3622,7 @@ function runHansEngine(){
     if(!el || !toPost.length) return;
     const item = toPost[0];
 
-    getHansLine(item.triggerType, name, completed, total, {missionNames, deductionReason, streak}).then(text => {
+    getHansLine(item.triggerType, name, completed, total, {missionNames, deductionReason, streak, contextNote: item.contextNote}).then(text => {
       const bg = 'rgba(200,146,42,.14)';
       const border = 'rgba(200,146,42,.4)';
       const nameColor = 'var(--gold)';
@@ -5656,6 +6026,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const qParams = new URLSearchParams(location.search);
   const assistAs = qParams.get('as');
   let lockedId = null;
+  let isOwnBoySession = false; // set true only by the currentSession.role==='boy' branch below
   let currentSession = null;
   try{ currentSession = JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){}
 
@@ -5668,6 +6039,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     lockedId = assistAs; // a real, currently-authenticated parent chose this agent on the Gangway
   }else if(currentSession && currentSession.role==='boy' && currentSession.person && AGENT_PROFILES[currentSession.person] && (Date.now()-currentSession.ts) < 1000*60*60*12){
     lockedId = currentSession.person;
+    isOwnBoySession = true;
   }
 
   if(!lockedId){
@@ -5706,6 +6078,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   initFirebase();
   selectAgent(lockedId, profile.codename, profile.name, profile.rank, profile.theme, profile.icon);
+  // Session timer: only the boy's own real login (never a parent boarding
+  // as him via ?as=) starts the clock — see the SESSION TIMER block above.
+  if(isOwnBoySession){ startSessionTimer(lockedId); initSessionTimerDisplay(lockedId); }
 });
 </script>
 </body>
