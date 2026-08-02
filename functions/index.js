@@ -2001,6 +2001,78 @@ async function fetchCrowsnestWeekData(weekStartMs, weekEndMs) {
   return { byBoy, household };
 }
 
+// ─── Galley Report (galley-report-punchlist.md, Step 4) ───
+// Two independent halves, deliberately not merged into one query: meal-
+// plan ADHERENCE (did each night's dinner happen as planned) and
+// planning TIMING (was the week planned in advance at all) live in two
+// differently-keyed places and answer two different questions.
+
+// Adherence: stewart/mealverification/{date} is keyed by real calendar
+// date (kitchen/index.html, Step 1/2) — reads directly across this
+// report's own 7 dates, no dependency on the Galley's separate
+// planning-week concept below. A night with NO verification entry is
+// its own bucket, never silently folded into "followed" or "changed" —
+// stewart/plan has no per-week history, so a past night's planned meal
+// only survives at all if it was actually verified at the time; there's
+// no reliable way to tell "nothing was planned" from "planned but never
+// verified" after the fact, and guessing either way would be inventing
+// data that isn't there.
+async function fetchGalleyAdherence(dates) {
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/mealverification/${date}`).once('value')));
+  const nights = dates.map((date, i) => {
+    const v = snaps[i].val();
+    if (!v) return { date, verified: false };
+    return { date, verified: true, plannedMeal: v.plannedMeal || '', followed: !!v.followed, reason: v.reason || null, note: v.note || '' };
+  });
+  const followed = nights.filter(n => n.verified && n.followed);
+  const changed = nights.filter(n => n.verified && !n.followed);
+  const unverified = nights.filter(n => !n.verified);
+  return {
+    nights,
+    followedCount: followed.length,
+    changedCount: changed.length,
+    unverifiedCount: unverified.length,
+    // Only the deviations — exactly what the write-up needs to cite
+    // real specifics ("3 of 7 nights changed, most often citing missing
+    // ingredients") without re-deriving it from the full nights list.
+    changedDetails: changed.map(n => ({ date: n.date, plannedMeal: n.plannedMeal, reason: n.reason, note: n.note }))
+  };
+}
+
+// Timing: stewart/planMeta/{weekOf} (kitchen/index.html, Step 1) is
+// keyed by the Galley's OWN week-start convention — the Sunday of
+// WEEK_SLOTS/sendToCalendar()'s week, not this report's Monday-anchored
+// weekOf. The two conventions are offset: this report's Monday through
+// Saturday (6 of its 7 nights) are governed by the Galley plan created
+// for the Sunday immediately BEFORE this report's own weekOf, while
+// only the report's final day (its own Sunday) falls under a newer
+// Galley week starting that same day. Rather than split "was the week
+// planned" across two partial verdicts, this reads the single plan that
+// covered the majority of the week's dinners — the Sunday right before
+// weekOf — since "did Dawn/John sit down and plan this week" is
+// fundamentally one behavioral event, not a per-night one.
+async function fetchGalleyPlanTiming(weekOf) {
+  const gallerySunday = formatDateStr(new Date(parseDateStr(weekOf).getTime() - 24 * 60 * 60 * 1000));
+  const snap = await db.ref(`stewart/planMeta/${gallerySunday}`).once('value');
+  const meta = snap.val();
+  if (!meta || !meta.createdAt) {
+    return { status: 'not planned', gallerySunday };
+  }
+  // easternDateStr, not formatDateStr — this is "what calendar day did
+  // this real moment happen on" (a client Date.now() timestamp), the
+  // exact question this file's own FAMILY_TIMEZONE comment block says
+  // formatDateStr is NOT for.
+  const createdDateStr = easternDateStr(new Date(meta.createdAt));
+  const status = createdDateStr <= gallerySunday ? 'on time' : 'last-minute';
+  // Count of pre-night edits (recordPlanChange, Step 1) across every day
+  // in this plan's history — supplementary context only ("planned on
+  // time but revised twice before nights arrived" is a real nuance),
+  // never required in the write-up the way adherence/timing are.
+  const history = meta.history || {};
+  const editCount = Object.values(history).reduce((sum, dayEdits) => sum + Object.keys(dayEdits || {}).length, 0);
+  return { status, gallerySunday, createdDateStr, editCount };
+}
+
 // Shared by both the scheduled Monday auto-run and the on-demand callable
 // check-in — same aggregation logic, different weekOf, same output
 // location, so Bridge and Officers' Country can never see different data.
@@ -2011,12 +2083,14 @@ async function aggregateWeeklyReportData(weekOf) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000;
 
-  const [boys, whiteglove, dawn, prayer, crowsnest] = await Promise.all([
+  const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming] = await Promise.all([
     Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates))),
     fetchWhiteGloveWeekData(dates),
     fetchDawnWeekData(dates),
     fetchPrayerWeekData(weekStartMs, weekEndMs),
-    fetchCrowsnestWeekData(weekStartMs, weekEndMs)
+    fetchCrowsnestWeekData(weekStartMs, weekEndMs),
+    fetchGalleyAdherence(dates),
+    fetchGalleyPlanTiming(weekOf)
   ]);
 
   const boysById = {};
@@ -2039,7 +2113,8 @@ async function aggregateWeeklyReportData(weekOf) {
     whiteglove,
     dawn,
     prayerHousehold: prayer.household,
-    crowsnestHousehold: crowsnest.household
+    crowsnestHousehold: crowsnest.household,
+    galley: { adherence: galleyAdherence, timing: galleyTiming }
   };
 
   await db.ref(`stewart/reportcards/${weekOf}`).set(report);
@@ -2067,7 +2142,15 @@ Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{
 
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
-The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.`;
+The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.
+
+Galley Report is its own third section, separate from both boys and household — meal-plan planning and adherence for the week, from real Kitchen/Galley data. This is the first section aimed at long-range household planning rather than accountability, so the tone should read as a planning aid, not a grade.
+
+"galley.timing" tells you whether this week's dinner plan was ever created and, if so, when relative to the week it covers. Its "status" is exactly one of "on time" (planned before or on the week's own Sunday), "last-minute" (planned after that Sunday had already passed), or "not planned" (no plan was ever generated for that week at all) — state this plainly using the status value directly, don't form your own judgment from raw dates. If "editCount" is 2 or more, you may note once that the plan was revised multiple times before nights arrived — skip it entirely if 0 or 1, that's normal and not worth a sentence.
+
+"galley.adherence" covers what actually got cooked against what was planned, across the week's 7 real nights: "followedCount" (dinner matched the plan), "changedCount" (it didn't), and "unverifiedCount" (nobody in the Galley confirmed either way that night — a gap in the DATA itself, not evidence either way about what actually happened; if this is high, say so plainly as its own observation rather than folding those nights into "followed" or "changed"). Use these three pre-tallied counts directly — do not recount them yourself from the nights list. For "changedCount" nights, "changedDetails" gives you the real planned meal and the real reason cited for each — aggregate genuine patterns from these specifics (e.g. "3 of 7 nights changed, most often citing missing ingredients," or "changed twice this week, both times for family preference"), never just a bare count with no texture. If a real pattern shows up worth nudging toward healthier planning — "ate out" recurring, or a specific meal or ingredient gap showing up more than once — surface it once, gently, as something worth knowing for planning ahead, never as a criticism. If followedCount and changedCount are both 0 (nothing was verified all week), say plainly that no meals were verified this week rather than manufacturing a pattern from it.
+
+Keep the Galley Report section to 2-4 sentences, same grounded, specific style as household.`;
 
 const REPORT_WRITEUP_SCHEMA = {
   type: 'object',
@@ -2083,9 +2166,10 @@ const REPORT_WRITEUP_SCHEMA = {
       required: ['samuel', 'johnjr', 'stephen', 'daniel'],
       additionalProperties: false
     },
-    household: { type: 'string' }
+    household: { type: 'string' },
+    galley: { type: 'string' }
   },
-  required: ['boys', 'household'],
+  required: ['boys', 'household', 'galley'],
   additionalProperties: false
 };
 
@@ -2098,7 +2182,7 @@ async function generateReportCardWriteup(reportData) {
     output_config: { format: { type: 'json_schema', schema: REPORT_WRITEUP_SCHEMA } },
     messages: [{
       role: 'user',
-      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold })}`
+      content: `Week of ${reportData.weekOf} through ${reportData.weekEnd}${reportData.isPartialWeek ? ' — week still in progress, only summarize days that have actually happened' : ''}.\n\nRaw data:\n${JSON.stringify({ boys: reportData.boys, whiteglove: reportData.whiteglove, dawn: reportData.dawn, prayerHousehold: reportData.prayerHousehold, crowsnestHousehold: reportData.crowsnestHousehold, galley: reportData.galley })}`
     }]
   });
 
@@ -2120,6 +2204,9 @@ function buildPlainTextReportCard(reportData, writeup) {
   });
   lines.push('HOUSEHOLD');
   lines.push(writeup.household || '');
+  lines.push('');
+  lines.push('GALLEY REPORT');
+  lines.push(writeup.galley || '');
   return lines.join('\n').trim();
 }
 

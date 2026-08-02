@@ -107,6 +107,16 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
 .day-alert{font-size:10px;color:#1a5276;margin-top:3px;background:#e8f4fd;padding:3px 7px;border-radius:5px;display:inline-block;}
 .day-defrost{font-size:10px;color:#4a1080;margin-top:3px;background:#f0eaff;padding:3px 7px;border-radius:5px;display:inline-block;}
 .cal-confirm{background:var(--gbg);border:1px solid #b8dfc4;border-radius:8px;padding:10px 13px;margin-bottom:10px;font-size:12px;color:var(--green);display:none;}
+.mv-card{background:var(--abg);border:1px solid #e8cd8a;border-radius:10px;padding:13px 14px;margin-bottom:14px;}
+.mv-q{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:10px;}
+.mv-yn-row{display:flex;gap:8px;}
+.mv-btn{flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.mv-yes{border:none;background:var(--green);color:#fff;}
+.mv-no{border:1px solid var(--border);background:var(--card);color:var(--ink);}
+.mv-reason-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.mv-chip{padding:7px 11px;border:1px solid var(--border);border-radius:16px;background:var(--card);font-size:12px;color:var(--ink);cursor:pointer;}
+.mv-chip:active{background:rgba(0,0,0,.04);}
+.mv-note-input{width:100%;margin-top:9px;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;resize:vertical;min-height:44px;}
 .nut-week{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:10px;}
 .nut-title{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--brown);margin-bottom:10px;}
 .nut-row{display:flex;gap:7px;margin-bottom:8px;}
@@ -280,6 +290,7 @@ body{font-family:'Lato',sans-serif;background:var(--cream);color:var(--ink);font
   <div class="screen" id="screen-planner">
     <div class="sc-title">Weekly Planner</div>
     <div class="sc-sub">Generate &middot; Review &middot; Send to calendar</div>
+    <div id="mealverify-prompt" style="display:none;"></div>
     <button class="plan-btn" onclick="generatePlan()">&#10022; Generate This Week's Plan</button>
     <button class="plan-btn" onclick="renderMealSuggestions();showSuggestions()" style="background:var(--sage);margin-top:8px;">&#128161; What Can I Make?</button>
     <div id="meal-suggestions-wrap" style="display:none;margin-top:12px;">
@@ -1136,6 +1147,7 @@ function initFirebase(){
         renderPlan(currentPlan);
         renderNutrition(currentPlan);
         const cb=document.getElementById('cal-btn'); if(cb) cb.style.display='block';
+        checkMealVerificationPrompt();
       }
     });
 
@@ -1441,6 +1453,7 @@ function doSwap(mealName){
   }
 
   savePlan(currentPlan);
+  recordPlanChange(slot.day, slot.mealName, meal.name);
   renderPlan(currentPlan);
   renderNutrition(currentPlan);
   closeSwap();
@@ -1462,6 +1475,7 @@ function setNoMeal(){
     noMeal: true
   };
   savePlan(currentPlan);
+  recordPlanChange(slot.day, slot.mealName, 'No Meal -- not cooking');
   renderPlan(currentPlan);
   renderNutrition(currentPlan);
   closeSwap();
@@ -1581,6 +1595,232 @@ async function askTinkForRecipe(){
 }
 
 
+// ══════════════════════════════════════════════════════
+// GALLEY REPORT — DATA LAYER (galley-report-punchlist.md, Step 1)
+// Two new paths, both additive — stewart/plan itself stays exactly the
+// bare array it's always been. boys/index.html reads it, dashboard/
+// index.html's Tink-driven "add to plan" confirm flow writes it
+// directly, and functions/index.js's pantry grounding for askTink reads
+// it too — changing its shape would break all three, so nothing here
+// touches it.
+//
+// stewart/planMeta/{weekOf} — when this week's plan was created/last
+// touched, and a per-night history of pre-night edits (a swap or "no
+// meal" made in this Galley UI before that night actually arrives).
+// weekOf is the SUNDAY of the plan's own week (WEEK_SLOTS/sendToCalendar
+// above both anchor the week to "today minus today's day-of-week", i.e.
+// Sunday-start) — a DIFFERENT week-start convention than the weekly
+// report card's own Monday-anchored weekOf in functions/index.js. The
+// two never need to agree: this key only has to self-correlate edits
+// made in the same real-world week, and the report card (Step 4) reads
+// stewart/mealverification by real calendar date, not by this key.
+//
+// stewart/mealverification/{date} — one real calendar date per key
+// (unlike stewart/plan's day-NAME keys) — {plannedMeal, actualMeal,
+// followed, reason, note, verifiedBy, timestamp}. Written by Step 2's
+// Galley UI once per night; Step 4's report card reads it directly by
+// date across whatever Monday-Sunday range it needs, independent of
+// planMeta's own Sunday-start week concept.
+//
+// Known gap: dashboard/index.html's pre-existing Tink-driven plan write
+// (adding a meal to a day via chat confirm) does not call
+// recordPlanChange() below — that write path lives in a different file
+// this step doesn't touch, so an edit made that way won't show up in a
+// night's change history, only edits made directly in this Galley UI
+// will. Flagging this rather than silently under-covering it.
+// ══════════════════════════════════════════════════════
+
+function ymd(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+const WEEKDAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// The real calendar date THIS plan week's Sunday falls on (same anchor
+// sendToCalendar() above uses) — the key for stewart/planMeta.
+function planWeekSundayStr(){
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  return ymd(sunday);
+}
+// The real calendar date a given plan day-name falls on THIS plan week.
+function dateForPlanDay(dayName){
+  const idx = WEEKDAY_NAMES.indexOf(dayName);
+  if(idx < 0) return null;
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay() + idx);
+  return ymd(sunday);
+}
+// The weekday name a real calendar date falls on — the inverse of
+// dateForPlanDay, used to look up that date's stewart/plan slot (Step 2:
+// "did you make [planned meal] last night" needs yesterday's slot).
+function weekdayNameForDate(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return WEEKDAY_NAMES[new Date(y, m-1, d).getDay()];
+}
+
+// Marks this week's plan as created (first generatePlan() this week) or
+// just touched again (a second full regenerate the same week) — a
+// transaction so a second regenerate never clobbers the original
+// createdAt, which is what "on time vs. last-minute" (Step 4) reads.
+function recordPlanCreated(){
+  if(!_db) return;
+  const weekOf = planWeekSundayStr();
+  const now = Date.now();
+  _db.ref('stewart/planMeta/'+weekOf).transaction(cur => {
+    if(!cur) return { weekOf, createdAt: now, lastModifiedAt: now };
+    return { ...cur, lastModifiedAt: now };
+  });
+}
+
+// Records one night's pre-night edit (a swap or "no meal" made in this
+// Galley UI before that night arrives) — the change-history half of
+// Step 1. Same createdAt-preserving transaction as recordPlanCreated()
+// so an edit made without a prior generatePlan() this week (shouldn't
+// normally happen, but the UI doesn't strictly prevent it) still
+// backfills a sane createdAt rather than leaving it unset.
+function recordPlanChange(day, oldMealName, newMealName){
+  if(!_db || !day) return;
+  const weekOf = planWeekSundayStr();
+  const now = Date.now();
+  _db.ref('stewart/planMeta/'+weekOf).transaction(cur => {
+    if(!cur) return { weekOf, createdAt: now, lastModifiedAt: now };
+    return { ...cur, lastModifiedAt: now };
+  });
+  _db.ref('stewart/planMeta/'+weekOf+'/history/'+day).push({
+    from: oldMealName || '', to: newMealName || '', at: now
+  });
+}
+
+// Fixed dropdown — kept as the primary field (not free text) so Step 4's
+// report card can aggregate real patterns across weeks instead of
+// parsing prose. "note" (optional, in recordMealVerification below)
+// carries "Other" detail or any added context on top of a chosen reason.
+const MEAL_VERIFICATION_REASONS = [
+  'Ran out of time',
+  'Missing ingredient',
+  'Family preference that night',
+  'Leftovers instead',
+  'Ate out',
+  'Other'
+];
+
+// Writes one night's verification. `date` is the real calendar date
+// (YYYY-MM-DD) the dinner actually happened on — resolve it against
+// stewart/plan's day-name slots with dateForPlanDay/weekdayNameForDate
+// above, never assume "today". `.set()`, not `.push()` — date is
+// already a natural unique key, one verification per night.
+function recordMealVerification(date, opts){
+  opts = opts || {};
+  if(!_db || !date) return Promise.resolve();
+  const followed = !!opts.followed;
+  return _db.ref('stewart/mealverification/'+date).set({
+    date,
+    plannedMeal: opts.plannedMeal || '',
+    actualMeal: opts.actualMeal || '',
+    followed,
+    reason: followed ? null : (opts.reason || 'Other'),
+    note: opts.note || '',
+    verifiedBy: opts.verifiedBy || '',
+    timestamp: Date.now()
+  });
+}
+
+// ── Galley Report — Step 2: the verification prompt itself ──
+// Low-friction by design: Yes is one tap and closes the whole thing out;
+// No reveals the fixed reason chips (+ an always-visible optional note
+// field above them) and a single chip tap submits — never a separate
+// "confirm" step on top of the chip tap itself.
+//
+// verifiedBy is a fixed 'galley' rather than asking who's confirming —
+// this app has no per-parent login (kitchen/index.html is a shared
+// household tablet page, not an authenticated surface like Bridge/
+// Officers' Country), and the punch list's Step 2 description doesn't
+// ask for identity capture. Adding a "who are you" tap would cut
+// directly against the low-friction requirement for a field nothing in
+// Step 4's report actually depends on.
+let _mealVerifyContext = null; // {date, plannedMeal} for whichever night's prompt is currently showing
+
+// Meal names that mean "nothing was really planned" — not worth asking
+// "did you make [this]?" about. Matches the exact literal strings
+// setNoMeal()/_coreGeneratePlan() write for those two cases above.
+const MEAL_VERIFY_SKIP_NAMES = ['No Meal -- not cooking', 'Open -- choose from library'];
+
+// Checks whether last night's dinner still needs verification and shows
+// the prompt if so. Called from the live stewart/plan listener in
+// initFirebase() below (guarantees currentPlan is already populated)
+// and once directly after a saved plan loads from localStorage — never
+// shown in BOYS_MODE, this is a parent-facing check only.
+function checkMealVerificationPrompt(){
+  if(BOYS_MODE || !_db || !currentPlan) return;
+  const wrap = document.getElementById('mealverify-prompt');
+  if(!wrap) return;
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  const dateStr = ymd(y);
+  const dayName = weekdayNameForDate(dateStr);
+  const slot = currentPlan.find(s => s.day === dayName);
+  if(!slot || !slot.mealName || MEAL_VERIFY_SKIP_NAMES.includes(slot.mealName)){
+    dismissMealVerifyPrompt();
+    return;
+  }
+  _db.ref('stewart/mealverification/'+dateStr).once('value').then(snap => {
+    if(snap.exists()){ dismissMealVerifyPrompt(); return; }
+    renderMealVerifyPrompt(dateStr, slot.mealName);
+  });
+}
+
+function renderMealVerifyPrompt(dateStr, plannedMeal){
+  _mealVerifyContext = { date: dateStr, plannedMeal };
+  const wrap = document.getElementById('mealverify-prompt');
+  if(!wrap) return;
+  wrap.innerHTML = `
+    <div class="mv-card">
+      <div class="mv-q">Did you make <strong>${escapeHtml(plannedMeal)}</strong> last night?</div>
+      <div class="mv-yn-row">
+        <button class="mv-btn mv-yes" onclick="confirmMealFollowed()">&#10003; Yes</button>
+        <button class="mv-btn mv-no" onclick="openMealVerifyReason()">&#10005; No, something else</button>
+      </div>
+      <div id="mv-reason-wrap" style="display:none;"></div>
+    </div>`;
+  wrap.style.display = 'block';
+}
+
+function confirmMealFollowed(){
+  if(!_mealVerifyContext) return;
+  const { date, plannedMeal } = _mealVerifyContext;
+  recordMealVerification(date, { plannedMeal, followed: true, verifiedBy: 'galley' })
+    .then(dismissMealVerifyPrompt);
+}
+
+function openMealVerifyReason(){
+  const w = document.getElementById('mv-reason-wrap');
+  if(!w) return;
+  w.innerHTML = `
+    <textarea id="mv-note" class="mv-note-input" maxlength="300" placeholder="Add a note (optional)"></textarea>
+    <div class="mv-reason-chips">${MEAL_VERIFICATION_REASONS.map(r => `<button class="mv-chip" onclick="submitMealVerifyReason('${r}')">${r}</button>`).join('')}</div>
+  `;
+  w.style.display = 'block';
+}
+
+function submitMealVerifyReason(reason){
+  if(!_mealVerifyContext) return;
+  const { date, plannedMeal } = _mealVerifyContext;
+  const noteEl = document.getElementById('mv-note');
+  const note = noteEl ? noteEl.value.trim() : '';
+  recordMealVerification(date, { plannedMeal, followed: false, reason, note, verifiedBy: 'galley' })
+    .then(dismissMealVerifyPrompt);
+}
+
+function dismissMealVerifyPrompt(){
+  _mealVerifyContext = null;
+  const wrap = document.getElementById('mealverify-prompt');
+  if(wrap){ wrap.style.display = 'none'; wrap.innerHTML = ''; }
+}
+
+
 function savePlan(plan){
   if(!plan) return;
   // Strip non-serializable bits before saving
@@ -1635,6 +1875,7 @@ function loadSavedPlan(){
 function generatePlan(){
   _coreGeneratePlan();
   if(currentPlan) savePlan(currentPlan);
+  recordPlanCreated();
 }
 
 
@@ -1875,6 +2116,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderHelp();
   initFirebase();
   setTimeout(()=>{ updateShopBadge(); }, 1500);
+
+  // Deep-link support: ?screen=planner (used by dashboard/index.html's
+  // "Verify last night's dinner" Ship's Orders item, Galley Report
+  // Step 3) jumps straight to the Weekly Planner screen where the
+  // verification prompt lives, instead of landing on Meals.
+  const deepLinkScreen = new URLSearchParams(location.search).get('screen');
+  if(deepLinkScreen){
+    const btn = document.querySelector('.nb[onclick*="\''+deepLinkScreen+'\'"]');
+    if(btn) showScreen(deepLinkScreen, btn);
+  }
 });
 
 </script>
