@@ -70,6 +70,27 @@ function toMidnight(d){
 // list of agentIds. type is open text (not a fixed enum) on purpose — this
 // is meant to be the foundation for later homeschool-day tracking too, per
 // the punch list's own design principle: build generically, not narrowly.
+//
+// RETROACTIVE CORRECTION APPLIED (2026-08-02): the week already reported
+// before this feature existed (weekOf 2026-07-27) was corrected per the
+// punch list's own explicit instruction ("Apply this retroactively to the
+// week already reported... Stephen and Daniel's Friday collapse was the
+// campout, not a discipline issue"), confirmed with John before writing to
+// production history. A Travel/Campout exception was added at
+// stewart/exceptions/2026-07-31 covering Stephen and Daniel specifically
+// (not Samuel or John Jr., who scored normally that real day — the family
+// campout evidently didn't pull them away from chores the same way). Their
+// stewart/scores, stewart/pay, and stewart/eligible for 2026-07-31 were
+// then nulled by hand to match exactly what recalculateScore's exception
+// branch above would have written had this feature existed that week —
+// same treatment as a weekend, excluded from the calculation entirely,
+// not counted as a $0/zero-score day. weekOf 2026-07-27's report card was
+// regenerated afterward and confirmed to read "Friday was a planned family
+// campout, no chores were expected" for both boys instead of describing an
+// unexplained collapse. This is a one-time, already-completed correction —
+// it does not need to run again and there is no ongoing mechanism tied to
+// it; noted here only so the July 31 numbers are never mistaken for a bug
+// if someone goes looking for why they look different from a raw log.
 // ══════════════════════════════════════════════════════
 
 // Pure — given the exceptions object already fetched at
