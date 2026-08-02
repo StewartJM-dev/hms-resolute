@@ -1397,6 +1397,152 @@ function selectAgent(id, codename, name, rank, theme, icon){
   setTimeout(() => showTutorialOrWalkthrough(), 1200);
 }
 
+// ══════════════════════════════════════════════════════
+// SESSION TIMER — three fixed 30-min daily windows
+// (session-timer-punchlist.md v2, Step 1)
+//
+// stewart/sessiontime/{agentId}/{date}/{session1|session2|session3} stores
+// ELAPSED seconds used in that window, not a countdown — elapsed is safe
+// to persist and resume from (just read back whatever's already there);
+// a stored countdown would need its own separate reset logic instead.
+//
+// Only ever started for the boy's OWN authenticated login. Never for a
+// parent boarding as him (assist-as from the Gangway) or a parent's
+// picker-screen glance (parent-view) — same exclusion the muster log
+// itself already draws between a boy's own activity and a parent
+// looking at/assisting with his account. Enforced by only ever calling
+// startSessionTimer() from the one call site that follows the identity-
+// lock IIFE's own currentSession.role==='boy' check, below.
+// ══════════════════════════════════════════════════════
+
+// Device-local time throughout, matching localDateStr() (mission-engine.js)
+// and every other "today"/"now" boundary already used in this file — this
+// app assumes device-local time is house time, never Eastern-anchored
+// client-side (that's a server/Cloud-Function-only concern).
+function currentSessionWindowKey(d){
+  d = d || new Date();
+  const mins = d.getHours() * 60 + d.getMinutes();
+  if(mins < 11 * 60 + 30) return 'session1';
+  if(mins < 15 * 60) return 'session2';
+  return 'session3';
+}
+
+// Ms timestamp of the moment windowKey's own window ENDS, on the same
+// calendar day as referenceDate — used to cap a window's elapsed time
+// exactly at its boundary when a live session crosses into the next
+// window, instead of crediting a few stray seconds to the wrong one.
+function sessionWindowEndMs(windowKey, referenceDate){
+  const d = new Date(referenceDate);
+  if(windowKey === 'session1') d.setHours(11, 30, 0, 0);
+  else if(windowKey === 'session2') d.setHours(15, 0, 0, 0);
+  else d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+const SESSION_HEARTBEAT_MS = 15000;
+let _sessionTimer = null; // {agentId, date, window, baseElapsed, sinceMs, intervalId}
+
+function _sessionTimeRef(agentId, date, windowKey){
+  return _db.ref(`stewart/sessiontime/${agentId}/${date}/${windowKey}`);
+}
+
+// Persists elapsed accrued from sinceMs through capMs into the currently-
+// tracked window, folds it into baseElapsed, and resets sinceMs to capMs —
+// so the next tick's delta doesn't double-count what was just written.
+function _sessionTimerFlush(capMs){
+  if(!_sessionTimer) return;
+  const now = typeof capMs === 'number' ? capMs : Date.now();
+  const deltaSec = Math.max(0, Math.floor((now - _sessionTimer.sinceMs) / 1000));
+  const newElapsed = _sessionTimer.baseElapsed + deltaSec;
+  _sessionTimeRef(_sessionTimer.agentId, _sessionTimer.date, _sessionTimer.window)
+    .update({ elapsedSeconds: newElapsed })
+    .catch(() => {});
+  _sessionTimer.baseElapsed = newElapsed;
+  _sessionTimer.sinceMs = now;
+}
+
+// One heartbeat tick. If the wall clock has crossed into a new window
+// since the last tick, finalize the OLD window exactly at its own
+// boundary (not "now" — the boundary is the correct cutoff even though
+// this tick itself fires a few seconds after it), then start the new
+// window fresh at 0 elapsed for the sliver of time since the boundary.
+// A single tick can only ever cross ONE boundary — windows run 3+ hours
+// and heartbeats fire every 15s, so this doesn't need to handle hopping
+// two boundaries in one tick (the visibilitychange resume path below
+// handles the "backgrounded across multiple boundaries" case instead, by
+// restarting fresh rather than ticking through them).
+function _sessionTimerTick(){
+  if(!_sessionTimer) return;
+  const now = Date.now();
+  const liveWindow = currentSessionWindowKey(new Date(now));
+  if(liveWindow !== _sessionTimer.window){
+    const boundaryMs = sessionWindowEndMs(_sessionTimer.window, new Date(now));
+    _sessionTimerFlush(Math.min(now, boundaryMs));
+    _sessionTimer.window = liveWindow;
+    _sessionTimer.baseElapsed = 0;
+    _sessionTimer.sinceMs = boundaryMs;
+  }
+  _sessionTimerFlush(now);
+}
+
+// Starts (or resumes) the timer for the boy's own login — reads whatever
+// elapsed value is already stored for the current window and resumes
+// from there rather than resetting to 0, so logging out and back in
+// within the same window never grants a fresh 30 minutes.
+function startSessionTimer(agentId){
+  if(!agentId || !_db) return;
+  if(_sessionTimer && _sessionTimer.agentId === agentId) return; // already running
+  stopSessionTimer();
+  const date = localDateStr();
+  const windowKey = currentSessionWindowKey();
+  _sessionTimeRef(agentId, date, windowKey).once('value').then(snap => {
+    const existing = snap.val() || {};
+    _sessionTimer = {
+      agentId, date, window: windowKey,
+      baseElapsed: typeof existing.elapsedSeconds === 'number' ? existing.elapsedSeconds : 0,
+      sinceMs: Date.now(),
+      intervalId: null
+    };
+    _sessionTimer.intervalId = setInterval(_sessionTimerTick, SESSION_HEARTBEAT_MS);
+  });
+}
+
+function stopSessionTimer(){
+  if(!_sessionTimer) return;
+  _sessionTimerFlush(Date.now());
+  if(_sessionTimer.intervalId) clearInterval(_sessionTimer.intervalId);
+  _sessionTimer = null;
+}
+
+// Pausing on hidden (not just on close) avoids crediting screen time while
+// the boy isn't actually looking at the app — the same "real usage, not
+// just a valid session token" spirit as the 12-hour session TTL used
+// elsewhere. Resuming re-runs startSessionTimer() from scratch rather than
+// just un-pausing, which is the simplest correct behavior if the window
+// boundary was crossed while the tab sat hidden in the background.
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){
+    if(_sessionTimer) _sessionTimerFlush(Date.now());
+  } else if(_sessionTimer){
+    // Already flushed correctly at the moment we WENT hidden, above — must
+    // NOT flush again here via stopSessionTimer(), which caps at Date.now()
+    // and would wrongly credit the entire backgrounded gap (sinceMs is
+    // stale, still pointing at the hide-time) as active elapsed time. Just
+    // discard the stale in-memory timer and start fresh, which re-reads
+    // whatever window is current now and its real stored elapsed value.
+    const agentId = _sessionTimer.agentId;
+    if(_sessionTimer.intervalId) clearInterval(_sessionTimer.intervalId);
+    _sessionTimer = null;
+    startSessionTimer(agentId);
+  }
+});
+
+// Best-effort final flush — Firebase writes issued this late in the page
+// lifecycle aren't guaranteed to complete, but the 15s heartbeat already
+// keeps the stored value within one tick of live, so the worst case here
+// is losing a few seconds off the tail, not the whole session.
+window.addEventListener('pagehide', () => { if(_sessionTimer) _sessionTimerFlush(Date.now()); });
+
 // ── FIRST-LOGIN WALKTHROUGH ──
 // Shown once per agent (tracked in Firebase so it persists across devices),
 // then Ship's Orders takes over as normal from then on. Revisitable anytime
@@ -5656,6 +5802,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const qParams = new URLSearchParams(location.search);
   const assistAs = qParams.get('as');
   let lockedId = null;
+  let isOwnBoySession = false; // set true only by the currentSession.role==='boy' branch below
   let currentSession = null;
   try{ currentSession = JSON.parse(localStorage.getItem('resolute.session')||'null'); }catch(e){}
 
@@ -5668,6 +5815,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     lockedId = assistAs; // a real, currently-authenticated parent chose this agent on the Gangway
   }else if(currentSession && currentSession.role==='boy' && currentSession.person && AGENT_PROFILES[currentSession.person] && (Date.now()-currentSession.ts) < 1000*60*60*12){
     lockedId = currentSession.person;
+    isOwnBoySession = true;
   }
 
   if(!lockedId){
@@ -5706,6 +5854,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   initFirebase();
   selectAgent(lockedId, profile.codename, profile.name, profile.rank, profile.theme, profile.icon);
+  // Session timer: only the boy's own real login (never a parent boarding
+  // as him via ?as=) starts the clock — see the SESSION TIMER block above.
+  if(isOwnBoySession) startSessionTimer(lockedId);
 });
 </script>
 </body>
