@@ -460,21 +460,30 @@ function buildMissions(agentId, _d){
   const missions = [];
 
   // ── SHARED DAILY (all 7 days) ──────────────────────
+  // period ('morning'/'lunch'/'evening') is used ONLY by the NextDNS
+  // lockdown unlock check (nextdns-lockdown-punchlist.md, Step 2) — every
+  // morning+lunch-period mission across a boy's ENTIRE day must be done
+  // before his recreation sites unlock. Missions with no period (weekly
+  // rotators, dinner-prep tasks, computer/officer-of-the-watch — the same
+  // two categories already excluded from "eligible" above) never gate the
+  // unlock; that's deliberate, confirmed with John, not an oversight.
   missions.push({
     id: 'bed',
     text: 'Make your bed',
     detail: 'Every morning before anything else.',
     points: 5,
     category: 'bedroom',
-    always: true
+    always: true,
+    period: 'morning'
   });
   missions.push({
     id: 'bedroom',
     text: 'Tidy your bedroom space',
-    detail: 'Your area clean and clothes put away.',
+    detail: 'Your area clean and clothes put away — floor included.',
     points: 5,
     category: 'bedroom',
-    always: true
+    always: true,
+    period: 'morning'
   });
   missions.push({
     id: 'rabbit-own',
@@ -482,7 +491,8 @@ function buildMissions(agentId, _d){
     detail: 'Feed and water your own rabbit before bed.',
     points: 5,
     category: 'animals',
-    always: true
+    always: true,
+    period: 'evening'
   });
 
   // ── COMPUTER MISSIONS (bonus — earn points, and screen time is earned through the family's own rule) ──
@@ -526,10 +536,16 @@ function buildMissions(agentId, _d){
     // Stephen+Daniel: Stephen UNLOADS, Daniel LOADS — always, no exceptions
     // Dishwasher runs up to 3 times a day — load, run, and put away after each run.
 
+    // Round 1/2/3 don't actually reset through the day (a boy checks each
+    // one exactly once) — deliberately NOT made repeatable/resettable even
+    // though the dishwasher can genuinely run more than 3 times some days;
+    // a checkbox that un-checks itself and reappears reads as broken, not
+    // as "go run it again." For the unlock gate, Round 1/2/3 map to
+    // morning/lunch/evening respectively — confirmed with John.
     const ROUNDS = [
-      {n: 1, label: 'Round 1'},
-      {n: 2, label: 'Round 2'},
-      {n: 3, label: 'Round 3'}
+      {n: 1, label: 'Round 1', period: 'morning'},
+      {n: 2, label: 'Round 2', period: 'lunch'},
+      {n: 3, label: 'Round 3', period: 'evening'}
     ];
 
     if(agentId === 'samuel' || agentId === 'johnjr'){
@@ -541,7 +557,8 @@ function buildMissions(agentId, _d){
           detail: `You and ${partner} handle dishes today. Load it up whenever it's full — up to 3 times a day.`,
           points: 10,
           category: 'kitchen',
-          always: true
+          always: true,
+          period: r.period
         });
         missions.push({
           id: `dishwasher-unload-${r.n}`,
@@ -549,7 +566,8 @@ function buildMissions(agentId, _d){
           detail: `As soon as this run finishes, empty it and put everything away before the next load goes in.`,
           points: 10,
           category: 'kitchen',
-          always: true
+          always: true,
+          period: r.period
         });
       });
     }
@@ -563,7 +581,8 @@ function buildMissions(agentId, _d){
           detail: `As soon as this run finishes, empty it and put everything away. Daniel will load the next one.`,
           points: 10,
           category: 'kitchen',
-          always: true
+          always: true,
+          period: r.period
         });
       });
     }
@@ -577,7 +596,8 @@ function buildMissions(agentId, _d){
           detail: `Load it up whenever it's full — up to 3 times a day. Stephen will unload and put away after each run.`,
           points: 10,
           category: 'kitchen',
-          always: true
+          always: true,
+          period: r.period
         });
       });
     }
@@ -588,15 +608,44 @@ function buildMissions(agentId, _d){
       detail: 'Bring all dishes, glasses, and food to the kitchen.',
       points: 5,
       category: 'kitchen',
-      always: true
+      always: true,
+      period: 'evening'
+    });
+    // Split into three (nextdns-lockdown-punchlist.md follow-up) — the old
+    // single 'table-wipe' checkbox claimed "after every meal" in its own
+    // detail text but could only ever be checked once a day, which made
+    // that description untrue by lunchtime (dinner hadn't happened yet).
+    // Three separate missions make "after every meal" literally checkable,
+    // and let breakfast+lunch gate the unlock without waiting on dinner.
+    // Point total kept at 5 (2+2+1, matching the original single mission's
+    // value) rather than 5 each — flagged for John to adjust if he'd
+    // rather this be worth more now that it's three real check-ins.
+    missions.push({
+      id: 'table-wipe-breakfast',
+      text: 'Wipe down the table — after breakfast',
+      detail: 'Wipe the whole table after breakfast.',
+      points: 2,
+      category: 'kitchen',
+      always: true,
+      period: 'morning'
     });
     missions.push({
-      id: 'table-wipe',
-      text: 'Wipe down the table after meals',
-      detail: 'Wipe the whole table after every meal — breakfast, lunch, and dinner.',
-      points: 5,
+      id: 'table-wipe-lunch',
+      text: 'Wipe down the table — after lunch',
+      detail: 'Wipe the whole table after lunch.',
+      points: 2,
       category: 'kitchen',
-      always: true
+      always: true,
+      period: 'lunch'
+    });
+    missions.push({
+      id: 'table-wipe-dinner',
+      text: 'Wipe down the table — after dinner',
+      detail: 'Wipe the whole table after dinner.',
+      points: 1,
+      category: 'kitchen',
+      always: true,
+      period: 'evening'
     });
   }
 
@@ -608,7 +657,8 @@ function buildMissions(agentId, _d){
       detail: 'The dish team\'s got the dishwasher today — if any pots or pans got used for breakfast or lunch, you wash those by hand. Keep the sink and counter clear. (Dinner pots and pans are Mom\'s.)',
       points: 10,
       category: 'kitchen',
-      always: true
+      always: true,
+      period: 'lunch'
     });
     missions.push({
       id: 'table-set',
@@ -616,7 +666,8 @@ function buildMissions(agentId, _d){
       detail: 'Plates, silverware, and napkins — set 10 minutes before we sit down.',
       points: 5,
       category: 'kitchen',
-      always: true
+      always: true,
+      period: 'evening'
     });
     // Drinks — only older boys
     if(agentId === 'samuel' || agentId === 'johnjr'){
@@ -627,7 +678,8 @@ function buildMissions(agentId, _d){
         detail: `Pour everyone's drinks 10 minutes before dinner. You and ${partner} handle setup today.`,
         points: 5,
         category: 'kitchen',
-        always: true
+        always: true,
+        period: 'evening'
       });
     }
     // Appliance wipes — Sam, John, Stephen only, dropped on their laundry day
@@ -638,7 +690,8 @@ function buildMissions(agentId, _d){
         detail: 'Wipe down all burners and the stovetop surface after cooking.',
         points: 5,
         category: 'kitchen',
-        always: true
+        always: true,
+        period: 'lunch'
       });
       missions.push({
         id: 'microwave',
@@ -646,12 +699,23 @@ function buildMissions(agentId, _d){
         detail: 'Inside and outside. Check for splatter.',
         points: 5,
         category: 'kitchen',
-        always: true
+        always: true,
+        period: 'lunch'
       });
     }
   }
 
   // ── AGENT-SPECIFIC DAILY ─────────────────────────
+  // Room-straighten/trash-pickup missions added alongside the existing
+  // floor sweeps (nextdns-lockdown-punchlist.md follow-up) — the floor
+  // sweep alone doesn't catch a cluttered couch, gear left on the
+  // washer/dryer, or dishes drifting out of the kitchen, which is what was
+  // actually falling through the cracks. Kept as separate mission IDs from
+  // their sibling floor sweep on purpose (a boy can sweep and still leave
+  // the couch a mess, or vice versa) and placed right next to it. All at
+  // period:'morning' — same weekday-only cadence as the floor sweeps they
+  // sit beside, EXCEPT kitchen-counter, which John specifically called out
+  // as needing to run every day, weekends included.
   if(agentId === 'samuel'){
     missions.push({
       id: 'floor-laundry',
@@ -659,7 +723,26 @@ function buildMissions(agentId, _d){
       detail: 'Sweep and tidy the laundry room.',
       points: 5,
       category: 'floors',
-      weekday: true
+      weekday: true,
+      period: 'morning'
+    });
+    missions.push({
+      id: 'laundry-room-clear',
+      text: 'Clear off the washer and dryer',
+      detail: 'Nothing left sitting on top of the washer or dryer — clear it all off.',
+      points: 5,
+      category: 'floors',
+      weekday: true,
+      period: 'morning'
+    });
+    missions.push({
+      id: 'bathroom-counter',
+      text: 'Clean & wipe the bathroom counter',
+      detail: 'Counter wiped down and cleared off — everything put away, nothing left sitting out.',
+      points: 5,
+      category: 'bathroom',
+      weekday: true,
+      period: 'lunch'
     });
   }
 
@@ -670,7 +753,17 @@ function buildMissions(agentId, _d){
       detail: 'Sweep the full living room floor.',
       points: 5,
       category: 'floors',
-      weekday: true
+      weekday: true,
+      period: 'morning'
+    });
+    missions.push({
+      id: 'living-room-straighten',
+      text: 'Straighten the living room',
+      detail: 'Couch cleared off, and any shoes put away in the shoe bin.',
+      points: 5,
+      category: 'floors',
+      weekday: true,
+      period: 'morning'
     });
   }
 
@@ -678,10 +771,11 @@ function buildMissions(agentId, _d){
     missions.push({
       id: 'kitchen-counter',
       text: 'Clean & wipe kitchen counters',
-      detail: 'Wipe down all counter surfaces. Clear anything that doesn\'t belong.',
+      detail: 'Wipe down all counter surfaces. Clear anything that doesn\'t belong. Every day, weekends included.',
       points: 10,
       category: 'kitchen',
-      weekday: true
+      always: true,
+      period: 'morning'
     });
     missions.push({
       id: 'floor-kitchen',
@@ -689,7 +783,8 @@ function buildMissions(agentId, _d){
       detail: 'Sweep the full kitchen floor including under the table.',
       points: 5,
       category: 'floors',
-      weekday: true
+      weekday: true,
+      period: 'morning'
     });
   }
 
@@ -700,7 +795,8 @@ function buildMissions(agentId, _d){
       detail: 'Sweep the hallway floor.',
       points: 5,
       category: 'floors',
-      weekday: true
+      weekday: true,
+      period: 'morning'
     });
     missions.push({
       id: 'floor-rabbit',
@@ -708,7 +804,17 @@ function buildMissions(agentId, _d){
       detail: 'Sweep around and under the rabbit cages.',
       points: 5,
       category: 'animals',
-      weekday: true
+      weekday: true,
+      period: 'morning'
+    });
+    missions.push({
+      id: 'house-dish-sweep',
+      text: 'Check every room for dishes & silverware',
+      detail: 'Walk through the whole house and bring back any dishes, cups, or silverware to the kitchen.',
+      points: 5,
+      category: 'kitchen',
+      weekday: true,
+      period: 'morning'
     });
   }
 
@@ -723,7 +829,8 @@ function buildMissions(agentId, _d){
         detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
         points: 15,
         category: 'laundry',
-        always: true
+        always: true,
+        period: 'lunch'
       });
     }
     missions.push({
@@ -733,7 +840,8 @@ function buildMissions(agentId, _d){
       points: 10,
       category: 'kitchen',
       weekly: true,
-      rotate: 'sj-stephen'
+      rotate: 'sj-stephen',
+      period: 'evening'
     });
     if(isBathroomWeek){
       missions.push({
@@ -742,7 +850,8 @@ function buildMissions(agentId, _d){
         detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
         points: 15,
         category: 'bathroom',
-        weekly: true
+        weekly: true,
+        period: 'evening'
       });
     }
   }
@@ -755,7 +864,8 @@ function buildMissions(agentId, _d){
         detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
         points: 15,
         category: 'laundry',
-        always: true
+        always: true,
+        period: 'lunch'
       });
     }
     missions.push({
@@ -765,7 +875,8 @@ function buildMissions(agentId, _d){
       points: 10,
       category: 'kitchen',
       weekly: true,
-      rotate: 'sj-stephen'
+      rotate: 'sj-stephen',
+      period: 'evening'
     });
     if(isBathroomWeek){
       missions.push({
@@ -774,7 +885,8 @@ function buildMissions(agentId, _d){
         detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
         points: 15,
         category: 'bathroom',
-        weekly: true
+        weekly: true,
+        period: 'evening'
       });
     }
   }
@@ -787,16 +899,18 @@ function buildMissions(agentId, _d){
         detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
         points: 15,
         category: 'laundry',
-        always: true
+        always: true,
+        period: 'lunch'
       });
     }
     missions.push({
       id: 'hutch',
-      text: 'Organize the hutch',
-      detail: 'Keep the food hutch organized — boxes neat, nothing expired, everything in its place.',
+      text: 'Straighten & organize the hutch',
+      detail: 'Straighten and organize the food hutch — boxes neat, nothing expired, everything in its place.',
       points: 10,
       category: 'kitchen',
-      weekly: true
+      weekly: true,
+      period: 'evening'
     });
     missions.push({
       id: 'fridge',
@@ -805,7 +919,8 @@ function buildMissions(agentId, _d){
       points: 10,
       category: 'kitchen',
       weekly: true,
-      rotate: 'sj-stephen'
+      rotate: 'sj-stephen',
+      period: 'evening'
     });
     if(isBathroomWeek){
       missions.push({
@@ -814,7 +929,8 @@ function buildMissions(agentId, _d){
         detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
         points: 15,
         category: 'bathroom',
-        weekly: true
+        weekly: true,
+        period: 'evening'
       });
     }
   }
@@ -827,7 +943,8 @@ function buildMissions(agentId, _d){
         detail: 'Wash, dry, and put away your laundry together. This is your main mission today.',
         points: 10,
         category: 'laundry',
-        always: true
+        always: true,
+        period: 'lunch'
       });
     }
     missions.push({
@@ -837,7 +954,8 @@ function buildMissions(agentId, _d){
       points: 10,
       category: 'bathroom',
       weekly: true,
-      wednesday: true
+      wednesday: true,
+      period: 'morning'
     });
     if(isBathroomWeek){
       missions.push({
@@ -846,7 +964,8 @@ function buildMissions(agentId, _d){
         detail: 'Full clean — toilet, sink, mirror, wipe down surfaces. Your turn this week.',
         points: 15,
         category: 'bathroom',
-        weekly: true
+        weekly: true,
+        period: 'evening'
       });
     }
   }
@@ -861,7 +980,8 @@ function buildMissions(agentId, _d){
       points: 10,
       category: 'trash',
       always: true,
-      urgent: true
+      urgent: true,
+      period: 'morning'
     });
   }
 
@@ -872,7 +992,8 @@ function buildMissions(agentId, _d){
     detail: 'All four boys clean the cages together once this week.',
     points: 15,
     category: 'animals',
-    weekly: true
+    weekly: true,
+    period: 'evening'
   });
 
   // ── DINNER SIDE DISH (Mon/Wed/Thu) ────────────────
@@ -888,7 +1009,8 @@ function buildMissions(agentId, _d){
           detail: `Potatoes, rice, pasta, or similar. Work with ${partner} to get it ready for dinner.`,
           points: 10,
           category: 'kitchen',
-          always: true
+          always: true,
+          period: 'evening'
         });
       } else {
         missions.push({
@@ -897,7 +1019,8 @@ function buildMissions(agentId, _d){
           detail: `Heat the vegetable on the stove or microwave with ${partner} for dinner tonight.`,
           points: 5,
           category: 'kitchen',
-          always: true
+          always: true,
+          period: 'evening'
         });
       }
     }
@@ -938,4 +1061,49 @@ function buildMissions(agentId, _d){
     if(m.wednesday && wed) return true;
     return false;
   });
+}
+
+// ══════════════════════════════════════════════════════
+// NextDNS lockdown unlock gate (nextdns-lockdown-punchlist.md, Step 2)
+// The single definition of "what has to be done before a boy's recreation
+// sites unlock" — every mission actually on his list TODAY (weekday-only,
+// laundry-day, rotation-dependent, etc. all already resolved by
+// buildMissions above) tagged period:'morning' or period:'lunch'. Evening/
+// dinner-prep missions, weekly rotators John decided don't gate the
+// unlock (fridge, hutch, weekly bathroom clean, rabbit cage), and the two
+// non-required categories (computer, officer-of-the-watch) are never
+// included — confirmed with John mission-by-mission, not inferred.
+//
+// Shared by the Cloud Function that checks completion (functions/index.js,
+// requires this file directly — see the module.exports guard at the
+// bottom) and available client-side too for a future "locked/unlocked"
+// status display (Step 4's "worth considering" note), so both can never
+// disagree about what "done" means the way the pay/score duplicate-copy
+// bug once let two pages disagree about the mission list itself.
+function morningLunchMissions(agentId, _d){
+  return buildMissions(agentId, _d).filter(m => m.period === 'morning' || m.period === 'lunch');
+}
+
+// True once every morning+lunch mission on a boy's list for this specific
+// day is marked done in doneMap ({missionId: true}). An empty required
+// list (shouldn't happen in practice, but not impossible on some future
+// exception-day config) returns false, not true — fails safe, never
+// unlocks from "there was nothing to check."
+function morningLunchComplete(agentId, _d, doneMap){
+  const required = morningLunchMissions(agentId, _d);
+  if(!required.length) return false;
+  return required.every(m => doneMap && doneMap[m.id]);
+}
+
+// Loaded two different ways: a plain <script> tag in the browser (boys/
+// dashboard), where these become ordinary globals, and require() from
+// Cloud Functions (functions/index.js), which is CommonJS and needs an
+// actual module.exports. `module` only exists in the latter environment,
+// so this never runs client-side — no behavior change there.
+if(typeof module !== 'undefined' && module.exports){
+  module.exports = {
+    localDateStr, parseLocalDate,
+    buildMissions,
+    morningLunchMissions, morningLunchComplete
+  };
 }

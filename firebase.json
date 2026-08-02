@@ -2,7 +2,10 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "default"
+      "codebase": "default",
+      "predeploy": [
+        "cp \"$RESOURCE_DIR/../mission-engine.js\" \"$RESOURCE_DIR/mission-engine.js\""
+      ]
     }
   ]
 }
