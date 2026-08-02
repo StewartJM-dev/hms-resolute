@@ -14,6 +14,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 // real copy, not a duplicate that can drift the way this file's own
 // header comment warns against.
 const { parseLocalDate, morningLunchComplete } = require('./mission-engine.js');
+const { NEXTDNS_RECREATION_DOMAINS } = require('./nextdns-config.js');
 admin.initializeApp();
 
 const db = admin.database();
@@ -212,49 +213,12 @@ const NEXTDNS_PROFILE_IDS = {
   daniel: '14f911'
 };
 
-// The recreation/allowed-sites list — PER BOY, confirmed with John these
-// genuinely differ (Daniel gets numuki.com instead of the biking/carving
-// sites the older three have; Stephen alone gets the kids-cooking store
-// subdomain), not just a shared list applied identically everywhere.
-// Deliberately just data, not code, so adding real homeschool sites in
-// September (Step 5) is an edit here, never a logic change.
-const NEXTDNS_RECREATION_DOMAINS = {
-  samuel: [
-    'havefunbiking.com',
-    'scratch.mit.edu',
-    'google.com',
-    'carvingisfun.com',
-    'letthekidscook.com',
-    'kids-cooking-activities.com',
-    'typing.com'
-  ],
-  johnjr: [
-    'havefunbiking.com',
-    'scratch.mit.edu',
-    'google.com',
-    'carvingisfun.com',
-    'letthekidscook.com',
-    'kids-cooking-activities.com',
-    'typing.com'
-  ],
-  stephen: [
-    'kids-cooking-activities.com',
-    'store.kids-cooking-activities.com',
-    'carvingisfun.com',
-    'scratch.mit.edu',
-    'letthekidscook.com',
-    'typing.com',
-    'google.com'
-  ],
-  daniel: [
-    'kids-cooking-activities.com',
-    'scratch.mit.edu',
-    'numuki.com',
-    'letthekidscook.com',
-    'typing.com',
-    'google.com'
-  ]
-};
+// The recreation/allowed-sites list (NEXTDNS_RECREATION_DOMAINS) is
+// required at the top of this file from nextdns-config.js — shared with
+// the client (a boy can see the real list of sites that unlock for him on
+// his own HQ page) via the same copy-on-predeploy pattern as
+// mission-engine.js, one definition instead of a duplicate that could
+// drift between what's shown and what actually unlocks.
 
 // TODO (needs John's input before this is real): confirm whether the
 // profiles use NextDNS's "allowlist-only" mode (deny everything except

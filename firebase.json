@@ -4,7 +4,8 @@
       "source": "functions",
       "codebase": "default",
       "predeploy": [
-        "cp \"$RESOURCE_DIR/../mission-engine.js\" \"$RESOURCE_DIR/mission-engine.js\""
+        "cp \"$RESOURCE_DIR/../mission-engine.js\" \"$RESOURCE_DIR/mission-engine.js\"",
+        "cp \"$RESOURCE_DIR/../nextdns-config.js\" \"$RESOURCE_DIR/nextdns-config.js\""
       ]
     }
   ]

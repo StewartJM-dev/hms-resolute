@@ -4,3 +4,4 @@ node_modules/
 # functions deploy — the real source of truth is the root mission-engine.js;
 # this is a generated duplicate, never hand-edited, never committed.
 functions/mission-engine.js
+functions/nextdns-config.js

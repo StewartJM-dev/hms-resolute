@@ -20,6 +20,7 @@
 <script src="../push-notifications.js"></script>
 <script src="../mission-engine.js?v=20260728"></script>
 <script src="../bible-shared.js?v=20260731"></script>
+<script src="../nextdns-config.js?v=20260802"></script>
 <style>
 :root{
   --teal:#0a7a7a;--teal2:#0d9e9e;--teal3:#12c4c4;
@@ -948,6 +949,21 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
           </div>
         </div>
       </div>
+
+      <!-- Recreation Sites (nextdns-lockdown-punchlist.md follow-up) —
+           explains the unlock + lists this boy's real allowed sites, right
+           where he's checking off the missions that actually trigger it. -->
+      <div class="hw-card">
+        <div class="hw-card-head">
+          <div class="hw-card-icon">&#127760;</div>
+          <div class="hw-card-title">Recreation Sites</div>
+        </div>
+        <div class="hw-card-body">
+          <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.6;">Your Chromebook starts the day locked to HQ only. Finish every morning AND lunch mission and these sites open up automatically for the rest of the day — nobody has to unlock it for you.</div>
+          <div id="recreation-status" style="margin-bottom:12px;"></div>
+          <div id="recreation-sites-list"></div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB: TRANSMISSIONS -->
@@ -1391,6 +1407,7 @@ function selectAgent(id, codename, name, rank, theme, icon){
   loadTransmissions();
   buildLunchDayTabs();
   renderMissions();
+  renderRecreationSites();
   renderPayScreen();
   loadPrivatePreview();
   setTimeout(() => updateGroupBadge(), 1600);
@@ -1845,7 +1862,7 @@ function showTab(name, btn){
   if(btn) btn.classList.add('active');
 
   if(name === 'lunch') renderLunch();
-  if(name === 'missions') renderMissions();
+  if(name === 'missions'){ renderMissions(); renderRecreationSites(); }
   if(name === 'pay'){ renderPayScreen(); renderSuperFamilyNight(); }
   if(name === 'xbox'){ renderGameTime(); renderReadingLog(); }
   if(name === 'transmissions'){ renderTransmissions(); initGroupThreadInline(); initPrivateThreadInline(); }
@@ -2167,6 +2184,32 @@ function buildMissionsForDate(agentId, dayDate){
 // ══════════════════════════════════════════════════════
 // RENDER MISSIONS
 // ══════════════════════════════════════════════════════
+// Recreation Sites (nextdns-lockdown-punchlist.md follow-up) — reads
+// NEXTDNS_RECREATION_DOMAINS (nextdns-config.js, shared with the Cloud
+// Function that actually performs the unlock) so this list can never
+// show a boy a site that isn't really what unlocks for him. Locked/
+// unlocked status reads stewart/nextdnsUnlock/{agentId}/{date}, the
+// exact node checkNextDnsUnlock writes on a real completion.
+function renderRecreationSites(){
+  if(!currentAgent) return;
+  const listEl = document.getElementById('recreation-sites-list');
+  const statusEl = document.getElementById('recreation-status');
+  if(!listEl || !statusEl) return;
+
+  const domains = (typeof NEXTDNS_RECREATION_DOMAINS !== 'undefined' && NEXTDNS_RECREATION_DOMAINS[currentAgent.id]) || [];
+  listEl.innerHTML = domains.length
+    ? domains.map(d => `<a href="https://${d}" target="_blank" rel="noopener" style="display:block;padding:9px 12px;margin-bottom:6px;border-radius:8px;background:rgba(12,200,200,.08);border:1px solid rgba(12,200,200,.25);color:var(--teal2);font-size:12.5px;text-decoration:none;">${escapeHtml(d)} &#8594;</a>`).join('')
+    : '<div class="empty">No recreation sites configured yet.</div>';
+
+  if(!_db){ statusEl.innerHTML = ''; return; }
+  _db.ref(`stewart/nextdnsUnlock/${currentAgent.id}/${localDateStr()}`).once('value').then(snap => {
+    const unlocked = snap.val() && snap.val().unlocked;
+    statusEl.innerHTML = unlocked
+      ? '<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:rgba(74,170,106,.15);border:1px solid rgba(74,170,106,.4);color:#4aaa6a;font-family:\'Orbitron\',sans-serif;font-size:9px;letter-spacing:1px;">&#128275; UNLOCKED &mdash; enjoy!</div>'
+      : '<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-family:\'Orbitron\',sans-serif;font-size:9px;letter-spacing:1px;">&#128274; LOCKED &mdash; finish morning + lunch missions</div>';
+  });
+}
+
 function renderMissions(){
   if(!currentAgent) return;
   const el = document.getElementById('missions-list');
