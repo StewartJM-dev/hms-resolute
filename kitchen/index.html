@@ -1441,6 +1441,7 @@ function doSwap(mealName){
   }
 
   savePlan(currentPlan);
+  recordPlanChange(slot.day, slot.mealName, meal.name);
   renderPlan(currentPlan);
   renderNutrition(currentPlan);
   closeSwap();
@@ -1462,6 +1463,7 @@ function setNoMeal(){
     noMeal: true
   };
   savePlan(currentPlan);
+  recordPlanChange(slot.day, slot.mealName, 'No Meal -- not cooking');
   renderPlan(currentPlan);
   renderNutrition(currentPlan);
   closeSwap();
@@ -1581,6 +1583,140 @@ async function askTinkForRecipe(){
 }
 
 
+// ══════════════════════════════════════════════════════
+// GALLEY REPORT — DATA LAYER (galley-report-punchlist.md, Step 1)
+// Two new paths, both additive — stewart/plan itself stays exactly the
+// bare array it's always been. boys/index.html reads it, dashboard/
+// index.html's Tink-driven "add to plan" confirm flow writes it
+// directly, and functions/index.js's pantry grounding for askTink reads
+// it too — changing its shape would break all three, so nothing here
+// touches it.
+//
+// stewart/planMeta/{weekOf} — when this week's plan was created/last
+// touched, and a per-night history of pre-night edits (a swap or "no
+// meal" made in this Galley UI before that night actually arrives).
+// weekOf is the SUNDAY of the plan's own week (WEEK_SLOTS/sendToCalendar
+// above both anchor the week to "today minus today's day-of-week", i.e.
+// Sunday-start) — a DIFFERENT week-start convention than the weekly
+// report card's own Monday-anchored weekOf in functions/index.js. The
+// two never need to agree: this key only has to self-correlate edits
+// made in the same real-world week, and the report card (Step 4) reads
+// stewart/mealverification by real calendar date, not by this key.
+//
+// stewart/mealverification/{date} — one real calendar date per key
+// (unlike stewart/plan's day-NAME keys) — {plannedMeal, actualMeal,
+// followed, reason, note, verifiedBy, timestamp}. Written by Step 2's
+// Galley UI once per night; Step 4's report card reads it directly by
+// date across whatever Monday-Sunday range it needs, independent of
+// planMeta's own Sunday-start week concept.
+//
+// Known gap: dashboard/index.html's pre-existing Tink-driven plan write
+// (adding a meal to a day via chat confirm) does not call
+// recordPlanChange() below — that write path lives in a different file
+// this step doesn't touch, so an edit made that way won't show up in a
+// night's change history, only edits made directly in this Galley UI
+// will. Flagging this rather than silently under-covering it.
+// ══════════════════════════════════════════════════════
+
+function ymd(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+const WEEKDAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// The real calendar date THIS plan week's Sunday falls on (same anchor
+// sendToCalendar() above uses) — the key for stewart/planMeta.
+function planWeekSundayStr(){
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  return ymd(sunday);
+}
+// The real calendar date a given plan day-name falls on THIS plan week.
+function dateForPlanDay(dayName){
+  const idx = WEEKDAY_NAMES.indexOf(dayName);
+  if(idx < 0) return null;
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay() + idx);
+  return ymd(sunday);
+}
+// The weekday name a real calendar date falls on — the inverse of
+// dateForPlanDay, used to look up that date's stewart/plan slot (Step 2:
+// "did you make [planned meal] last night" needs yesterday's slot).
+function weekdayNameForDate(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return WEEKDAY_NAMES[new Date(y, m-1, d).getDay()];
+}
+
+// Marks this week's plan as created (first generatePlan() this week) or
+// just touched again (a second full regenerate the same week) — a
+// transaction so a second regenerate never clobbers the original
+// createdAt, which is what "on time vs. last-minute" (Step 4) reads.
+function recordPlanCreated(){
+  if(!_db) return;
+  const weekOf = planWeekSundayStr();
+  const now = Date.now();
+  _db.ref('stewart/planMeta/'+weekOf).transaction(cur => {
+    if(!cur) return { weekOf, createdAt: now, lastModifiedAt: now };
+    return { ...cur, lastModifiedAt: now };
+  });
+}
+
+// Records one night's pre-night edit (a swap or "no meal" made in this
+// Galley UI before that night arrives) — the change-history half of
+// Step 1. Same createdAt-preserving transaction as recordPlanCreated()
+// so an edit made without a prior generatePlan() this week (shouldn't
+// normally happen, but the UI doesn't strictly prevent it) still
+// backfills a sane createdAt rather than leaving it unset.
+function recordPlanChange(day, oldMealName, newMealName){
+  if(!_db || !day) return;
+  const weekOf = planWeekSundayStr();
+  const now = Date.now();
+  _db.ref('stewart/planMeta/'+weekOf).transaction(cur => {
+    if(!cur) return { weekOf, createdAt: now, lastModifiedAt: now };
+    return { ...cur, lastModifiedAt: now };
+  });
+  _db.ref('stewart/planMeta/'+weekOf+'/history/'+day).push({
+    from: oldMealName || '', to: newMealName || '', at: now
+  });
+}
+
+// Fixed dropdown — kept as the primary field (not free text) so Step 4's
+// report card can aggregate real patterns across weeks instead of
+// parsing prose. "note" (optional, in recordMealVerification below)
+// carries "Other" detail or any added context on top of a chosen reason.
+const MEAL_VERIFICATION_REASONS = [
+  'Ran out of time',
+  'Missing ingredient',
+  'Family preference that night',
+  'Leftovers instead',
+  'Ate out',
+  'Other'
+];
+
+// Writes one night's verification. `date` is the real calendar date
+// (YYYY-MM-DD) the dinner actually happened on — resolve it against
+// stewart/plan's day-name slots with dateForPlanDay/weekdayNameForDate
+// above, never assume "today". `.set()`, not `.push()` — date is
+// already a natural unique key, one verification per night.
+function recordMealVerification(date, opts){
+  opts = opts || {};
+  if(!_db || !date) return Promise.resolve();
+  const followed = !!opts.followed;
+  return _db.ref('stewart/mealverification/'+date).set({
+    date,
+    plannedMeal: opts.plannedMeal || '',
+    actualMeal: opts.actualMeal || '',
+    followed,
+    reason: followed ? null : (opts.reason || 'Other'),
+    note: opts.note || '',
+    verifiedBy: opts.verifiedBy || '',
+    timestamp: Date.now()
+  });
+}
+
+
 function savePlan(plan){
   if(!plan) return;
   // Strip non-serializable bits before saving
@@ -1635,6 +1771,7 @@ function loadSavedPlan(){
 function generatePlan(){
   _coreGeneratePlan();
   if(currentPlan) savePlan(currentPlan);
+  recordPlanCreated();
 }
 
 
