@@ -1114,6 +1114,13 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
         <div class="empty">Loading wishes...</div>
       </div>
 
+      <!-- RED SKY AT MORNING / NIGHT (Matthew 16:2-3) — sibling-free personal daily reports, Tom's voice -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button onclick="showRedSky('morning')" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(200,146,42,.4);background:rgba(200,146,42,.08);color:var(--gold);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;font-weight:700;cursor:pointer;">&#127749; RED SKY AT MORNING</button>
+        <button onclick="showRedSky('night')" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(200,146,42,.4);background:rgba(200,146,42,.08);color:var(--gold);font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;font-weight:700;cursor:pointer;">&#127765; RED SKY AT NIGHT</button>
+      </div>
+      <div id="redsky-content" style="display:none;margin-bottom:12px;"></div>
+
       <div style="background:var(--black);border:1px solid var(--gold);border-radius:10px;overflow:hidden;">
         <div style="font-size:9px;color:rgba(255,255,255,.4);padding:8px 13px 0;">Ask Tom anything. App questions are always free.</div>
         <div style="padding:10px 13px;max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:8px;" id="tom-messages"></div>
@@ -3369,6 +3376,34 @@ async function renderTomWishCounter(){
       <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,.4);margin-top:2px;">UNLOCK TOMORROW</div>
     </div>` : ''}
   `;
+}
+
+// Red Sky at Morning / Red Sky at Night (combined-batch-punchlist.md
+// Part 7) — calls the same generateRedSkyReport Cloud Function for both;
+// the server decides the target day and, for Night, whether it's
+// actually earned yet (gated server-side, not just hidden client-side).
+async function showRedSky(type){
+  if(!currentAgent) return;
+  const el = document.getElementById('redsky-content');
+  if(!el) return;
+  el.style.display = 'block';
+  const label = type === 'morning' ? 'Red Sky at Morning' : 'Red Sky at Night';
+  el.innerHTML = `<div style="background:rgba(200,146,42,.1);border:1px solid rgba(200,146,42,.4);border-radius:10px;padding:14px;text-align:center;">
+    <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;color:var(--gold);margin-bottom:6px;">${label.toUpperCase()}</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.6);">Reading the sky<span class="hans-thinking-dots"><span></span><span></span><span></span></span></div>
+  </div>`;
+  try{
+    const res = await callFunction('generateRedSkyReport', { agentId: currentAgent.id, type });
+    const result = res && res.data;
+    if(!result || !result.message) throw new Error('Empty Red Sky response');
+    const locked = !!result.locked;
+    el.innerHTML = `<div style="background:${locked?'rgba(255,255,255,.04)':'rgba(200,146,42,.1)'};border:1px solid ${locked?'rgba(255,255,255,.15)':'rgba(200,146,42,.4)'};border-radius:10px;padding:14px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;color:${locked?'rgba(255,255,255,.4)':'var(--gold)'};margin-bottom:8px;text-align:center;">${label.toUpperCase()}${locked?' — LOCKED':''}</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.9);line-height:1.55;">${result.message.replace(/</g,'&lt;')}</div>
+    </div>`;
+  }catch(e){
+    el.innerHTML = `<div style="background:rgba(139,48,16,.15);border:1px solid rgba(139,48,16,.3);border-radius:10px;padding:14px;text-align:center;font-size:12px;color:#cc5533;">Couldn't read the sky right now — try again in a moment.</div>`;
+  }
 }
 
 async function askTomChat(){

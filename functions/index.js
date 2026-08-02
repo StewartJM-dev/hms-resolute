@@ -2456,6 +2456,133 @@ exports.closeTeachMeVote = functions
   });
 
 // ════════════════════════════════════════════════════
+// RED SKY AT MORNING / RED SKY AT NIGHT (combined-batch-punchlist.md
+// Part 7) — Matthew 16:2-3, "When it is evening, ye say, It will be fair
+// weather... can ye not discern the signs of the times?" Two personal
+// daily reports per boy, Tom's voice, live in Compass — zero sibling
+// data, ever. Reuses the parent report card's scoping discipline (one
+// boy's own real numbers, nothing invented) but for a single day, not a
+// week, and in Tom's voice, not a parent-facing summary.
+// ════════════════════════════════════════════════════
+
+// Own White Glove rooms only for the given day — whichever room(s) he
+// was the assigned officer for (or "All Hands"), across any inspection
+// window, pass/fail. Never another boy's room. Mirrors mission-engine.js's
+// wgFailedRoomsForAgent()'s officer-scoping exactly, but returns pass AND
+// fail (Red Sky at Night needs to celebrate a real pass, not just flag
+// failures) rather than only failures.
+function ownWhiteGloveRoomsForDay(wgDay, agentId) {
+  const rooms = [];
+  if (!wgDay) return rooms;
+  ['morning', 'afternoon', 'evening'].forEach(win => {
+    const winRooms = (wgDay[win] && wgDay[win].rooms) || {};
+    Object.entries(winRooms).forEach(([roomId, r]) => {
+      if (!r || r.na) return;
+      if (r.officer !== agentId && r.officer !== 'all') return;
+      const passed = ['trash', 'dishes', 'clothing', 'floor', 'counters'].every(k => r[k] === true);
+      rooms.push({ room: WG_ROOM_LABELS[roomId] || roomId, window: win, passed });
+    });
+  });
+  return rooms;
+}
+
+async function fetchRedSkyDayData(agentId, dateStr) {
+  const [scoreSnap, eligibleSnap, deductionSnap, wishSnap, strikeSnap, wgSnap] = await Promise.all([
+    db.ref(`stewart/scores/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/eligible/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/wishes/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/strikes/${agentId}/${dateStr}`).once('value'),
+    db.ref(`stewart/whiteglove/${dateStr}`).once('value')
+  ]);
+  const deductions = deductionSnap.val() || {};
+  const wishes = wishSnap.val() || {};
+  const strikeRec = strikeSnap.val() || {};
+  return {
+    date: dateStr,
+    score: scoreSnap.val(),
+    eligible: eligibleSnap.val(),
+    deductionReasons: Object.keys(deductions).filter(k => k !== 'outOfTime'),
+    ranOutOfTime: deductions.outOfTime !== undefined,
+    wishesEarned: wishes.earned || 0,
+    wishesUsed: wishes.used || 0,
+    strikeCount: strikeRec.count || 0,
+    strikeIncidents: Object.values(strikeRec.incidents || {}),
+    ownWhiteGloveRooms: ownWhiteGloveRoomsForDay(wgSnap.val(), agentId)
+  };
+}
+
+const RED_SKY_MATTHEW_INTRO = `This is his FIRST time ever seeing a Red Sky report. Open by referencing Matthew 16:2-3 naturally, briefly (one or two sentences woven in, not a sermon) — Jesus's own words: "When it is evening, ye say, It will be fair weather: for the sky is red. And in the morning, It will be foul weather to day: for the sky is red and lowering... can ye not discern the signs of the times?" Tie it to how a sailor learns to read the sky as warning or promise — that's what these two reports are for him now.`;
+
+const RED_SKY_SCHEMA = {
+  type: 'object',
+  properties: { message: { type: 'string' } },
+  required: ['message'],
+  additionalProperties: false
+};
+
+async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const roleInstructions = type === 'morning'
+    ? `This is RED SKY AT MORNING — he's just opened it, reviewing YESTERDAY. Forward-looking and gentle: name what actually went rough yesterday if anything did (a low score, a strike, a failed White Glove room, running out of time) plainly but without dwelling — then pivot firmly to today as a fresh start, "let's not repeat yesterday's mistakes," never a scolding. If yesterday was genuinely clean (good score, no strikes, rooms passed), say so plainly and warmly — don't manufacture a rough patch that isn't in the data. 2-4 sentences.`
+    : `This is RED SKY AT NIGHT — today's good report, only ever shown after every one of today's missions is actually done, so this IS a real earned moment. Celebrate today specifically and concretely (real numbers, real specifics — which rooms he passed, wishes earned, a clean conduct day) — warm, proud, earned, not generic cheerleading. If something today wasn't perfect despite finishing all missions (a strike, a failed room) still be honest about it, but the overall frame stays a genuine win — he finished the mission. 2-4 sentences.`;
+  const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
+
+  const response = await anthropic.messages.create({
+    model: TOM_MODEL,
+    max_tokens: 400,
+    system,
+    output_config: { format: { type: 'json_schema', schema: RED_SKY_SCHEMA } },
+    messages: [{ role: 'user', content: `${agentName}'s real data for ${dayData.date}:\n${JSON.stringify(dayData)}` }]
+  });
+  await logTomUsage(agentId, response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).message;
+}
+
+exports.generateRedSkyReport = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .https.onCall(async (data, callableContext) => {
+    const { agentId, type } = data || {};
+    if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
+    }
+    if (type !== 'morning' && type !== 'night') {
+      throw new functions.https.HttpsError('invalid-argument', 'type must be "morning" or "night".');
+    }
+
+    const agentName = AGENT_DISPLAY_NAMES[agentId];
+    const age = AGENT_AGES[agentId];
+
+    let targetDate;
+    if (type === 'morning') {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      targetDate = easternDateStr(y);
+    } else {
+      targetDate = easternDateStr();
+      // Night is gated on full chore completion, server-side — a real
+      // earned moment, not just a client-side hide a boy could route
+      // around by calling the function directly.
+      const eligSnap = await db.ref(`stewart/eligible/${agentId}/${targetDate}`).once('value');
+      const elig = eligSnap.val();
+      const allDone = !!(elig && elig.total > 0 && elig.completed >= elig.total);
+      if (!allDone) {
+        return { locked: true, message: "Not tonight, sailor — finish today's missions first. This one's earned." };
+      }
+    }
+
+    const dayData = await fetchRedSkyDayData(agentId, targetDate);
+    const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
+    const seenSnap = await seenRef.once('value');
+    const isFirstTime = !seenSnap.val();
+    if (isFirstTime) await seenRef.set(true);
+
+    const message = await generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime);
+    return { locked: false, message, date: targetDate };
+  });
+
+// ════════════════════════════════════════════════════
 // MEDALS — Step 5: criteria checker
 // All 5 criteria are modeled as "how many consecutive qualifying days does
 // he currently have" — even the two that read as weekly checks (zero
