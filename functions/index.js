@@ -1857,11 +1857,19 @@ async function fetchExceptionsByDate(dates) {
   return byDate;
 }
 
+// Session Timer (session-timer-punchlist.md) — matches boys/index.html's
+// own SESSION_WINDOW_KEYS/SESSION_CAP_SECONDS exactly. No shared module
+// between client and Cloud Functions to enforce this automatically (same
+// caveat as KJV_BOOK_ALIASES and AGENT_AGES elsewhere in this file) —
+// keep them in sync if either changes.
+const SESSION_WINDOW_KEYS = ['session1', 'session2', 'session3'];
+const SESSION_WINDOW_CAP_SECONDS = 30 * 60;
+
 async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
 
-  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations, reflectionSnaps] = await Promise.all([
+  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations, reflectionSnaps, sessiontimeSnaps] = await Promise.all([
     Promise.all(dates.map(date => db.ref(`stewart/scores/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/eligible/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/deductions/${agentId}/${date}`).once('value'))),
@@ -1873,7 +1881,13 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
     // Today's Reflection (Part 4) — distinct from the 40-day Courage Dare,
     // date-keyed (not program-day-numbered) so it reads the same way
     // scores/deductions/etc. above already do, straight across `dates`.
-    Promise.all(dates.map(date => db.ref(`stewart/selfassessment/${agentId}/${date}`).once('value')))
+    Promise.all(dates.map(date => db.ref(`stewart/selfassessment/${agentId}/${date}`).once('value'))),
+    // Session Timer (session-timer-punchlist.md, Step 4) — already
+    // guaranteed boy-only, parent-oversight-free data at the source
+    // (startSessionTimer/the heartbeat that writes this are never invoked
+    // for an assist/parent-view login in the first place), so there's
+    // nothing extra to filter out here, unlike Muster's household counts.
+    Promise.all(dates.map(date => db.ref(`stewart/sessiontime/${agentId}/${date}`).once('value')))
   ]);
 
   const days = dates.map((date, i) => {
@@ -1888,6 +1902,19 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
     // instead of reading a null/low day as a performance dip. null when
     // no exception applies, same shape mission-engine.js's own reader uses.
     const exception = findExceptionForAgent(exceptionsByDate && exceptionsByDate[date], agentId);
+    // Session Timer (Step 4) — a window with no node at all that day is
+    // null (never logged into during it), distinct from one that exists
+    // with 0 elapsed (logged in but immediately left) — same "missing
+    // data" vs. "real zero" distinction the rest of this file already
+    // draws elsewhere (e.g. exceptionType vs. a genuine null score).
+    const sessiontimeDay = sessiontimeSnaps[i].val() || {};
+    const sessions = {};
+    SESSION_WINDOW_KEYS.forEach(key => {
+      const w = sessiontimeDay[key];
+      sessions[key] = (w && typeof w.elapsedSeconds === 'number')
+        ? { elapsedSeconds: w.elapsedSeconds, ranOver: w.elapsedSeconds > SESSION_WINDOW_CAP_SECONDS }
+        : null;
+    });
     return {
       date,
       exceptionType: exception ? exception.type : null,
@@ -1912,7 +1939,8 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
       wishesEarned: wishes.earned || 0,
       wishesUsed: wishes.used || 0,
       strikeCount: strikeRec.count || 0,
-      strikeIncidents
+      strikeIncidents,
+      sessions
     };
   });
 
@@ -1928,7 +1956,14 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
     totalStrikes: days.reduce((a, d) => a + d.strikeCount, 0),
     unkindDays: days.filter(d => d.strikeIncidents.some(inc => inc.category === 'unkind')).length,
     daysOutOfTime: days.filter(d => d.ranOutOfTime).length,
-    daysException: days.filter(d => d.exceptionType).length
+    daysException: days.filter(d => d.exceptionType).length,
+    // Session Timer (Step 4) — pre-tallied across all 3 windows × every day
+    // in the week, so the write-up can cite a real week-level pattern
+    // ("maxed every session" or "barely used any") without recounting the
+    // nested per-day sessions objects itself.
+    sessionsPossible: days.length * SESSION_WINDOW_KEYS.length,
+    sessionsUsedCount: days.reduce((a, d) => a + SESSION_WINDOW_KEYS.filter(k => d.sessions[k] !== null).length, 0),
+    sessionsMaxedCount: days.reduce((a, d) => a + SESSION_WINDOW_KEYS.filter(k => d.sessions[k] && d.sessions[k].elapsedSeconds >= SESSION_WINDOW_CAP_SECONDS).length, 0)
   };
 
   // Courage Dare is program-day-numbered, not calendar-date-keyed, so
@@ -2388,6 +2423,8 @@ Include a short, natural mention of what a boy's been asking Tom about, woven in
 Each boy's data also carries "couragedareCompletedThisWeek" (a count — the 40-day Courage Dare devotional) and, separately, "reflectionCompletedThisWeek"/"reflections" (Today's Reflection, a distinct 5-question private daily form — strength/mission/step/practice/tomorrow — NOT the same thing as Courage Dare, don't conflate them). Mention completion counts for both briefly if either is 0 for the week (say so plainly, don't pad) or notably strong (most/all weekdays). "reflections" holds the actual entries for days he filled one out — if something in a specific field stands out as worth John/Dawn knowing (a real struggle named in "step," a genuine goal in "tomorrow"), you may reference it gently and non-judgmentally, the same restraint you'd use for a Tom conversation — this is his own private self-reflection, not a behavior log.
 
 Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{forWho,txt,how}]}) and "crowsnest" ([{txt}]) — prayer requests attributed to him (either he submitted it himself, or someone else's request was clearly for him by name) and Crow's Nest praise/gratitude entries he personally logged that week. These are genuine spiritual-life signals worth a brief, warm mention if present — a boy bringing a real prayer request, one of his being answered, or him logging something he saw God do all say something worth John/Dawn knowing, distinct from the chore/behavior data. Don't force a mention if both are empty; one clause at most, don't dwell on it. Don't quote a prayer request or praise entry verbatim if it's sensitive-sounding — summarize gently, the same restraint you'd use for a Tom conversation.
+
+Each boy's data also carries "totals.sessionsPossible"/"sessionsUsedCount"/"sessionsMaxedCount" — pre-tallied across his 3 daily session windows (morning/after-lunch/after-dinner screen-time windows) × every day this week; use these three numbers directly rather than recounting his per-day "sessions" objects yourself. Only worth a mention if a real week-level PATTERN shows up — consistently maxing nearly every session (sessionsMaxedCount close to sessionsPossible), or barely using the time at all (sessionsUsedCount low relative to sessionsPossible) — not for an ordinary, unremarkable week of usage, which needs no comment at all. Each day's own "sessions" object ({session1/session2/session3}, each either null — never logged into that window — or {elapsedSeconds, ranOver}) is there only for citing one specific day if something stands out (e.g. a day that ran well over 30 minutes in a window) — never state a day's session sat unused unless its entry is genuinely null. Keep this to at most one clause; it's minor context next to the chore/behavior data, not a headline.
 
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
