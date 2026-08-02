@@ -187,7 +187,58 @@ function getMyDinnerSide(agentId, _d){
 //
 // `dollars` below is a SEPARATE, independently-computed figure — actual
 // cash pay follows its own rule (see below), not a derivative of the score.
-function calculateDayScore(agentId, missions, doneMap){
+// White Glove -> pay accountability (combined-batch-punchlist.md Part 5).
+// Maps a mission to the White Glove room it represents, if any — used
+// below to zero a mission's PAY (not its score/game-time) when that room
+// fails inspection. Category-based for the fixed always-present chores
+// (every boy's own bedroom, whoever's on kitchen/bathroom duty), plus
+// explicit ids for the room-specific floor missions where the 'floors'
+// category alone spans more rooms than just one.
+function wgRoomForMission(mission){
+  if(mission.category === 'bedroom') return 'berths';
+  if(mission.category === 'kitchen') return 'galley';
+  if(mission.category === 'bathroom') return 'head';
+  if(mission.id === 'floor-living') return 'commondeck';
+  if(mission.id === 'floor-kitchen') return 'galley';
+  return null;
+}
+const WG_CATEGORY_KEYS = ['trash','dishes','clothing','floor','counters'];
+// Pure — given one day's raw stewart/whiteglove/{date} value (all three
+// inspection windows) and an agentId, returns the Set of WG room ids that
+// FAILED for this agent, using each room's LATEST inspected window that
+// day (not "any failure ever that day") — a boy who fixes a room and
+// passes a later re-inspection isn't still penalized for the earlier one.
+// A room assigned to 'all' (All Hands) counts against every agent equally
+// — nobody individually owns it, but nobody's exempt from it either.
+function wgFailedRoomsForAgent(whiteGloveDay, agentId){
+  const failed = new Set();
+  if(!whiteGloveDay) return failed;
+  const windows = ['morning','afternoon','evening'].filter(w => whiteGloveDay[w]);
+  const roomIds = new Set();
+  windows.forEach(w => { const rooms = whiteGloveDay[w].rooms || {}; Object.keys(rooms).forEach(r => roomIds.add(r)); });
+  roomIds.forEach(roomId => {
+    // Latest window (by array order above) that actually rated this room.
+    let latest = null;
+    windows.forEach(w => { const r = whiteGloveDay[w].rooms && whiteGloveDay[w].rooms[roomId]; if(r) latest = r; });
+    if(!latest || latest.na) return;
+    if(latest.officer !== agentId && latest.officer !== 'all') return;
+    const passed = WG_CATEGORY_KEYS.every(k => latest[k] === true);
+    if(!passed) failed.add(roomId);
+  });
+  return failed;
+}
+
+// opts.failedWgMissionIds (optional Set/array of mission ids) zeroes
+// those specific missions out of PAY only — eligibleCompleted/dollars —
+// never earned/possible/pct/points100. Matches this file's own
+// established points100-vs-dollars decoupling: game time and wishes stay
+// based on raw completion, exactly as already decided when `dollars` was
+// first split out as its own independently-computed figure. A room that
+// failed White Glove doesn't erase that the chore was actually attempted;
+// it just means it wasn't done to standard, which is a pay question, not
+// a "did he try" question.
+function calculateDayScore(agentId, missions, doneMap, opts){
+  const failedWgMissionIds = (opts && opts.failedWgMissionIds) ? new Set(opts.failedWgMissionIds) : null;
   const payMissions = missions.filter(m => m.category !== 'computer');
   const possible = payMissions.reduce((sum,m) => sum + (m.points||0), 0);
   const earned = payMissions.reduce((sum,m) => sum + (doneMap[m.id] ? (m.points||0) : 0), 0);
@@ -207,7 +258,14 @@ function calculateDayScore(agentId, missions, doneMap){
   // anywhere in the app (report card, both weekly chore-log grids) — one
   // definition, not a third one invented per surface.
   const eligibleMissions = missions.filter(m => m.category !== 'computer' && m.category !== 'officer-of-the-watch');
-  const eligibleCompleted = eligibleMissions.filter(m => doneMap[m.id]).length;
+  // A WG-failed mission stays IN the denominator (it was still a real,
+  // assigned, payable mission that day) but drops OUT of the completed
+  // count even if checked off — that's what actually reduces the day's
+  // pay. Removing it from both would leave his percentage (and so his
+  // pay) completely unchanged whenever he'd finished everything, which
+  // would make this whole feature a no-op for the exact case it exists
+  // to catch: paid for work not actually done to standard.
+  const eligibleCompleted = eligibleMissions.filter(m => doneMap[m.id] && !(failedWgMissionIds && failedWgMissionIds.has(m.id))).length;
   const eligibleTotal = eligibleMissions.length;
   const dollars = eligibleTotal > 0 ? (eligibleCompleted / eligibleTotal) : 0;
 
@@ -301,8 +359,9 @@ function recalculateScore(agentId, dateStr){
     _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value'),
     _db.ref(`stewart/transferAdjust/${agentId}/${dateStr}`).once('value'),
     _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value'),
-    _db.ref(`stewart/exceptions/${dateStr}`).once('value')
-  ]).then(([mSnap, tSnap, dSnap, eSnap]) => {
+    _db.ref(`stewart/exceptions/${dateStr}`).once('value'),
+    _db.ref(`stewart/whiteglove/${dateStr}`).once('value')
+  ]).then(([mSnap, tSnap, dSnap, eSnap, wgSnap]) => {
     const done = mSnap.val() || {};
     const transferAdjust = tSnap.val() || 0;
     const deductions = dSnap.val() || {};
@@ -321,7 +380,11 @@ function recalculateScore(agentId, dateStr){
     }
 
     const missions = buildMissions(agentId, dayDate);
-    const base = calculateDayScore(agentId, missions, done);
+    // White Glove -> pay accountability (Part 5): missions whose room
+    // failed inspection lose their pay share even if checked off.
+    const failedRooms = wgFailedRoomsForAgent(wgSnap.val(), agentId);
+    const failedWgMissionIds = missions.filter(m => failedRooms.has(wgRoomForMission(m))).map(m => m.id);
+    const base = calculateDayScore(agentId, missions, done, { failedWgMissionIds });
 
     let score = base.points100;
     score += transferAdjust;
@@ -343,7 +406,13 @@ function recalculateScore(agentId, dateStr){
       // alongside the percentage score without needing its own copy of
       // buildMissions to compute one (the report card in particular runs
       // server-side, where mission-engine.js isn't loaded at all).
-      _db.ref(`stewart/eligible/${agentId}/${dateStr}`).set({ completed: base.eligibleCompleted, total: base.eligibleTotal })
+      _db.ref(`stewart/eligible/${agentId}/${dateStr}`).set({ completed: base.eligibleCompleted, total: base.eligibleTotal }),
+      // Visibility (Part 5's "not silent" requirement) — which of his own
+      // missions lost pay to a failed room today, if any, so his own Pay
+      // tab can say why instead of a number just quietly coming up short.
+      // null (not just empty) when nothing failed, so a page can tell
+      // "checked, nothing failed" apart from "hasn't loaded yet."
+      _db.ref(`stewart/wgPayImpact/${agentId}/${dateStr}`).set(failedWgMissionIds.length ? failedWgMissionIds : null)
     ]);
   });
 }

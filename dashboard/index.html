@@ -3269,6 +3269,15 @@ function saveWhiteGloveInspection(){
     loggedAt: Date.now()
   }).then(() => {
     renderWhiteGlove();
+    // White Glove -> pay accountability (Part 5): recalculate every boy
+    // named as responsible for a room this inspection (or all four, if
+    // any room was "All Hands") right away, rather than waiting for some
+    // unrelated later action to happen to trigger it.
+    const officers = new Set(WG_ROOMS.map(r => roomsCopy[r.id].officer).filter(Boolean));
+    const agentIds = officers.has('all') ? AGENTS.map(a=>a.id) : Array.from(officers).filter(o => o !== 'all');
+    if(typeof recalculateScore === 'function'){
+      agentIds.forEach(id => recalculateScore(id, today));
+    }
   });
 }
 

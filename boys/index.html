@@ -2220,13 +2220,15 @@ function renderPayScreen(){
     _db.ref(`stewart/pay/${currentAgent.id}`).once('value'),
     _db.ref(`stewart/transfers`).once('value'),
     _db.ref(`stewart/weekly/${currentAgent.id}/${weekStart}`).once('value'),
-    _db.ref(`stewart/deductions/${currentAgent.id}`).once('value')
-  ]).then(([sSnap, paySnap, tSnap, wSnap, dSnap]) => {
+    _db.ref(`stewart/deductions/${currentAgent.id}`).once('value'),
+    _db.ref(`stewart/wgPayImpact/${currentAgent.id}`).once('value')
+  ]).then(([sSnap, paySnap, tSnap, wSnap, dSnap, wgSnap]) => {
     const scores = sSnap.val() || {};
     const pay = paySnap.val() || {};
     const transferData = tSnap.val() || {};
     const weeklyDone = wSnap.val() || {};
     const allDeductions = dSnap.val() || {};
+    const wgPayImpact = wgSnap.val() || {};
 
     let totalDollars = 0;
     const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
@@ -2327,6 +2329,26 @@ function renderPayScreen(){
         deductionNote += '</div>';
       }
 
+      // White Glove -> pay accountability (Part 5) — "not silent": say
+      // exactly which chore(s) lost pay and why, same visual pattern as
+      // the deduction notes right above.
+      let wgNote = '';
+      const weekWgDays = weekDays.filter(d => wgPayImpact[d] && wgPayImpact[d].length);
+      if(weekWgDays.length){
+        wgNote = '<div style="margin-bottom:12px;">';
+        weekWgDays.forEach(date => {
+          const d = new Date(date);
+          const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+          const dayMissions = buildMissions(currentAgent.id, d);
+          wgPayImpact[date].forEach(missionId => {
+            const m = dayMissions.find(mm => mm.id === missionId);
+            const label = m ? m.text : missionId;
+            wgNote += `<div style="font-size:11px;color:#cc5533;background:rgba(139,48,16,.1);border-radius:6px;padding:5px 9px;margin-bottom:4px;">&#9875; ${dayName} &mdash; "${label}" didn't count — the room didn't pass White Glove that day</div>`;
+          });
+        });
+        wgNote += '</div>';
+      }
+
       const familyNightHtml = familyNightUnlocked
         ? `<div style="background:linear-gradient(135deg,var(--teal),var(--indigo));border-radius:12px;padding:16px;text-align:center;margin-bottom:14px;border:2px solid var(--gold);">
             <div style="font-size:28px;margin-bottom:6px;">&#127881;</div>
@@ -2359,6 +2381,7 @@ function renderPayScreen(){
         <div id="ship-account"></div>
         ${transferNote}
         ${deductionNote}
+        ${wgNote}
         ${familyNightHtml}`;
       renderShipAccount(currentAgent.id);
     });
