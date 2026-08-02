@@ -1798,7 +1798,7 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
 
-  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations] = await Promise.all([
+  const [scoreSnaps, eligibleSnaps, deductionSnaps, wishSnaps, strikeSnaps, couragedareSnap, growthNoteSnap, tomConversations, reflectionSnaps] = await Promise.all([
     Promise.all(dates.map(date => db.ref(`stewart/scores/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/eligible/${agentId}/${date}`).once('value'))),
     Promise.all(dates.map(date => db.ref(`stewart/deductions/${agentId}/${date}`).once('value'))),
@@ -1806,7 +1806,11 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
     Promise.all(dates.map(date => db.ref(`stewart/strikes/${agentId}/${date}`).once('value'))),
     db.ref(`stewart/couragedare/progress/${agentId}`).once('value'),
     db.ref(`stewart/growth/boynotes/${agentId}`).once('value'),
-    fetchTomChatWeekData(agentId, weekStartMs, weekEndMs)
+    fetchTomChatWeekData(agentId, weekStartMs, weekEndMs),
+    // Today's Reflection (Part 4) — distinct from the 40-day Courage Dare,
+    // date-keyed (not program-day-numbered) so it reads the same way
+    // scores/deductions/etc. above already do, straight across `dates`.
+    Promise.all(dates.map(date => db.ref(`stewart/selfassessment/${agentId}/${date}`).once('value')))
   ]);
 
   const days = dates.map((date, i) => {
@@ -1872,12 +1876,20 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
     .filter(entry => entry && typeof entry.completedAt === 'number' && entry.completedAt >= weekStartMs && entry.completedAt < weekEndMs)
     .sort((a, b) => a.completedAt - b.completedAt);
 
+  // Today's Reflection (Part 4) — only real, non-empty entries, in order,
+  // so the write-up can cite specifics without wading through blank days.
+  const reflections = dates
+    .map((date, i) => ({ date, ...(reflectionSnaps[i].val() || {}) }))
+    .filter(r => r.strength || r.mission || r.step || r.practice || r.tomorrow);
+
   return {
     agentId,
     agentName: AGENT_DISPLAY_NAMES[agentId] || agentId,
     days,
     totals,
     couragedareCompletedThisWeek: couragedareThisWeek.length,
+    reflectionCompletedThisWeek: reflections.length,
+    reflections,
     growthNote: growthNoteSnap.val() || null,
     tomConversations
   };
@@ -2194,6 +2206,8 @@ Each day also carries a "ranOutOfTime" flag (true/false) — set from the Bridge
 CRITICAL — Exception Days: a day can carry "exceptionType" (e.g. "Travel/Campout", "Sick Day", "Doctor's Visit", "Holiday", or a custom type) and "exceptionNote". On that day, score/eligibleCompleted/eligibleTotal are null — same as a weekend — because normal chore expectations were deliberately lifted, NOT because he underperformed. This is the single most important rule in this whole prompt: NEVER read an exception day as a slump, a bad day, or a gap in the data to explain away — name it plainly and matter-of-factly instead, the same way you'd note a weekend ("Friday was a planned campout, no chores were expected" — not "chores dropped off Friday" or any phrasing that implies something went wrong). If totals.daysException is 0, say nothing about it. If a boy had a rough-looking stretch of low scores or missed strikes RIGHT AROUND an exception day, check whether the exception explains it before characterizing it as a pattern — an exception day breaks a streak calculation, it doesn't represent a bad one.
 
 Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
+
+Each boy's data also carries "couragedareCompletedThisWeek" (a count — the 40-day Courage Dare devotional) and, separately, "reflectionCompletedThisWeek"/"reflections" (Today's Reflection, a distinct 5-question private daily form — strength/mission/step/practice/tomorrow — NOT the same thing as Courage Dare, don't conflate them). Mention completion counts for both briefly if either is 0 for the week (say so plainly, don't pad) or notably strong (most/all weekdays). "reflections" holds the actual entries for days he filled one out — if something in a specific field stands out as worth John/Dawn knowing (a real struggle named in "step," a genuine goal in "tomorrow"), you may reference it gently and non-judgmentally, the same restraint you'd use for a Tom conversation — this is his own private self-reflection, not a behavior log.
 
 Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{forWho,txt,how}]}) and "crowsnest" ([{txt}]) — prayer requests attributed to him (either he submitted it himself, or someone else's request was clearly for him by name) and Crow's Nest praise/gratitude entries he personally logged that week. These are genuine spiritual-life signals worth a brief, warm mention if present — a boy bringing a real prayer request, one of his being answered, or him logging something he saw God do all say something worth John/Dawn knowing, distinct from the chore/behavior data. Don't force a mention if both are empty; one clause at most, don't dwell on it. Don't quote a prayer request or praise entry verbatim if it's sensitive-sounding — summarize gently, the same restraint you'd use for a Tom conversation.
 
