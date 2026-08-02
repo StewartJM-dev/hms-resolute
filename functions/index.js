@@ -1224,6 +1224,42 @@ function tomNudgeContextBlock(nudges) {
   return `\n\nYour own recent moderation corrections to THIS boy, for your reference only — do not bring these up unprompted, but if he asks why you corrected him or references it, you can explain using exactly what's below and nothing else (no other boy's thread, no group chat, no sibling conversations):\n${lines}`;
 }
 
+// White Glove pattern coaching (combined-batch-punchlist.md Part 9) —
+// his own real results only, last two weeks, rooms he was actually the
+// assigned officer for (or "All Hands"). Day-of-week is included on
+// purpose: a room that fails the same weekday repeatedly reads as a
+// scheduling problem, not a character one, and Tom can only coach that
+// distinction accurately if he can see the real pattern, not just guess.
+const TOM_WG_CONTEXT_WINDOW_DAYS = 14;
+async function recentWhiteGloveForAgent(agentId) {
+  const dates = [];
+  for (let i = 0; i < TOM_WG_CONTEXT_WINDOW_DAYS; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(easternDateStr(d));
+  }
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/whiteglove/${date}`).once('value')));
+  const entries = [];
+  dates.forEach((date, i) => {
+    const windows = snaps[i].val() || {};
+    Object.values(windows).forEach(win => {
+      Object.entries(win.rooms || {}).forEach(([roomId, room]) => {
+        if (!room || room.na) return;
+        if (room.officer !== agentId && room.officer !== 'all') return;
+        const dayOfWeek = parseDateStr(date).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+        entries.push({ date, dayOfWeek, room: WG_ROOM_LABELS[roomId] || roomId, passed: !!room.metStandard });
+      });
+    });
+  });
+  return entries.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function tomWhiteGloveContextBlock(entries) {
+  if (!entries.length) return '';
+  const lines = entries.map(e => `- ${e.date} (${e.dayOfWeek}): ${e.room} — ${e.passed ? 'passed' : 'did not pass'}`).join('\n');
+  return `\n\nHis own real White Glove inspection results from the last two weeks, for your reference only — do not bring this up unprompted, but if he asks why he keeps failing inspection, or a devotional/discipline-adjacent conversation genuinely touches on it, you can coach from exactly this list. A room that fails the same day of the week repeatedly is a scheduling pattern worth naming as such, not a character flaw — notice the difference if it's there. Never reference another boy's rooms or results, and never invent a pattern beyond what's actually in this list:\n${lines}`;
+}
+
 // Answers a boy's question in Tom's voice, classified into exactly one
 // category. Devotional citations are grounded against the real local KJV
 // (never trusting the model's own quote), and interest/website suggestions
@@ -1288,7 +1324,10 @@ exports.askTom = functions
 
     const sanitizedHistory = sanitizeHistory(history);
     const overBudget = (await getMonthlyBudgetSpent(agentId)) >= TOM_BUDGET_CAP_USD;
-    const nudges = await recentTomNudgesForAgent(agentId);
+    const [nudges, wgPattern] = await Promise.all([
+      recentTomNudgesForAgent(agentId),
+      recentWhiteGloveForAgent(agentId)
+    ]);
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -1299,7 +1338,7 @@ exports.askTom = functions
     const response = await anthropic.messages.create({
       model: TOM_MODEL,
       max_tokens: 500,
-      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}${tomNudgeContextBlock(nudges)}`,
+      system: `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}${tomNudgeContextBlock(nudges)}${tomWhiteGloveContextBlock(wgPattern)}`,
       output_config: { format: { type: 'json_schema', schema: TOM_RESPONSE_SCHEMA } },
       messages: [
         ...sanitizedHistory,
@@ -1926,6 +1965,12 @@ async function fetchWhiteGloveWeekData(dates) {
   ALLOWED_AGENT_IDS.forEach(id => { byBoy[id] = { assigned: 0, passed: 0 }; });
   const byRoom = {};
   Object.keys(WG_ROOM_LABELS).forEach(id => { byRoom[id] = { label: WG_ROOM_LABELS[id], assigned: 0, passed: 0 }; });
+  // Day-of-week clustering (Part 9) — a room/boy failing the same
+  // weekday repeatedly reads as a scheduling problem, not a character
+  // one, and that distinction only shows up if it's broken out this way
+  // rather than folded into one flat weekly total.
+  const byDayOfWeek = {};
+  ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].forEach(d => { byDayOfWeek[d] = { assigned: 0, passed: 0 }; });
 
   let totalInspections = 0;
   let totalPassed = 0;
@@ -1934,6 +1979,7 @@ async function fetchWhiteGloveWeekData(dates) {
   dates.forEach((date, i) => {
     const windows = snaps[i].val() || {};
     days[date] = windows;
+    const dayOfWeek = parseDateStr(date).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
     Object.values(windows).forEach(win => {
       Object.entries(win.rooms || {}).forEach(([roomId, room]) => {
         totalInspections++;
@@ -1942,6 +1988,8 @@ async function fetchWhiteGloveWeekData(dates) {
           byRoom[roomId].assigned++;
           if (room.metStandard) byRoom[roomId].passed++;
         }
+        byDayOfWeek[dayOfWeek].assigned++;
+        if (room.metStandard) byDayOfWeek[dayOfWeek].passed++;
         // 'all' ("All Hands") and unassigned rooms aren't attributed to one boy.
         if (ALLOWED_AGENT_IDS.includes(room.officer)) {
           byBoy[room.officer].assigned++;
@@ -1955,7 +2003,7 @@ async function fetchWhiteGloveWeekData(dates) {
   // directly instead of manually counting nested per-day/per-window JSON —
   // that manual counting is exactly what produced a wrong "0 for 4" claim
   // about the berths during testing.
-  return { days, summary: { totalInspections, totalPassed, byBoy, byRoom } };
+  return { days, summary: { totalInspections, totalPassed, byBoy, byRoom, byDayOfWeek } };
 }
 
 // Teach Me Vote fold-in (combined-batch-punchlist.md Part 3, last bullet).
@@ -2230,7 +2278,7 @@ Each boy's data also carries "prayer" ({submitted:[{forWho,txt,by}], answered:[{
 
 Never invent a detail, a day, or an incident that isn't in the data you're given. Keep each boy's summary to a tight paragraph or two — a parent should be able to read all four in under a minute. Plain prose, no markdown headers or bullet lists within a summary (the surrounding UI already provides structure).
 
-The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy or per room), use the pre-tallied numbers in whiteglove.summary.byBoy and whiteglove.summary.byRoom directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic.
+The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy, per room, or per day-of-week), use the pre-tallied numbers in whiteglove.summary.byBoy, whiteglove.summary.byRoom, and whiteglove.summary.byDayOfWeek directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic. byDayOfWeek is only worth mentioning if a real weekday clustering shows up (e.g. most failures landing on the same one or two weekdays) — that's a scheduling pattern worth naming, distinct from a general consistency problem; don't force a mention if the failures are just spread evenly across the week.
 
 "teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it.
 
