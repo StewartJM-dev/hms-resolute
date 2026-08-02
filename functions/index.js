@@ -1104,6 +1104,8 @@ Catchphrases — use naturally where they genuinely fit, don't force more than o
 
 T.O.M. reveal: if a boy directly asks what "Tom" or "T.O.M." stands for, or who/what you are, tell him exactly: "T.O.M.? Today's On-Call Mate — and tomorrow's too, if you want to know the truth. I don't take a day off, sailor." Never volunteer this unprompted — only on a direct ask.
 
+Grace and reconciliation (combined-batch-punchlist.md Part 8b) — a real, recurring theme in who you are, grounded in Matthew 7:12 and Luke 6:31 (treat others as you'd want treated) and Matthew 22:36-40 (love God, love your neighbor — "on these two commandments hang all the law and the prophets"). When a boy brings you a real conflict, a moment he handled badly, or guilt over something he did — devotional territory, not sibling-referee territory — grace is a genuine lens you reach for: he's not defined by the worst thing he did today, making it right matters more than being right, and forgiveness (received and given) is real and available, not just a nice idea. Cite an actual verse when one is genuinely relevant, same standard as your devotional grounding elsewhere — never invented, never paraphrased as if it were a direct quote. This is a theme in your character, not a new free-standing feature — it shows up naturally inside devotional conversations he already brings you, the same wish-spend rules as any other devotional question.
+
 What actually exists in HMS Resolute today, for app-help questions — never invent functionality beyond this:
 - Daily missions/chores, weekdays only. Completing them earns points, which become pay and game time.
 - Wishes: completing 1/3 of a day's chores earns 1 wish, 2/3 earns 2, all of it earns 3. Wishes earned today can be spent starting TOMORROW, not the same day — and unused wishes stack up.
@@ -1268,7 +1270,7 @@ exports.askTom = functions
     async function moderateAndRespond(category) {
       const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', question);
       const message = tomModerationNudgeText(category, count);
-      await pushTomModerationNudge(agentId, message);
+      await pushTomModerationNudge(agentId, message, category);
       if (category === 'unkind') {
         await notifyParentsOfUnkindMessage(agentId, agentName, question, 'tomchat', String(Date.now()));
       }
@@ -1511,13 +1513,28 @@ async function recordStrike(agentId, date, category, source, text) {
   return result.snapshot.val();
 }
 
+// Grace & reconciliation (combined-batch-punchlist.md Part 8a) — after an
+// UNKINDNESS strike specifically, a genuinely separate follow-up message
+// (never appended to the nudge itself, so it reads as its own thought,
+// not a qualifier softening the correction above it) inviting him to make
+// it right with the other person. An offer, never a requirement — not
+// tracked anywhere, not gated behind, doesn't touch or erase the strike
+// or the parent notification that already happened. Fixed, static text
+// rather than AI-generated — a carefully-worded, pre-approved invitation
+// is safer here than letting a model freelance grace language to a kid
+// mid-moderation-event.
+const TOM_RECONCILIATION_NUDGE = "No pressure here, sailor — but if there's someone on the other end of that, making it right with them is always open to you. Not because you have to. Because it's who you actually want to be.";
+
 // Lands in the same private thread parents use (stewart/messages/{agentId})
 // rather than Tom's own separate Compass chat, so John/Dawn naturally see
 // it too without a dedicated notification for every Category A incident.
 // No `agentId` field on purpose — that's what tells moderatePrivateMessage
 // to skip re-classifying Tom's own nudge when this write re-triggers it.
-async function pushTomModerationNudge(agentId, text) {
+async function pushTomModerationNudge(agentId, text, category) {
   await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text, timestamp: Date.now() });
+  if (category === 'unkind') {
+    await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text: TOM_RECONCILIATION_NUDGE, timestamp: Date.now() + 1 });
+  }
 }
 
 // Unlike gibberish/spam, unkindness is never deleted — it stays visible in
@@ -1612,7 +1629,7 @@ exports.moderateGroupChatMessage = functions
 
     if (category === 'unkind') {
       const count = await recordStrike(m.agentId, easternDateStr(), category, 'groupchat', m.text);
-      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('unkind', count));
+      await pushTomModerationNudge(m.agentId, tomModerationNudgeText('unkind', count), 'unkind');
       await notifyParentsOfUnkindMessage(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId, m.text, 'groupchat', context.params.msgId);
       if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(m.agentId, AGENT_DISPLAY_NAMES[m.agentId] || m.agentId);
       await snap.ref.update({ moderation: category });
@@ -1656,7 +1673,7 @@ exports.moderatePrivateMessage = functions
 
     if (category === 'unkind') {
       const count = await recordStrike(agentId, easternDateStr(), category, 'private', m.text);
-      await pushTomModerationNudge(agentId, tomModerationNudgeText('unkind', count));
+      await pushTomModerationNudge(agentId, tomModerationNudgeText('unkind', count), 'unkind');
       await notifyParentsOfUnkindMessage(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId, m.text, 'private', context.params.msgId);
       if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, AGENT_DISPLAY_NAMES[agentId] || agentId);
       await snap.ref.update({ moderation: category });
