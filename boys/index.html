@@ -1053,6 +1053,23 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
           <div id="self-assessment-saved" style="font-size:10px;color:#4aaa6a;text-align:center;margin-top:6px;display:none;">&#10003; Saved to your agent file</div>
         </div>
       </div>
+      <!-- PRIVATE JOURNAL (combined-batch-punchlist.md Part 12) — genuinely
+           private: unlike Today's Reflection above, this never appears in
+           the weekly report card or anywhere a parent can read it. -->
+      <div class="hw-card">
+        <div class="hw-card-head">
+          <div class="hw-card-icon">&#128220;</div>
+          <div class="hw-card-title">My Journal</div>
+        </div>
+        <div class="hw-card-body">
+          <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;line-height:1.6;">Write whatever's actually on your mind — nobody reads this, not Mom, not Dad, not your brothers. If something you write about keeps coming up, Tom might gently nudge you to talk to Mom or Dad about it — but never what you wrote, just an invitation.</div>
+          <textarea id="journal-input" placeholder="Write here..." maxlength="2000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(12,200,200,.3);background:var(--dark2);color:var(--white);font-family:'Exo 2',sans-serif;font-size:13px;resize:vertical;min-height:80px;margin-bottom:8px;"></textarea>
+          <button onclick="saveJournalEntry()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--teal);color:var(--black);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">SAVE ENTRY</button>
+          <div id="journal-saved" style="font-size:10px;color:#4aaa6a;text-align:center;margin-top:6px;display:none;">&#10003; Saved — just for you</div>
+          <div id="journal-entries" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
       <div class="sec-head" style="margin-top:18px;">
         <div class="sec-head-diamond"></div>
         <div class="sec-head-text">Teach Me Vote</div>
@@ -1521,7 +1538,7 @@ function showTab(name, btn){
   if(name === 'pay'){ renderPayScreen(); renderSuperFamilyNight(); }
   if(name === 'xbox'){ renderGameTime(); renderReadingLog(); }
   if(name === 'transmissions'){ renderTransmissions(); initGroupThreadInline(); initPrivateThreadInline(); }
-  if(name === 'training'){ renderSelfAssessment(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
+  if(name === 'training'){ renderSelfAssessment(); renderJournalEntries(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
   if(name === 'compass'){ initTomChat(); renderTomWishCounter(); }
   if(name === 'word') renderWordTab();
 }
@@ -4419,6 +4436,51 @@ function saveSelfAssessment(){
       savedEl.style.display = 'block';
       setTimeout(() => { savedEl.style.display = 'none'; }, 3000);
     }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// PRIVATE JOURNAL (combined-batch-punchlist.md Part 12)
+// stewart/journal/{agentId}/{pushId} = {text, timestamp} — his own entries
+// only. Never read by dashboard/index.html or bridge/index.html — the
+// only two things that ever come OUT of this path toward a parent are
+// Tom's own topic-only classification records (functions/index.js), which
+// never carry raw text. Append-only (push, not set) — this is a real
+// journal, not a single daily form that gets overwritten.
+// ══════════════════════════════════════════════════════
+function renderJournalEntries(){
+  if(!currentAgent || !_db) return;
+  const el = document.getElementById('journal-entries');
+  if(!el) return;
+  _db.ref(`stewart/journal/${currentAgent.id}`).limitToLast(20).once('value', snap => {
+    const entries = Object.values(snap.val() || {}).sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
+    if(!entries.length){ el.innerHTML = ''; return; }
+    el.innerHTML = '<div style="font-family:\'Orbitron\',sans-serif;font-size:8px;letter-spacing:2px;color:var(--teal2);margin-bottom:6px;">PAST ENTRIES</div>' +
+      entries.map(e => {
+        const when = new Date(e.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        return `<div style="border-top:1px solid rgba(255,255,255,.08);padding:8px 0;">
+          <div style="font-size:9px;color:rgba(255,255,255,.35);margin-bottom:3px;">${when}</div>
+          <div style="font-size:12.5px;color:rgba(255,255,255,.85);white-space:pre-wrap;line-height:1.5;">${escapeHtml(e.text)}</div>
+        </div>`;
+      }).join('');
+  });
+}
+
+function saveJournalEntry(){
+  if(!currentAgent || !_db) return;
+  const input = document.getElementById('journal-input');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  _db.ref(`stewart/journal/${currentAgent.id}`).push({
+    text, timestamp: Date.now()
+  }).then(() => {
+    input.value = '';
+    const savedEl = document.getElementById('journal-saved');
+    if(savedEl){
+      savedEl.style.display = 'block';
+      setTimeout(() => { savedEl.style.display = 'none'; }, 3000);
+    }
+    renderJournalEntries();
   });
 }
 

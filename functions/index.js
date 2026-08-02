@@ -2835,6 +2835,158 @@ exports.generateDawnDailyReport = functions
   });
 
 // ════════════════════════════════════════════════════
+// PRIVATE JOURNAL — TOM'S DUAL NUDGE (combined-batch-punchlist.md Part 12)
+// stewart/journal/{agentId}/{pushId} = {text, timestamp} — a boy's own,
+// genuinely private entries. This section's entire design exists to
+// answer one question safely: when something recurs across MULTIPLE
+// separate entries (not a one-off), (a) gently nudge the boy himself to
+// talk to Mom/Dad, and (b) tell John/Dawn a bare topic category — never
+// content, never a quote, never a paraphrase close enough to reconstruct
+// what he actually wrote.
+//
+// The privacy guarantee here is structural, not just a prompt
+// instruction: the ONLY call that ever sees raw journal text
+// (classifyJournalPattern) is constrained by JSON schema to output
+// nothing but one value from a fixed, closed enum — it is not physically
+// possible for that call to return free text, a summary, or a quote. The
+// two things built FROM that category (the boy's nudge, the parent
+// prompt) are separate calls/templates that are only ever given the
+// category string itself — they never see the raw entries at all, so
+// there's nothing in their own context to leak even if they tried.
+// ════════════════════════════════════════════════════
+
+// Deliberately closed, not free text — this is what makes "can't be
+// reverse-engineered into what he actually wrote" a real guarantee
+// instead of a hope. Broad enough to be useful to a parent, vague enough
+// that knowing the category tells you nothing about the specifics.
+const JOURNAL_TOPIC_CATEGORIES = [
+  'Friendships', 'Family relationships', 'School or learning', 'Emotions or mood',
+  'Body or health', 'Faith or spiritual struggle', 'Confidence or self-esteem', 'Something else'
+];
+
+// A genuine pattern needs at least this many total entries to even
+// consider — recurrence across 1-2 entries isn't recurrence, it's just
+// what he happened to write about recently.
+const JOURNAL_MIN_ENTRIES_FOR_PATTERN = 3;
+// Don't re-flag the exact same category again for at least this long —
+// once is enough to prompt a conversation; nagging the boy and his
+// parents daily about the same already-surfaced thing isn't the goal.
+const JOURNAL_RECHECK_COOLDOWN_MS = 21 * 24 * 60 * 60 * 1000;
+
+const JOURNAL_CLASSIFY_SCHEMA = {
+  type: 'object',
+  properties: {
+    category: { type: 'string', enum: [...JOURNAL_TOPIC_CATEGORIES, 'none'] }
+  },
+  required: ['category'],
+  additionalProperties: false
+};
+
+// The ONLY function in this whole feature that ever reads raw journal
+// text. Schema-enum-constrained output is the actual safeguard — even a
+// misbehaving or manipulated model literally cannot return anything
+// outside JOURNAL_TOPIC_CATEGORIES or 'none'.
+async function classifyJournalPattern(entries) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const system = `You are reviewing a boy's private journal entries for his own eyes only — you will never repeat, quote, summarize, or paraphrase any of this content to anyone; your only output is a single category label. Look for a topic that genuinely RECURS across multiple SEPARATE entries (not just repeated within one entry, and not just a single mention) — something that keeps coming up for him. If a real recurring theme exists, return the single closest category from the fixed list. If nothing recurs — the entries are about different things, or only one entry touches a given topic — return "none". Do not return "none" just because a topic is heavy or sensitive; heaviness isn't the test, recurrence is. Do not invent a pattern that isn't genuinely there across multiple entries.`;
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 50,
+    system,
+    output_config: { format: { type: 'json_schema', schema: JOURNAL_CLASSIFY_SCHEMA } },
+    messages: [{ role: 'user', content: `Entries, oldest first:\n${entries.map((e, i) => `${i + 1}. ${e.text}`).join('\n\n')}` }]
+  });
+  await logTinkUsage('claude-sonnet-4-6', response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).category;
+}
+
+const JOURNAL_NUDGE_SCHEMA = { type: 'object', properties: { message: { type: 'string' } }, required: ['message'], additionalProperties: false };
+
+// Given ONLY the category — never the raw entries — writes the private,
+// in-voice nudge that lands in the boy's own thread. Safe by
+// construction: there is no raw content in this call's context for it to
+// leak even if it tried.
+async function generateJournalBoyNudge(agentId, agentName, age, category) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\nHe's been journaling privately about something touching on "${category}" more than once lately — you don't know the specifics and never will, only that this general area keeps coming up for him. Write a short, gentle, private nudge (2-3 sentences) encouraging him to talk to Mom or Dad about it — an invitation, not a push, no guilt, no implication that journaling was wrong or that he's in trouble. Don't say the word "journal" explicitly — naming it outright reads like surveillance. Keep it feeling like Tom noticing him, not monitoring him.`;
+  const response = await anthropic.messages.create({
+    model: TOM_MODEL,
+    max_tokens: 200,
+    system,
+    output_config: { format: { type: 'json_schema', schema: JOURNAL_NUDGE_SCHEMA } },
+    messages: [{ role: 'user', content: `Category: ${category}` }]
+  });
+  await logTomUsage(agentId, response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).message;
+}
+
+// Fixed template, not AI-generated — for the parent-facing notification
+// specifically, a static template built from nothing but the category
+// name is a stronger guarantee than trusting a model prompt every time,
+// and there's no real benefit to variability here the way there is for
+// Tom's own voice elsewhere.
+function journalParentPromptText(agentName, category) {
+  return {
+    title: `Might be worth a check-in — ${agentName}`,
+    body: `A topic around "${category}" has come up more than once for ${agentName} lately, in his own private journal. Nothing urgent, and no specifics to share — just worth a conversation with him when the moment feels right.`
+  };
+}
+
+// Runs daily. Per boy: skip entirely if nothing's changed since the last
+// check (no wasted Anthropic calls), skip if too few entries exist yet
+// for "recurrence" to mean anything, skip if the same category was
+// already flagged within the cooldown window. Only on a genuine, fresh
+// pattern does anything get written or sent.
+exports.detectJournalPatterns = functions
+  .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
+  .pubsub.schedule('0 7 * * *')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    for (const agentId of ALLOWED_AGENT_IDS) {
+      try {
+        const [entriesSnap, metaSnap] = await Promise.all([
+          db.ref(`stewart/journal/${agentId}`).once('value'),
+          db.ref(`stewart/journalPatterns/${agentId}/_meta`).once('value')
+        ]);
+        const entries = Object.values(entriesSnap.val() || {})
+          .filter(e => e && e.text && typeof e.timestamp === 'number')
+          .sort((a, b) => a.timestamp - b.timestamp);
+        if (entries.length < JOURNAL_MIN_ENTRIES_FOR_PATTERN) continue;
+
+        const meta = metaSnap.val() || {};
+        if (meta.lastCheckedEntryCount === entries.length) continue; // nothing new since last check
+
+        const category = await classifyJournalPattern(entries);
+        await db.ref(`stewart/journalPatterns/${agentId}/_meta`).update({ lastCheckedEntryCount: entries.length, lastCheckedAt: Date.now() });
+        if (category === 'none') continue;
+
+        const cooldownActive = meta.lastFlaggedCategory === category &&
+          meta.lastFlaggedAt && (Date.now() - meta.lastFlaggedAt) < JOURNAL_RECHECK_COOLDOWN_MS;
+        if (cooldownActive) continue;
+
+        const agentName = AGENT_DISPLAY_NAMES[agentId];
+        const age = AGENT_AGES[agentId];
+
+        const boyMessage = await generateJournalBoyNudge(agentId, agentName, age, category);
+
+        await db.ref(`stewart/journalPatterns/${agentId}`).push({ category, timestamp: Date.now() });
+        await db.ref(`stewart/journalPatterns/${agentId}/_meta`).update({ lastFlaggedCategory: category, lastFlaggedAt: Date.now() });
+
+        // Two SEPARATE deliveries — never the same message reused for both.
+        await db.ref(`stewart/messages/${agentId}`).push({ from: 'Tom', text: boyMessage, timestamp: Date.now() });
+        await db.ref(`stewart/journalTopicPrompts/${agentId}`).push({ category, timestamp: Date.now() });
+        const parentMsg = journalParentPromptText(agentName, category);
+        await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, parentMsg.title, parentMsg.body, 'bridge/')));
+      } catch (e) {
+        console.error('detectJournalPatterns failed for', agentId, e);
+      }
+    }
+    return null;
+  });
+
+// ════════════════════════════════════════════════════
 // MEDALS — Step 5: criteria checker
 // All 5 criteria are modeled as "how many consecutive qualifying days does
 // he currently have" — even the two that read as weekly checks (zero
