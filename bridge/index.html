@@ -610,6 +610,11 @@ body{
     <div class="shead" style="margin-top:22px;">Teach Me Suggestions</div>
     <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Real website and family-day ideas generated once this week's Teach Me topic wins the vote — nothing shows up for the boys until you approve it.</div>
     <div id="teachme-approvals" style="margin-bottom:8px;"></div>
+
+    <!-- PRIVATE JOURNAL — TOPIC-ONLY PROMPTS (combined-batch-punchlist.md Part 12) -->
+    <div class="shead" style="margin-top:22px;">Worth a Check-In</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Tom noticed a topic recurring in a boy's own private journal — never the content, just the general area, and only when it's come up more than once. Nothing to approve here, just something worth knowing.</div>
+    <div id="journal-topic-prompts" style="margin-bottom:8px;"></div>
   </div>
 
   <!-- ===== INSTRUMENTS TAB ===== -->
@@ -1333,7 +1338,7 @@ function showBTab(name, btn){
   document.querySelectorAll('.bnav').forEach(b=>b.classList.remove('active'));
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
-  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); renderShipPending(); renderTeachMeApprovals(); }
+  if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); renderShipPending(); renderTeachMeApprovals(); renderJournalTopicPrompts(); }
   if(name==='helm'){ renderReportCard(); }
   if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
@@ -1657,6 +1662,45 @@ function resolveTeachMeWebsite(weekKey, key, status){
 function resolveTeachMeFamilyDay(weekKey, status){
   if(!_db) return;
   _db.ref('stewart/teachvote/'+weekKey+'/familyDaySuggestion').update({status, resolvedAt: Date.now()});
+}
+
+// ════════════════════════════════════════════
+// PRIVATE JOURNAL — TOPIC-ONLY PROMPTS (combined-batch-punchlist.md Part
+// 12). Reads stewart/journalTopicPrompts/{agentId} — category + timestamp
+// only, written server-side by detectJournalPatterns (functions/index.js).
+// This page never reads stewart/journal itself — the raw entries aren't
+// even a path this UI has any reason to touch.
+// ════════════════════════════════════════════
+function renderJournalTopicPrompts(){
+  if(!_db) return;
+  const el = document.getElementById('journal-topic-prompts');
+  if(!el) return;
+  Promise.all(AGENTS.map(a => _db.ref('stewart/journalTopicPrompts/'+a.id).once('value'))).then(snaps => {
+    const rows = [];
+    snaps.forEach((snap, i) => {
+      const entries = snap.val() || {};
+      Object.entries(entries).forEach(([key, e]) => {
+        if(e && !e.dismissed) rows.push({agentId: AGENTS[i].id, agentName: AGENTS[i].name, key, ...e});
+      });
+    });
+    if(!rows.length){
+      el.innerHTML = '<div style="font-size:12px;opacity:.5;font-style:italic;">Nothing flagged.</div>';
+      return;
+    }
+    rows.sort((a,b) => (b.timestamp||0)-(a.timestamp||0));
+    el.innerHTML = rows.map(r => {
+      const when = r.timestamp ? new Date(r.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+      return '<div style="padding:9px 0;border-bottom:1px solid rgba(200,146,42,.2);">'+
+        '<div style="font-weight:700;font-size:13px;color:var(--cream,#f7f2ea);">'+esc(r.agentName)+' — '+esc(r.category)+'</div>'+
+        '<div style="font-size:11px;opacity:.6;margin-top:2px;">Flagged '+when+'</div>'+
+        '<button onclick="dismissJournalTopicPrompt(\''+r.agentId+'\',\''+r.key+'\')" style="margin-top:6px;padding:6px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:none;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;">Mark as seen</button>'+
+        '</div>';
+    }).join('');
+  });
+}
+function dismissJournalTopicPrompt(agentId, key){
+  if(!_db) return;
+  _db.ref('stewart/journalTopicPrompts/'+agentId+'/'+key).update({dismissed: true}).then(renderJournalTopicPrompts);
 }
 
 // ════════════════════════════════════════════
