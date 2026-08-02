@@ -206,10 +206,10 @@ exports.notifyShipAccountResolved = functions.database
 // NEXTDNS_API_KEY is a Cloud Functions secret (same pattern as
 // ANTHROPIC_API_KEY), never committed to source.
 const NEXTDNS_PROFILE_IDS = {
-  samuel: null,  // TODO: John's NextDNS profile ID for Samuel
-  johnjr: null,  // TODO: John's NextDNS profile ID for John Jr.
-  stephen: null, // TODO: John's NextDNS profile ID for Stephen
-  daniel: null   // TODO: John's NextDNS profile ID for Daniel
+  samuel: 'f4d5a2',
+  johnjr: '1e7d2d',
+  stephen: 'cc245e',
+  daniel: '14f911'
 };
 
 // The recreation/allowed-sites list — same list unlocked for every boy's
