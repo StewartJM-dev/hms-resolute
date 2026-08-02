@@ -873,6 +873,10 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
        boy's own login (initSessionTimerDisplay), never for parent
        assist/oversight views. -->
   <div id="session-timer-bar" style="margin:2px 14px 10px;"></div>
+  <!-- Step 3: Hans's end-of-session prompt — its own dismissible banner,
+       not the Ship's Orders modal, since it needs to appear the instant
+       the active window hits 0:00 no matter which tab is open. -->
+  <div id="session-hans-prompt" style="margin:0 14px 10px;"></div>
 
   <!-- CONTENT -->
   <div class="content">
@@ -1615,6 +1619,8 @@ function renderSessionTimerBar(){
   const color = sessionColorForRemaining(remaining);
   const liveIdx = SESSION_WINDOW_KEYS.indexOf(liveWindow);
 
+  maybeShowSessionEndPrompt(currentAgent.id, liveWindow, remaining);
+
   const summaryParts = SESSION_WINDOW_KEYS.map((key, idx) => {
     const label = SESSION_WINDOW_LABELS[key];
     if(key === liveWindow){
@@ -1643,6 +1649,49 @@ function renderSessionTimerBar(){
       <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;flex-wrap:wrap;">
         ${summaryParts.join('')}
       </div>
+    </div>`;
+}
+
+// session-timer-punchlist.md, Step 3 — Hans's end-of-session prompt.
+// remaining===0 here specifically means the boy is LIVE in this window
+// right now and has genuinely used the whole 30 minutes (liveElapsedForWindow
+// sources from the in-memory _sessionTimer for whichever window is active),
+// not just a stale display of some past completed window.
+const _sessionEndPromptShown = {}; // in-memory guard against a double-fire within one page load
+function maybeShowSessionEndPrompt(agentId, windowKey, remaining){
+  if(remaining > 0) return;
+  const date = localDateStr();
+  const key = 'sessionend-' + agentId + '-' + date + '-' + windowKey;
+  if(_sessionEndPromptShown[key]) return;
+  let seen = false;
+  try { seen = localStorage.getItem(key) === '1'; } catch(e){}
+  if(seen) return;
+  _sessionEndPromptShown[key] = true;
+  try { localStorage.setItem(key, '1'); } catch(e){}
+
+  _db.ref(`stewart/missions/${agentId}/${date}`).once('value').then(snap => {
+    const done = snap.val() || {};
+    const missions = buildMissions(agentId);
+    const total = missions.length;
+    const completed = missions.filter(m => done[m.id]).length;
+    const contextNote = `${SESSION_WINDOW_LABELS[windowKey]}'s 30-minute window just ran out while he was actively using it — informational only, not a forced logout.`;
+    getHansLine('sessionEnd', currentAgent.name, completed, total, { contextNote }).then(renderSessionHansPrompt);
+  });
+}
+
+function renderSessionHansPrompt(text){
+  const el = document.getElementById('session-hans-prompt');
+  if(!el) return;
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:flex-start;background:rgba(200,146,42,.14);border:1.5px solid rgba(200,146,42,.4);border-radius:12px;padding:10px 12px;">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(200,146,42,.14);border:2px solid rgba(200,146,42,.4);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+        <img src="assets/hans.png" alt="Hans" style="width:100%;height:100%;object-fit:contain;">
+      </div>
+      <div style="flex:1;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:var(--gold);margin-bottom:3px;">HANS</div>
+        <div style="font-size:12.5px;color:rgba(255,255,255,.9);line-height:1.5;">${text}</div>
+      </div>
+      <button onclick="document.getElementById('session-hans-prompt').innerHTML=''" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:16px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0;" title="Dismiss">&times;</button>
     </div>`;
 }
 
@@ -3196,6 +3245,27 @@ const HANS_LINES = {
     "{NAME}! Reporting for duty, I see. HQ is proud of you already, and it's not even done yet.",
     "Well if it isn't Agent {NAME}. Back in Gimmelshtump we had a saying — actually never mind, just go do great things today.",
     "There you are, {NAME}! Every great mission starts with showing up. You've already done that part!"
+  ],
+  // session-timer-punchlist.md, Step 3: fires when a session window's 30
+  // minutes run out while it's actively being used.
+  sessionEnd: [
+    "Agent {NAME}, that session clock just hit zero! Might be a good moment to log off and bank the rest of your day. Purely a suggestion — I once ignored every clock I ever owned and look how THAT turned out.",
+    "Time's up on this one, {NAME}! No alarms, no sirens, just a friendly nudge from HQ: probably a good time to step away for now. You can always come back next session!",
+    "Beep beep, Agent {NAME} — session's out of runway. Nothing forced, just Hans being Hans: maybe log off for a bit? Worked wonders for my blood pressure, allegedly."
+  ],
+  // session-timer-punchlist.md, Step 3b: an honest, non-alarming nudge when
+  // this morning's session window passed with no login at all.
+  missedSession: [
+    "Agent {NAME}, HQ noticed this morning's session came and went without a check-in. No big speech here — just wanted you to know you're a little behind on the day's missions. Plenty of day left. Let's get after it!",
+    "{NAME}! Looks like the morning window slipped by unused. Happens to the best of us — I once missed an ENTIRE evil scheme because I overslept. Nothing lost that can't be caught up. Let's go!",
+    "Heads up, Agent {NAME} — this morning's session passed by without you. Just letting you know, honestly, no fuss. Today's still very much winnable. Onward!"
+  ],
+  // session-timer-punchlist.md, Step 3b: a genuine compliment for finishing
+  // early, with real session time still on the clock.
+  efficiency: [
+    "Agent {NAME}! Every mission done, and with real time STILL on the clock?! That's not luck, that's skill. I once finished an evil scheme early and it turned out I'd skipped a step. You didn't skip anything. Impressive!",
+    "{NAME}, look at you — finished with time to spare! That's genuine efficiency, Agent, the kind I've been chasing my whole career and never once caught. Take the win!",
+    "Whoa, Agent {NAME} — all done AND time left over? That's the good kind of surprising. HQ is officially impressed. Go enjoy the rest of your session!"
   ]
 };
 
@@ -3359,7 +3429,8 @@ async function getHansLine(triggerType, name, completed, total, extra){
     total,
     missionNames: extra.missionNames || [],
     deductionReason: extra.deductionReason || null,
-    streak: typeof extra.streak === 'number' ? extra.streak : null
+    streak: typeof extra.streak === 'number' ? extra.streak : null,
+    contextNote: extra.contextNote || null
   };
   for(let attempt = 1; attempt <= 2; attempt++){
     try {
@@ -3419,12 +3490,28 @@ function runHansEngine(){
     _db.ref(`stewart/scores/${agentId}/${yesterday}`).once('value'),
     _db.ref(`stewart/deductions/${agentId}/${yesterday}`).once('value'),
     _db.ref(`stewart/missions/${agentId}/${yesterday}`).once('value'),
-    calculateStreak(agentId)
-  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap, streak]) => {
+    calculateStreak(agentId),
+    _db.ref(`stewart/sessiontime/${agentId}/${today}`).once('value')
+  ]).then(([mSnap, dSnap, yScoreSnap, yDedSnap, yMissionSnap, streak, stSnap]) => {
     const done = mSnap.val() || {};
     const missions = buildMissions(agentId);
     const total = missions.length;
     const completed = missions.filter(m => done[m.id]).length;
+
+    // Session-timer context (session-timer-punchlist.md, Step 3b) — a
+    // fresh read here rather than reusing Step 2's display cache, since
+    // this can run before that cache is populated and the two have no
+    // guaranteed ordering relative to each other.
+    const sessionData = stSnap.val() || {};
+    const liveSessionWindow = currentSessionWindowKey();
+    const session1Elapsed = (sessionData.session1 && sessionData.session1.elapsedSeconds) || 0;
+    // "Missed" means the window has already closed (we're logging in
+    // during session2 or session3) with zero recorded use — not simply
+    // "session1 isn't the live window," which would also be true for a
+    // perfectly normal session2/session3 login on a day session1 WAS used.
+    const missedSession1 = liveSessionWindow !== 'session1' && session1Elapsed <= 0;
+    const liveWindowElapsed = (sessionData[liveSessionWindow] && sessionData[liveSessionWindow].elapsedSeconds) || 0;
+    const sessionRemainingSeconds = Math.max(0, SESSION_CAP_SECONDS - liveWindowElapsed);
 
     const deductions = dSnap.val() || {};
     const deductionTotal = Object.values(deductions).reduce((a,b)=>a+b,0);
@@ -3472,10 +3559,31 @@ function runHansEngine(){
       state.evening = true;
     }
 
-    // 3. MILESTONE: all done (Hans, once per day) — always good
+    // 3. EFFICIENCY (session-timer-punchlist.md, Step 3b) — a more specific
+    // version of the plain MILESTONE right below: all missions done AND
+    // real time still left in the active session window (not just finished
+    // in the window's last few seconds). Checked first so it wins whenever
+    // both are true, and marks state.allDone too so the generic milestone
+    // check doesn't also fire for the same moment.
+    const SESSION_EFFICIENCY_THRESHOLD_SEC = 60;
+    if(completed >= total && total > 0 && !state.allDone && !state.efficiencyShown && sessionRemainingSeconds > SESSION_EFFICIENCY_THRESHOLD_SEC){
+      toPost.push({persona:'hans', triggerType:'efficiency', contextNote:`He just finished every mission for the day with about ${Math.round(sessionRemainingSeconds/60)} minutes still left in ${SESSION_WINDOW_LABELS[liveSessionWindow]}.`});
+      state.allDone = true;
+      state.efficiencyShown = true;
+    }
+
+    // 3b. MILESTONE: all done (Hans, once per day) — always good
     if(completed >= total && total > 0 && !state.allDone){
       toPost.push({persona:'hans', triggerType:'allDone'});
       state.allDone = true;
+    }
+
+    // 3c. MISSED SESSION 1 (session-timer-punchlist.md, Step 3b) — noted
+    // honestly, once per day, on the first login that happens after
+    // session1's window has already closed with none of it used.
+    if(missedSession1 && !state.missedSessionShown){
+      toPost.push({persona:'hans', triggerType:'missedSession', contextNote:"He had no login at all before 11:30am, so this morning's session window passed with none of it used."});
+      state.missedSessionShown = true;
     }
 
     // 4. DEDUCTION NOTED (once per day) — fire if a deduction appeared
@@ -3514,7 +3622,7 @@ function runHansEngine(){
     if(!el || !toPost.length) return;
     const item = toPost[0];
 
-    getHansLine(item.triggerType, name, completed, total, {missionNames, deductionReason, streak}).then(text => {
+    getHansLine(item.triggerType, name, completed, total, {missionNames, deductionReason, streak, contextNote: item.contextNote}).then(text => {
       const bg = 'rgba(200,146,42,.14)';
       const border = 'rgba(200,146,42,.4)';
       const nameColor = 'var(--gold)';

@@ -192,7 +192,7 @@ Rules for every line you write:
 - Write exactly 2-3 sentences. No markdown, no lists, no emoji, no quotation marks around the whole thing.
 - Stay in character as Hans at all times.`;
 
-function buildHansUserPrompt({ triggerType, agentName, completed, total, missionNames, deductionReason, streak }) {
+function buildHansUserPrompt({ triggerType, agentName, completed, total, missionNames, deductionReason, streak, contextNote }) {
   const lines = [`Trigger: ${triggerType}`, `Agent name: ${agentName}`];
   if (typeof completed === 'number' && typeof total === 'number') {
     lines.push(`Missions completed: ${completed} of ${total}`);
@@ -206,6 +206,13 @@ function buildHansUserPrompt({ triggerType, agentName, completed, total, mission
   if (typeof streak === 'number' && streak > 0) {
     lines.push(`Current streak of good days in a row: ${streak}`);
   }
+  // Plain-fact context for newer trigger types (session-timer-punchlist.md,
+  // Steps 3/3b: sessionEnd, missedSession, efficiency) — a factual note the
+  // client already knows to be true, not an instruction on tone (the system
+  // prompt's rules already cover tone for every trigger).
+  if (contextNote) {
+    lines.push(contextNote);
+  }
   lines.push('Write one Hans line for this exact moment.');
   return lines.join('\n');
 }
@@ -216,7 +223,7 @@ function buildHansUserPrompt({ triggerType, agentName, completed, total, mission
 exports.generateHansLine = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, context) => {
-    const { triggerType, agentName, completed, total, missionNames, deductionReason, streak } = data || {};
+    const { triggerType, agentName, completed, total, missionNames, deductionReason, streak, contextNote } = data || {};
     if (!triggerType || !agentName) {
       throw new functions.https.HttpsError('invalid-argument', 'triggerType and agentName are required.');
     }
@@ -229,7 +236,7 @@ exports.generateHansLine = functions
       system: HANS_SYSTEM_PROMPT,
       messages: [{
         role: 'user',
-        content: buildHansUserPrompt({ triggerType, agentName, completed, total, missionNames, deductionReason, streak })
+        content: buildHansUserPrompt({ triggerType, agentName, completed, total, missionNames, deductionReason, streak, contextNote })
       }]
     });
 
