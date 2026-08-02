@@ -262,13 +262,27 @@ const NEXTDNS_RECREATION_DOMAINS = {
 // unlocking needs BOTH a denylist DELETE and an allowlist POST per domain,
 // or just the allowlist POST. Shaped for the denylist+allowlist pair per
 // the punch list's own description; adjust once that's confirmed.
+// POST adds to the list with the domain in the BODY, against the bare
+// list URL. DELETE is the opposite shape — domain in the URL PATH, no
+// body at all. Live-verified against the real NextDNS API before this was
+// fixed: DELETE with the domain in the body (matching POST's shape)
+// returned 404/"notFound" and silently deleted nothing — caught by
+// unlockRecreationSites' own .catch(), so it never crashed anything, but
+// it also never actually cleaned up a denylist entry. Doesn't break the
+// unlock itself (NextDNS's own docs: "Allowing takes precedence over
+// everything else, including security features," confirmed by testing —
+// the allowlist POST alone unlocks regardless of the denylist DELETE's
+// outcome) but was worth fixing properly rather than leaving a
+// permanently-failing best-effort cleanup call in place.
 async function nextDnsRequest(method, profileId, listType, domain) {
   const apiKey = process.env.NEXTDNS_API_KEY;
-  const url = `https://api.nextdns.io/profiles/${profileId}/${listType}`;
+  const url = method === 'DELETE'
+    ? `https://api.nextdns.io/profiles/${profileId}/${listType}/${encodeURIComponent(domain)}`
+    : `https://api.nextdns.io/profiles/${profileId}/${listType}`;
   const resp = await fetch(url, {
     method,
     headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
-    body: method === 'POST' ? JSON.stringify({ id: domain, active: true }) : JSON.stringify({ id: domain })
+    ...(method === 'POST' ? { body: JSON.stringify({ id: domain, active: true }) } : {})
   });
   if (!resp.ok) {
     throw new Error(`NextDNS ${method} ${listType} (${domain}) failed: ${resp.status} ${await resp.text()}`);
