@@ -516,13 +516,15 @@ body{
     <div class="focus" id="t-focus">—</div>
   </div>
 
+    <!-- WEEKLY REPORT CARD -->
+    <div class="shead">Weekly Report Card</div>
+    <button class="rc-checkin-btn" id="rc-checkin-btn" onclick="checkInReportCard()">Check In — Generate Now</button>
+    <div id="rc-status" class="rc-status"></div>
+    <div id="rc-content"><div class="rc-empty">Loading…</div></div>
+
     <!-- THE WEEK -->
   <div class="shead">The Seven-Day Cycle</div>
   <div class="week" id="week"></div>
-
-    <!-- CREW STATUS (live from family app) -->
-  <div class="shead">🎖️ Captain's Walkthrough — Today</div>
-  <div class="crew" id="crew"><div class="crew-loading">Reading the family channel…</div></div>
   </div>
 
   <!-- ===== COMMS TAB ===== -->
@@ -590,11 +592,9 @@ body{
     <div id="bridge-week-grid"></div>
     <div style="font-size:11px;opacity:.55;text-align:center;margin-top:6px;">Eligible chores completed each day (excludes Computer Missions &amp; Officer of the Watch), same as pay and the weekly report card. Fills as the week goes.</div>
 
-    <!-- WEEKLY REPORT CARD -->
-    <div class="shead">Weekly Report Card</div>
-    <button class="rc-checkin-btn" id="rc-checkin-btn" onclick="checkInReportCard()">Check In — Generate Now</button>
-    <div id="rc-status" class="rc-status"></div>
-    <div id="rc-content"><div class="rc-empty">Loading…</div></div>
+    <!-- CREW STATUS (live from family app) -->
+    <div class="shead">🎖️ Captain's Walkthrough — Today</div>
+    <div class="crew" id="crew"><div class="crew-loading">Reading the family channel…</div></div>
   </div>
 
   <!-- ===== SAGA TAB ===== -->
@@ -1157,7 +1157,8 @@ function showBTab(name, btn){
   document.getElementById('btab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='comms'){ loadBridgeChat(); markSourceRead('groupchat'); if(!bridgePrivateThreadAgent) openBridgeThread('samuel','Samuel', document.querySelector('#bpt-selector .filter-btn')); renderModeration(); renderScreenTimeApprovals(); renderShipPending(); }
-  if(name==='instruments'){ loadInstruments(); renderReportCard(); }
+  if(name==='helm'){ renderReportCard(); }
+  if(name==='instruments'){ loadInstruments(); }
   if(name==='word'){ loadWord(); }
   if(name==='bible'){ renderBibleTab(); }
   window.scrollTo(0,0);
@@ -2381,6 +2382,11 @@ function renderStatusBoard(crew){
 
 renderWeek();
 initFirebase();
+// Helm is the default landing tab and never gets an explicit showBTab('helm')
+// call on first paint (unlike every other tab, whose content loads lazily
+// on click) — so the Weekly Report Card needs this direct kick to appear
+// without requiring the user to navigate away and back first.
+renderReportCard();
 </script>
 
 <!-- BRIDGE BOTTOM NAV -->
