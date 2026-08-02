@@ -128,7 +128,7 @@ main{ max-width:900px; margin:14px auto 0; padding:0 14px;}
     </div>
   </div>
 
-  <a class="depart" href="../">← Depart (log out)</a>
+  <a class="depart" href="#" onclick="departShip(); return false;">← Depart (log out)</a>
 </main>
 
 <script>
@@ -137,6 +137,17 @@ try{
   const s = JSON.parse(localStorage.getItem('resolute.session')||'null');
   if(s && s.person){ document.getElementById('whoName').textContent = CREW_NAMES[s.person] || s.person; }
 }catch(e){}
+
+// Previously this link just navigated to '../' and relied on the Gangway
+// never auto-resuming a boy's session to LOOK like a logout — it never
+// actually cleared anything. Now that the Gangway correctly auto-resumes a
+// valid boy session (index.html boot()), this has to really clear the
+// session itself, or "Depart (log out)" would silently bounce right back
+// into Agent HQ instead of doing what it says.
+function departShip(){
+  try{ localStorage.removeItem('resolute.session'); }catch(e){}
+  location.href = '../';
+}
 
 function mapSay(el){
   document.getElementById('mapCaption').innerHTML = '<b>'+el.dataset.name+'</b> — '+el.dataset.sub;

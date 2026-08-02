@@ -2205,14 +2205,27 @@ async function fetchMusterWeekData(weekStartMs, weekEndMs) {
   const dayOfWeek = t => new Date(t).toLocaleDateString('en-US', { weekday: 'long', timeZone: FAMILY_TIMEZONE });
 
   const byBoy = {};
+  const loginTimestampsByBoy = {}; // internal only — sorted+diffed below, never returned raw
   ALLOWED_AGENT_IDS.forEach(id => {
     byBoy[id] = {
       totalAttempts: 0, totalSuccess: 0, totalFailed: 0,
       byMethod: { qr: 0, 'pin-fallback': 0 },
       failedAttempts: [],
+      rapidReloginCount: 0,
       assistSessions: []
     };
+    loginTimestampsByBoy[id] = [];
   });
+  // A login-to-login gap under this counts as "rapid" — a real investigation
+  // (session-timer-punchlist.md follow-up) found a boy averaging several
+  // logins within 10 minutes of each other most days, caused by a Gangway
+  // bug that forced a full re-login on return trips rather than resuming a
+  // still-valid session. That bug is fixed at the source now (index.html's
+  // boot()), but this stays as a diagnostic signal — a genuinely worn/
+  // unreadable card produces scattered failures throughout the day, not
+  // logins clustered minutes apart, and the write-up needs a real way to
+  // tell those two patterns apart instead of defaulting to "bad card."
+  const MUSTER_RAPID_RELOGIN_MS = 10 * 60 * 1000;
 
   let householdFailedTotal = 0;
   let householdUnknownFailed = 0;
@@ -2233,6 +2246,7 @@ async function fetchMusterWeekData(weekStartMs, weekEndMs) {
       b.totalAttempts++;
       if (e.ok) b.totalSuccess++; else { b.totalFailed++; b.failedAttempts.push({ when: when(e.t), method: e.method }); }
       if (b.byMethod[e.method] !== undefined) b.byMethod[e.method]++;
+      loginTimestampsByBoy[e.who].push(e.t);
     }
 
     if (e.ok === false) {
@@ -2259,6 +2273,15 @@ async function fetchMusterWeekData(weekStartMs, weekEndMs) {
         byBoy[as].assistSessions.push({ parent: e.who, method: e.method, when: when(e.t) });
       }
     }
+  });
+
+  ALLOWED_AGENT_IDS.forEach(id => {
+    const ts = loginTimestampsByBoy[id].sort((a, b) => a - b);
+    let rapid = 0;
+    for (let i = 1; i < ts.length; i++) {
+      if (ts[i] - ts[i - 1] < MUSTER_RAPID_RELOGIN_MS) rapid++;
+    }
+    byBoy[id].rapidReloginCount = rapid;
   });
 
   return {
@@ -2430,7 +2453,11 @@ Never invent a detail, a day, or an incident that isn't in the data you're given
 
 The household summary is separate: cover White Glove inspection patterns and results across the boys collectively, "prayerHousehold" ({submitted, answered} — same shape as above, but requests not attributable to a specific boy: usually a parent's own request, or for someone outside the family) and "crowsnestHousehold" (praise entries John or Dawn logged), and anything else week-level worth noting from the data — 2-4 sentences, same grounded, specific style. Treat the household prayer/praise data the same way as each boy's: a brief, warm mention if present, nothing forced if empty. For any White Glove pass/fail counts (per boy, per room, or per day-of-week), use the pre-tallied numbers in whiteglove.summary.byBoy, whiteglove.summary.byRoom, and whiteglove.summary.byDayOfWeek directly — do not recount them yourself from the nested whiteglove.days data, which is there only for citing specific incidents (a particular day/window that failed), not for arithmetic. byDayOfWeek is only worth mentioning if a real weekday clustering shows up (e.g. most failures landing on the same one or two weekdays) — that's a scheduling pattern worth naming, distinct from a general consistency problem; don't force a mention if the failures are just spread evenly across the week.
 
-Also include a brief Muster summary in the household section — real specifics, not just a count. Each boy's own "muster" field (boys.{id}.muster) carries his week's login activity: "totalAttempts"/"totalSuccess"/"totalFailed", "byMethod" (qr vs pin-fallback counts), and "failedAttempts" (a list of {when, method} for his own failed logins, already pre-tallied — cite these directly rather than recounting). If a boy has 2+ failed attempts, or leans heavily on pin-fallback over qr, that's worth a specific, low-key mention (e.g. "Daniel had 3 failed login attempts Tuesday before succeeding — may be worth checking if his card or PIN is giving him trouble"); if failures are 0-1 and qr is his normal method, say nothing about him. "musterHousehold" carries "totalFailed" and "unknownFailed" (failed attempts not tied to any boy's identity, with "unknownFailedAttempts" giving {when, method, device} for each) — mention the unknown-failed count if it's nonzero, and name a specific one if something about it looks genuinely worth a glance (an odd hour, an unfamiliar device, a cluster of several in a short window) — but this is informational pattern-tracking, not an alarm system, so don't editorialize or imply a security incident from a single stray attempt. "musterHousehold" also carries pre-tallied parent-assist activity: "assistSessionCount" (total parent-assist/parent-view sessions all week), "assistByParent" ({john, dawn} counts), and "assistByDayOfWeek" (count per weekday — only worth mentioning if it clusters on one or two days). Use these counts directly rather than trying to reconstruct a timeline. boys.{id}.muster.assistSessions gives a specific, per-boy list ({parent, method, when}) ONLY for sessions where a parent was actively assisting or boarded as that specific boy (not general picker-screen viewing, which isn't attributed to one boy) — cite one of these directly if it's notable. Mention parent-assist activity briefly if it happened that week, as useful context distinct from the boys' own independent logins; say nothing if there was none. If nothing stands out anywhere in Muster this week (low failures, no unknowns, no assist sessions), a single plain sentence saying logins were routine is enough — don't manufacture texture that isn't there.
+Also include a brief Muster summary in the household section — real specifics, not just a count. Each boy's own "muster" field (boys.{id}.muster) carries his week's login activity: "totalAttempts"/"totalSuccess"/"totalFailed", "byMethod" (qr vs pin-fallback counts), "failedAttempts" (a list of {when, method} for his own failed logins, already pre-tallied — cite these directly rather than recounting), and "rapidReloginCount" (a pre-tallied count of how many of his logins this week landed within 10 minutes of his previous one). These two patterns look similar on the surface (both show up as elevated totalAttempts/totalFailed) but mean very different things, and you must check rapidReloginCount BEFORE reaching for a card/PIN explanation:
+- A HIGH rapidReloginCount (roughly a third or more of his totalAttempts) means he's repeatedly being sent back through re-authentication in quick succession — that reads as a navigation/session pattern, not a hardware problem, and should be described that way (e.g. "Daniel logged in 43 times this week, many in quick clusters minutes apart — that's a navigation pattern worth knowing about, not necessarily a card problem"). Do NOT suggest his card or PIN is unreliable when the clustering is what's driving the numbers.
+- A LOW rapidReloginCount alongside 2+ genuinely spread-out failedAttempts (scattered across different times/days, not clustered) is the pattern actually worth a card/PIN mention (e.g. "Daniel had 3 failed login attempts this week, spread across different days — may be worth checking if his card or PIN is giving him trouble").
+- If failures are 0-1, qr is his normal method, and rapidReloginCount is low, say nothing about him. Never guess at a cause the data doesn't actually support — if the pattern doesn't clearly match either case above, describe the numbers plainly without naming a cause at all.
+"musterHousehold" carries "totalFailed" and "unknownFailed" (failed attempts not tied to any boy's identity, with "unknownFailedAttempts" giving {when, method, device} for each) — mention the unknown-failed count if it's nonzero, and name a specific one if something about it looks genuinely worth a glance (an odd hour, an unfamiliar device, a cluster of several in a short window) — but this is informational pattern-tracking, not an alarm system, so don't editorialize or imply a security incident from a single stray attempt. "musterHousehold" also carries pre-tallied parent-assist activity: "assistSessionCount" (total parent-assist/parent-view sessions all week), "assistByParent" ({john, dawn} counts), and "assistByDayOfWeek" (count per weekday — only worth mentioning if it clusters on one or two days). Use these counts directly rather than trying to reconstruct a timeline. boys.{id}.muster.assistSessions gives a specific, per-boy list ({parent, method, when}) ONLY for sessions where a parent was actively assisting or boarded as that specific boy (not general picker-screen viewing, which isn't attributed to one boy) — cite one of these directly if it's notable. Mention parent-assist activity briefly if it happened that week, as useful context distinct from the boys' own independent logins; say nothing if there was none. If nothing stands out anywhere in Muster this week (low failures, no unknowns, no assist sessions), a single plain sentence saying logins were routine is enough — don't manufacture texture that isn't there.
 
 "teachMe" (null if nobody's touched Teach Me Vote at all this week — say nothing in that case) carries this week's winning topic ("winnerTopic"), how many boys suggested a topic vs. actually voted ("suggestedByCount"/"votedByCount" — worth a clause if participation was notably low, e.g. only 1 of 4 voted), and the real website/family-day suggestions generated for the winning topic along with their approval "status" (pending/approved/denied — a pending suggestion just means nobody's reviewed it yet, not a problem to flag). Mention the winning topic and participation briefly; only mention a specific website or family-day suggestion by name if it's already approved — a still-pending one isn't real yet, so don't build anticipation around it. The family day suggestion also carries "happened" (true/false/undefined) and "reflection" once John or Dawn has actually verified it — this is the full loop (topic won → suggestion approved → family day actually happened → how it went), worth closing the loop on in one sentence if "happened" is set: name whether it happened and, if there's a real reflection, a brief honest note of how it went. If "happened" is still undefined, that just means it hasn't been verified yet — don't treat that as a problem either.
 

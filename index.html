@@ -687,6 +687,14 @@ async function commission(){
     const s = getSession();
     if(s && s.role==='parent' && Date.now()-s.ts < 1000*60*60*12){
       showDecks(s.person);
+    }else if(s && s.role==='boy' && s.person && CREW[s.person] && Date.now()-s.ts < 1000*60*60*12){
+      // Matches boys/index.html's own identity-lock, which already treats a
+      // valid role:'boy' session within 12 hours as fully trusted — the
+      // Gangway previously only auto-resumed parents, forcing a boy to
+      // re-scan/re-enter his PIN every time he was routed back here (the
+      // topbar's "Back to Gangway" arrow, or boys/map.html's "Depart" link)
+      // even though nothing about his session was ever actually invalid.
+      location.href = 'boys/map.html';
     }
   }catch(e){
     document.getElementById('loginCard').style.display='none';
