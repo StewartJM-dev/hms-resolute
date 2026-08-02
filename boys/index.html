@@ -1845,14 +1845,26 @@ function renderMissions(){
   const refPath = `stewart/missions/${currentAgent.id}/${today}`;
 
   if(_db){
-    _db.ref(refPath).once('value', snap => {
-      const done = snap.val() || {};
-      renderMissionsList(el, missions, done, refPath);
+    Promise.all([
+      _db.ref(refPath).once('value'),
+      _db.ref(`stewart/exceptions/${today}`).once('value')
+    ]).then(([mSnap, eSnap]) => {
+      const done = mSnap.val() || {};
+      const exception = findExceptionForAgent(eSnap.val(), currentAgent.id);
+      renderMissionsList(el, missions, done, refPath, exception);
     });
   }
 }
 
-function renderMissionsList(el, missions, done, refPath){
+// Exception Days (combined-batch-punchlist.md Part 2d): shown explicitly,
+// not as an unexplained empty checklist — findExceptionForAgent is the
+// same shared reader mission-engine.js's recalculateScore uses, so this
+// always agrees with whether today actually scored for him.
+function renderMissionsList(el, missions, done, refPath, exception){
+  if(exception){
+    el.innerHTML = `<div class="empty">&#9875; Exception Day — ${escapeHtml(exception.type)}<br>${exception.note ? escapeHtml(exception.note)+'<br>' : ''}No missions expected today.</div>`;
+    return;
+  }
   if(!missions.length){
     el.innerHTML = '<div class="empty">No missions today, Agent.<br>Enjoy your day off.</div>';
     return;

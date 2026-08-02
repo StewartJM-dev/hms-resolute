@@ -525,6 +525,46 @@ body{
     <!-- THE WEEK -->
   <div class="shead">The Seven-Day Cycle</div>
   <div class="week" id="week"></div>
+
+    <!-- EXCEPTION DAYS (combined-batch-punchlist.md Part 2) -->
+    <div class="shead" style="margin-top:18px;">Exception Days</div>
+    <div style="font-size:12px;opacity:.7;margin-bottom:10px;">Flag a campout, sickness, travel, or holiday in advance or same-day — normal chore/pay/White Glove expectations are lifted for whoever's affected, and the report card will explain why instead of reading it as a slump.</div>
+    <div id="exception-form" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div style="flex:1;">
+          <label style="font-size:10px;opacity:.6;display:block;margin-bottom:3px;">FROM</label>
+          <input type="date" id="exc-start" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:12px;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:10px;opacity:.6;display:block;margin-bottom:3px;">TO (optional, multi-day)</label>
+          <input type="date" id="exc-end" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:12px;">
+        </div>
+      </div>
+      <label style="font-size:10px;opacity:.6;display:block;margin-bottom:3px;">TYPE</label>
+      <select id="exc-type" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:12px;margin-bottom:8px;" onchange="document.getElementById('exc-type-other-wrap').style.display=(this.value==='Other'?'block':'none')">
+        <option>Travel/Campout</option>
+        <option>Sick Day</option>
+        <option>Doctor's Visit</option>
+        <option>Holiday</option>
+        <option>Other</option>
+      </select>
+      <div id="exc-type-other-wrap" style="display:none;margin-bottom:8px;">
+        <input type="text" id="exc-type-other" placeholder="Describe the exception type" maxlength="40" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:12px;">
+      </div>
+      <label style="font-size:10px;opacity:.6;display:block;margin-bottom:3px;">AFFECTED</label>
+      <div id="exc-agents" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+        <button type="button" class="filter-btn active" data-exc-agent="all" onclick="toggleExcAgentBtn(this,'all')">All Hands</button>
+        <button type="button" class="filter-btn" data-exc-agent="samuel" onclick="toggleExcAgentBtn(this,'samuel')">🦅 Samuel</button>
+        <button type="button" class="filter-btn" data-exc-agent="johnjr" onclick="toggleExcAgentBtn(this,'johnjr')">🦁 John Jr.</button>
+        <button type="button" class="filter-btn" data-exc-agent="stephen" onclick="toggleExcAgentBtn(this,'stephen')">🦖 Stephen</button>
+        <button type="button" class="filter-btn" data-exc-agent="daniel" onclick="toggleExcAgentBtn(this,'daniel')">🐘 Daniel</button>
+      </div>
+      <label style="font-size:10px;opacity:.6;display:block;margin-bottom:3px;">NOTE (optional)</label>
+      <input type="text" id="exc-note" placeholder="e.g. Trail Life campout, back Sunday night" maxlength="140" style="width:100%;padding:7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;font-size:12px;margin-bottom:10px;">
+      <button class="rc-checkin-btn" style="margin-bottom:0;" onclick="setExceptionDay()">Set Exception</button>
+      <div id="exc-status" style="font-size:11.5px;text-align:center;margin-top:6px;min-height:14px;"></div>
+    </div>
+    <div id="exceptions-list"></div>
   </div>
 
   <!-- ===== COMMS TAB ===== -->
@@ -916,6 +956,138 @@ function renderWeek(){
   document.getElementById('t-day').textContent = t.day;
   document.getElementById('t-watch').textContent = t.sys;
   document.getElementById('t-focus').textContent = t.note;
+}
+
+// ════════════════════════════════════════════
+// EXCEPTION DAYS (combined-batch-punchlist.md Part 2)
+// stewart/exceptions/{date}/{pushId} — see mission-engine.js's own header
+// comment for the full shape/reasoning. This is the "set an exception"
+// side; mission-engine.js's findExceptionForAgent() is the shared reader
+// every consumer (recalculateScore, White Glove, the report card) uses.
+// ════════════════════════════════════════════
+const EXC_AGENT_LABELS = {all:'All Hands', samuel:'Samuel', johnjr:'John Jr.', stephen:'Stephen', daniel:'Daniel'};
+let _excSelectedAgents = new Set(['all']);
+
+function toggleExcAgentBtn(btn, agentId){
+  if(agentId === 'all'){
+    _excSelectedAgents = new Set(['all']);
+  } else {
+    _excSelectedAgents.delete('all');
+    if(_excSelectedAgents.has(agentId)) _excSelectedAgents.delete(agentId);
+    else _excSelectedAgents.add(agentId);
+    if(_excSelectedAgents.size === 0) _excSelectedAgents.add('all');
+  }
+  document.querySelectorAll('#exc-agents .filter-btn').forEach(b => {
+    b.classList.toggle('active', _excSelectedAgents.has(b.dataset.excAgent));
+  });
+}
+
+// Inclusive list of YYYY-MM-DD strings, mirrors dateRange()'s style
+// elsewhere in this codebase (functions/index.js) but client-side.
+function excDateRange(startStr, endStr){
+  const start = parseLocalDate(startStr);
+  const end = parseLocalDate(endStr || startStr);
+  const dates = [];
+  const cursor = new Date(start);
+  let guard = 0;
+  while(cursor <= end && guard < 60){
+    dates.push(localDateStr(cursor));
+    cursor.setDate(cursor.getDate()+1);
+    guard++;
+  }
+  return dates;
+}
+
+function setExceptionDay(){
+  if(!_db) return;
+  const startEl = document.getElementById('exc-start');
+  const endEl = document.getElementById('exc-end');
+  const statusEl = document.getElementById('exc-status');
+  const start = startEl.value;
+  if(!start){ statusEl.textContent = 'Pick at least a start date.'; statusEl.style.color = '#e08a8a'; return; }
+  const end = endEl.value || start;
+  const typeSel = document.getElementById('exc-type').value;
+  const type = typeSel === 'Other' ? (document.getElementById('exc-type-other').value.trim() || 'Other') : typeSel;
+  const note = document.getElementById('exc-note').value.trim();
+  const affectedAgents = Array.from(_excSelectedAgents);
+  const dates = excDateRange(start, end);
+  const rangeId = Date.now();
+
+  statusEl.style.color = '';
+  statusEl.textContent = 'Setting…';
+
+  const writes = dates.map(date => _db.ref(`stewart/exceptions/${date}`).push({
+    type, note, affectedAgents, setBy: 'bridge', timestamp: Date.now(), rangeId
+  }));
+
+  Promise.all(writes).then(() => {
+    // Recalculate every affected agent's already-passed/today dates in the
+    // range immediately, so pay/score reflect the exception without
+    // waiting on the next unrelated write to trigger it. Future dates
+    // don't need this — nothing's been scored for them yet.
+    const agentsToRecalc = affectedAgents.includes('all') ? AGENTS.map(a=>a.id) : affectedAgents;
+    const today = localDateStr();
+    const recalcs = [];
+    dates.forEach(date => {
+      if(date <= today) agentsToRecalc.forEach(id => recalcs.push(recalculateScore(id, date)));
+    });
+    return Promise.all(recalcs);
+  }).then(() => {
+    statusEl.style.color = '#7ad19a';
+    statusEl.textContent = `Set for ${dates.length} day${dates.length===1?'':'s'}.`;
+    document.getElementById('exc-note').value = '';
+    renderExceptionsList();
+    if(typeof loadInstruments === 'function') loadInstruments();
+    setTimeout(()=>{ statusEl.textContent = ''; }, 3000);
+  }).catch(()=>{
+    statusEl.style.color = '#e08a8a';
+    statusEl.textContent = 'Failed to save — try again.';
+  });
+}
+
+function removeExceptionEntry(date, pushId, affectedAgentsCsv){
+  if(!_db) return;
+  _db.ref(`stewart/exceptions/${date}/${pushId}`).remove().then(() => {
+    const affectedAgents = affectedAgentsCsv.split(',');
+    const agentsToRecalc = affectedAgents.includes('all') ? AGENTS.map(a=>a.id) : affectedAgents;
+    return Promise.all(agentsToRecalc.map(id => recalculateScore(id, date)));
+  }).then(() => {
+    renderExceptionsList();
+    if(typeof loadInstruments === 'function') loadInstruments();
+  });
+}
+
+// Shows exceptions from 3 days back through 30 days ahead — enough to see
+// what just happened (for context) and what's coming (to plan around).
+function renderExceptionsList(){
+  if(!_db) return;
+  const el = document.getElementById('exceptions-list');
+  if(!el) return;
+  const start = new Date(); start.setDate(start.getDate()-3);
+  const end = new Date(); end.setDate(end.getDate()+30);
+  const dates = excDateRange(localDateStr(start), localDateStr(end));
+  Promise.all(dates.map(d => _db.ref(`stewart/exceptions/${d}`).once('value'))).then(snaps => {
+    const rows = [];
+    snaps.forEach((snap, i) => {
+      const val = snap.val();
+      if(!val) return;
+      Object.entries(val).forEach(([pushId, e]) => {
+        rows.push({date: dates[i], pushId, ...e});
+      });
+    });
+    if(!rows.length){ el.innerHTML = ''; return; }
+    rows.sort((a,b) => a.date.localeCompare(b.date));
+    el.innerHTML = '<div class="shead" style="margin-top:4px;">Set Exceptions</div>' + rows.map(r => {
+      const agentLabel = (r.affectedAgents||[]).map(a => EXC_AGENT_LABELS[a]||a).join(', ');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:8px;margin-bottom:6px;">
+        <div style="font-size:12px;">
+          <b>${r.date}</b> — ${r.type} <span style="opacity:.6;">(${agentLabel})</span>
+          ${r.note ? `<div style="opacity:.6;font-size:11px;margin-top:2px;">${r.note.replace(/</g,'&lt;')}</div>` : ''}
+        </div>
+        <button onclick="removeExceptionEntry('${r.date}','${r.pushId}','${(r.affectedAgents||[]).join(',')}')" style="flex-shrink:0;background:none;border:1px solid rgba(255,255,255,.2);border-radius:6px;color:rgba(255,255,255,.6);font-size:11px;padding:5px 9px;cursor:pointer;">Remove</button>
+      </div>`;
+    }).join('');
+  });
 }
 
 // ════════════════════════════════════════════
@@ -2127,8 +2299,13 @@ async function regenerateReportCard(){
 function loadInstruments(){
   if(!_db) return;
   const today = localDateStr();
-  Promise.all(AGENTS.map(a => _db.ref('stewart/missions/'+a.id+'/'+today).once('value')))
-  .then(results => {
+  Promise.all([
+    ...AGENTS.map(a => _db.ref('stewart/missions/'+a.id+'/'+today).once('value')),
+    _db.ref('stewart/exceptions/'+today).once('value')
+  ])
+  .then(allResults => {
+    const results = allResults.slice(0, AGENTS.length);
+    const exceptionsToday = allResults[AGENTS.length].val() || {};
     const crew = AGENTS.map((a,i)=>{
       const done = results[i].val() || {};
       // Computed fresh from the same shared engine Officers' Country uses —
@@ -2144,7 +2321,13 @@ function loadInstruments(){
       const total = expected.length;
       const dayScore = calculateDayScore(a.id, expected, done);
       const pct = dayScore.points100;
-      return {a, completed, total, score: dayScore.points100, pct, dollars: dayScore.dollars};
+      // Quick Sick Day toggle (Part 2a) state — only reflects a Sick Day
+      // exception scoped to just this one agent, not a family-wide
+      // exception (that's set/cleared from the full Exception Days form
+      // above, not this one-tap card button).
+      const sick = Object.values(exceptionsToday).some(e => e && e.type === 'Sick Day' &&
+        Array.isArray(e.affectedAgents) && e.affectedAgents.length === 1 && e.affectedAgents[0] === a.id);
+      return {a, completed, total, score: dayScore.points100, pct, dollars: dayScore.dollars, sick};
     });
     renderGauges(crew);
     renderStatusBoard(crew);
@@ -2239,7 +2422,8 @@ function renderGauges(crew){
   const crewCards = crew.map(c=>{
     const color = AGENT_COLORS[c.a.id] || '#4d9fff';
     const scoreTxt = (c.score===null||c.score===undefined)?'—':('$'+c.dollars.toFixed(2));
-    return '<div class="gauge-card">'+
+    return '<div class="gauge-card" style="position:relative;">'+
+      '<button onclick="toggleSickDay(\''+c.a.id+'\')" title="'+(c.sick?'Clear sick day':'Mark sick today')+'" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:1px solid '+(c.sick?'#e08a8a':'rgba(255,255,255,.25)')+';background:'+(c.sick?'rgba(224,138,138,.25)':'rgba(255,255,255,.06)')+';font-size:11px;cursor:pointer;line-height:1;">🤒</button>'+
       '<div class="gc-name">'+c.a.name+'</div>'+
       '<div class="gc-icon">'+c.a.icon+'</div>'+
       gaugeSVG(c.pct,color)+
@@ -2248,6 +2432,31 @@ function renderGauges(crew){
       '<div class="gc-sub">'+scoreTxt+'</div></div>';
   }).join('');
   gr.innerHTML = crewCards + fleetCard;
+}
+
+// Quick single-boy Sick Day toggle (combined-batch-punchlist.md Part 2a) —
+// separate from the full Exception Days form on Helm: this is the fast,
+// same-day, one-tap path for "mark this one boy sick today," not a
+// planned/multi-day/multi-agent exception. Toggling off removes ONLY a
+// single-agent Sick Day exception it finds for today — never touches a
+// family-wide exception that happens to also cover this agent.
+async function toggleSickDay(agentId){
+  if(!_db) return;
+  const today = localDateStr();
+  const snap = await _db.ref('stewart/exceptions/'+today).once('value');
+  const val = snap.val() || {};
+  const existing = Object.entries(val).find(([,e]) => e && e.type === 'Sick Day' &&
+    Array.isArray(e.affectedAgents) && e.affectedAgents.length === 1 && e.affectedAgents[0] === agentId);
+  if(existing){
+    await _db.ref('stewart/exceptions/'+today+'/'+existing[0]).remove();
+  } else {
+    await _db.ref('stewart/exceptions/'+today).push({
+      type: 'Sick Day', note: '', affectedAgents: [agentId], setBy: 'bridge-quick', timestamp: Date.now(), rangeId: Date.now()
+    });
+  }
+  await recalculateScore(agentId, today);
+  loadInstruments();
+  renderExceptionsList();
 }
 
 
@@ -2394,8 +2603,10 @@ initFirebase();
 // Helm is the default landing tab and never gets an explicit showBTab('helm')
 // call on first paint (unlike every other tab, whose content loads lazily
 // on click) — so the Weekly Report Card needs this direct kick to appear
-// without requiring the user to navigate away and back first.
+// without requiring the user to navigate away and back first. Same reason
+// Exception Days needs its own direct kick here too.
 renderReportCard();
+renderExceptionsList();
 </script>
 
 <!-- BRIDGE BOTTOM NAV -->

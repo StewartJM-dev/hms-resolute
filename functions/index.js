@@ -1776,7 +1776,25 @@ async function fetchTomChatWeekData(agentId, weekStartMs, weekEndMs) {
   return conversations;
 }
 
-async function fetchBoyWeekData(agentId, dates) {
+// Exception Days (combined-batch-punchlist.md Part 2e). Mirrors mission-
+// engine.js's findExceptionForAgent() exactly but duplicated here in plain
+// Node — that file is browser-only (relies on a global _db already on the
+// page) and isn't loaded by Cloud Functions at all.
+function findExceptionForAgent(exceptionsForDate, agentId) {
+  if (!exceptionsForDate) return null;
+  const entries = Object.values(exceptionsForDate);
+  return entries.find(e => e && Array.isArray(e.affectedAgents) &&
+    (e.affectedAgents.includes('all') || e.affectedAgents.includes(agentId))) || null;
+}
+
+async function fetchExceptionsByDate(dates) {
+  const snaps = await Promise.all(dates.map(date => db.ref(`stewart/exceptions/${date}`).once('value')));
+  const byDate = {};
+  dates.forEach((date, i) => { byDate[date] = snaps[i].val(); });
+  return byDate;
+}
+
+async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000; // exclusive upper bound
 
@@ -1798,8 +1816,15 @@ async function fetchBoyWeekData(agentId, dates) {
     const wishes = wishSnaps[i].val() || {};
     const strikeRec = strikeSnaps[i].val() || {};
     const strikeIncidents = Object.values(strikeRec.incidents || {}).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    // Exception Days: a real, planned reason score/eligible are null this
+    // day that ISN'T a weekend — the write-up must cite this explicitly
+    // instead of reading a null/low day as a performance dip. null when
+    // no exception applies, same shape mission-engine.js's own reader uses.
+    const exception = findExceptionForAgent(exceptionsByDate && exceptionsByDate[date], agentId);
     return {
       date,
+      exceptionType: exception ? exception.type : null,
+      exceptionNote: exception ? (exception.note || '') : null,
       score: (score === undefined || score === null) ? null : score,
       // Same "eligible" definition as pay: excludes Computer Missions and
       // Officer of the Watch checks. Real completed/total counts, not a
@@ -1835,7 +1860,8 @@ async function fetchBoyWeekData(agentId, dates) {
     totalWishesUsed: days.reduce((a, d) => a + d.wishesUsed, 0),
     totalStrikes: days.reduce((a, d) => a + d.strikeCount, 0),
     unkindDays: days.filter(d => d.strikeIncidents.some(inc => inc.category === 'unkind')).length,
-    daysOutOfTime: days.filter(d => d.ranOutOfTime).length
+    daysOutOfTime: days.filter(d => d.ranOutOfTime).length,
+    daysException: days.filter(d => d.exceptionType).length
   };
 
   // Courage Dare is program-day-numbered, not calendar-date-keyed, so
@@ -2083,8 +2109,10 @@ async function aggregateWeeklyReportData(weekOf) {
   const weekStartMs = parseDateStr(dates[0]).getTime();
   const weekEndMs = parseDateStr(dates[dates.length - 1]).getTime() + 24 * 60 * 60 * 1000;
 
+  const exceptionsByDate = await fetchExceptionsByDate(dates);
+
   const [boys, whiteglove, dawn, prayer, crowsnest, galleyAdherence, galleyTiming] = await Promise.all([
-    Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates))),
+    Promise.all(ALLOWED_AGENT_IDS.map(id => fetchBoyWeekData(id, dates, exceptionsByDate))),
     fetchWhiteGloveWeekData(dates),
     fetchDawnWeekData(dates),
     fetchPrayerWeekData(weekStartMs, weekEndMs),
@@ -2135,6 +2163,8 @@ Write like a sharp, honest coach's report, not a form letter. Be specific: cite 
 Each day has BOTH a "score" (0-100%, weighted by how many points each chore is worth) and a raw "eligibleCompleted"/"eligibleTotal" count (how many actual chores he finished out of how many he had, excluding Computer Missions and Officer of the Watch checks — the same two things already excluded from score). These are genuinely different numbers and can diverge (a boy can finish most of his LOW-point chores and skip a big one, giving a lower score than his completed-count alone would suggest, or the reverse). Cite BOTH together at least once per boy's summary, e.g. "scored 73% — 11 of 15 eligible chores" — don't make the parent reconcile a percentage against what they see on the chore-log grid themselves. Use totalEligibleCompleted/totalEligibleAssigned the same way for the week-level pattern.
 
 Each day also carries a "ranOutOfTime" flag (true/false) — set from the Bridge tab when a boy ran out of time before finishing his chores that day. This is explicitly NOT a behavior issue or punishment (it carries no point penalty and is separate from deductionReasons) — it's pure pattern-tracking. Don't mention it at all if it happened zero or one day this week; that's normal and not worth a sentence. If totals.daysOutOfTime is 2+ for a boy, note it once, neutrally, as a scheduling/pacing pattern worth John/Dawn knowing about (e.g. "ran out of time before finishing chores twice this week") — never frame it as a fault or lump it in with deductions/strikes.
+
+CRITICAL — Exception Days: a day can carry "exceptionType" (e.g. "Travel/Campout", "Sick Day", "Doctor's Visit", "Holiday", or a custom type) and "exceptionNote". On that day, score/eligibleCompleted/eligibleTotal are null — same as a weekend — because normal chore expectations were deliberately lifted, NOT because he underperformed. This is the single most important rule in this whole prompt: NEVER read an exception day as a slump, a bad day, or a gap in the data to explain away — name it plainly and matter-of-factly instead, the same way you'd note a weekend ("Friday was a planned campout, no chores were expected" — not "chores dropped off Friday" or any phrasing that implies something went wrong). If totals.daysException is 0, say nothing about it. If a boy had a rough-looking stretch of low scores or missed strikes RIGHT AROUND an exception day, check whether the exception explains it before characterizing it as a pattern — an exception day breaks a streak calculation, it doesn't represent a bad one.
 
 Include a short, natural mention of what a boy's been asking Tom about, woven into his summary — genuine interests or recurring topics worth John/Dawn knowing about (each conversation entry's "category" tells you the kind of question: app_help/verse_lookup/reveal are routine and free, interest/learning/devotional cost a wish, declined_* means Tom turned the question away). Summarize the gist age-appropriately — don't quote the conversation verbatim — UNLESS a conversation was declined for sibling conflict, discipline/trouble, or rule-bypass reasons (category starts with "declined_sibling", "declined_discipline", or "declined_rulebypass"), which is worth naming specifically since it's the same territory parents already track through moderation strikes. Purely off-topic or app-help declines aren't worth flagging. If a boy had no Tom conversations this week, don't force a mention — say so in one clause at most, don't dwell on it.
 

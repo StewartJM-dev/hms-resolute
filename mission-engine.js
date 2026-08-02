@@ -59,6 +59,32 @@ function toMidnight(d){
 // history for a discrepancy nobody could distinguish from normal day-to-day
 // variance. If this ever needs revisiting, it's a deliberate reopening of a
 // closed decision, not a forgotten TODO.
+
+// ══════════════════════════════════════════════════════
+// EXCEPTION DAYS (combined-batch-punchlist.md Part 2)
+// stewart/exceptions/{date}/{pushId} = {type, note, affectedAgents, setBy,
+// timestamp, rangeId}. Keyed by pushId per date (not a single object per
+// date) deliberately — a family holiday affecting everyone and one boy
+// separately flagged sick the same day are two independent exceptions, not
+// a conflict to resolve. affectedAgents is either ['all'] or a specific
+// list of agentIds. type is open text (not a fixed enum) on purpose — this
+// is meant to be the foundation for later homeschool-day tracking too, per
+// the punch list's own design principle: build generically, not narrowly.
+// ══════════════════════════════════════════════════════
+
+// Pure — given the exceptions object already fetched at
+// stewart/exceptions/{date} (a map of pushId -> exception, or null/{} if
+// none), returns the first exception covering this agent, or null. Shared
+// by every surface that needs to answer "is today an exception day for
+// this boy" — recalculateScore below, White Glove, the report card, and
+// each page's own missions-view rendering.
+function findExceptionForAgent(exceptionsForDate, agentId){
+  if(!exceptionsForDate) return null;
+  const entries = Object.values(exceptionsForDate);
+  return entries.find(e => e && Array.isArray(e.affectedAgents) &&
+    (e.affectedAgents.includes('all') || e.affectedAgents.includes(agentId))) || null;
+}
+
 function isLaundryDayFor(agentId, dayOfWeek){
   if((agentId==='samuel'||agentId==='johnjr') && dayOfWeek===1) return true;
   if((agentId==='stephen'||agentId==='daniel') && dayOfWeek===4) return true;
@@ -258,20 +284,34 @@ function getAvailableWishes(agentId){
 // count toward pay, game time, or wishes — tracked separately as "Damage
 // Control"). Relies on a global `_db` (Firebase ref) already existing on the
 // page — same as the original, so existing call sites don't need to change.
+//
+// Exception Days (combined-batch-punchlist.md Part 2) are treated exactly
+// like a weekend here — null score/pay/eligible/wishes, excluded from the
+// calculation entirely rather than counted as a $0 day. Deliberately NOT a
+// change to buildMissions()'s own signature: every read-only display call
+// site across boys/dashboard/bridge (20+ of them) already has to handle a
+// null score gracefully because weekends produce one twice a week — so
+// making exception days null too means they inherit that same handling for
+// free, with zero risk to call sites this pass doesn't touch. The one
+// surface that needs to say WHY explicitly (not just show blank) is the
+// boy's own missions view, which checks stewart/exceptions itself.
 function recalculateScore(agentId, dateStr){
   if(!_db) return Promise.resolve();
   return Promise.all([
     _db.ref(`stewart/missions/${agentId}/${dateStr}`).once('value'),
     _db.ref(`stewart/transferAdjust/${agentId}/${dateStr}`).once('value'),
-    _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value')
-  ]).then(([mSnap, tSnap, dSnap]) => {
+    _db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value'),
+    _db.ref(`stewart/exceptions/${dateStr}`).once('value')
+  ]).then(([mSnap, tSnap, dSnap, eSnap]) => {
     const done = mSnap.val() || {};
     const transferAdjust = tSnap.val() || 0;
     const deductions = dSnap.val() || {};
+    const exceptions = eSnap.val() || {};
 
     const dayDate = parseLocalDate(dateStr);
     const dayOfWeek = dayDate.getDay();
-    if(dayOfWeek===0||dayOfWeek===6){
+    const exception = findExceptionForAgent(exceptions, agentId);
+    if(dayOfWeek===0||dayOfWeek===6||exception){
       return Promise.all([
         _db.ref(`stewart/scores/${agentId}/${dateStr}`).set(null),
         _db.ref(`stewart/wishes/${agentId}/${dateStr}/earned`).set(0),
