@@ -3168,10 +3168,46 @@ function startWhiteGloveInspection(){
     <div class="card-bd" style="padding:14px;">
       <div style="font-family:'Cinzel',serif;font-weight:700;font-size:14px;color:var(--brown);margin-bottom:10px;">\u26F5 ${win.label} Inspection</div>
       <div id="wg-room-rows"></div>
+      <div id="wg-behavior-section"></div>
       <button onclick="saveWhiteGloveInspection()" id="wg-save-btn" style="width:100%;margin-top:10px;padding:11px;border:none;border-radius:8px;background:var(--border);color:var(--muted);font-family:'Cinzel',serif;font-size:13px;font-weight:700;cursor:not-allowed;" disabled>Log Inspection (finish every compartment)</button>
     </div>
   </div>`;
   renderWGRoomRows();
+}
+
+// Behavior tracker inside White Glove (combined-batch-punchlist.md Part
+// 6) \u2014 Dawn likes these buttons but forgets them since they live
+// separately from her actual routine. Surfaced right here, once per
+// distinct boy actually assigned a room in THIS inspection (not once per
+// room \u2014 the same boy is often responsible for more than one room, and
+// showing his buttons four times would just be visual noise), reusing
+// applyDeduction/removeDeduction exactly as the Overview cards already
+// do. Additive only \u2014 the standalone Overview access is untouched.
+function renderWGBehaviorSection(){
+  const el = document.getElementById('wg-behavior-section');
+  if(!el || !_db) return;
+  const officers = Array.from(new Set(WG_ROOMS.map(r => wgPending[r.id] && wgPending[r.id].officer).filter(o => o && o !== 'all')));
+  if(!officers.length){ el.innerHTML = ''; return; }
+  const today = localDateStr();
+  Promise.all(officers.map(id => _db.ref(`stewart/deductions/${id}/${today}`).once('value')))
+    .then(snaps => {
+      const html = officers.map((id, i) => {
+        const deductions = snaps[i].val() || {};
+        const name = (WG_OFFICERS.find(o => o.id === id) || {}).label || id;
+        const buttons = BEHAVIOR_REASONS.map(r => {
+          const active = !!deductions[r.key];
+          return `<button onclick="${active?'removeDeduction':'applyDeduction'}('${id}','${today}','${r.key}');setTimeout(renderWGBehaviorSection,300);" style="font-size:10px;padding:5px 9px;border-radius:6px;border:1px solid ${active?'#b5451b':'var(--border)'};background:${active?'rgba(181,69,27,.12)':'var(--card)'};color:${active?'#b5451b':'var(--muted)'};cursor:pointer;">${r.label}${active?' \u2713':''} (-${r.points})</button>`;
+        }).join('');
+        return `<div style="margin-top:10px;">
+          <div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;">${name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">${buttons}</div>
+        </div>`;
+      }).join('');
+      el.innerHTML = `<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);">Behavior \u2014 while you're already here</div>
+        ${html}
+      </div>`;
+    });
 }
 
 function renderWGRoomRows(){
@@ -3221,6 +3257,7 @@ function renderWGRoomRows(){
     </div>`;
   }).join('');
   updateWGSaveButton();
+  renderWGBehaviorSection();
 }
 
 function updateWGSaveButton(){
