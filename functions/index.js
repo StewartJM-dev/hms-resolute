@@ -3059,7 +3059,7 @@ async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isF
 // it. Every other weekday keeps the single-day version unchanged.
 async function generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFirstTime) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const roleInstructions = `This is RED SKY AT MORNING, but it's Monday -- Sunday isn't a scored day, so instead of reviewing just "yesterday" (which would come up empty), review the FULL WEEK that just ended (Monday through Sunday). Give an honest week-in-review: how the week actually went overall (real average score, real total strikes/wishes/exceptions, a real pattern if one exists across the days) -- then close with plain, specific encouragement on where to improve this coming week. Same warm, honest, never-scolding tone as the daily version, just a wider lens. Exception Days and weekends within the week (score/eligible null, exceptionType set or not) are NOT a performance gap -- name them plainly the same way the daily version would ("Saturday and Sunday don't score," "Thursday was a planned [exceptionType]") rather than reading them as missing/bad days. If the week was genuinely solid, say so plainly and warmly rather than manufacturing a rough patch that isn't in the data. A bit longer than the daily version since there's a real week to cover, but still tight: 3-5 sentences.`;
+  const roleInstructions = `This is RED SKY AT MORNING, but it's Monday -- Sunday isn't a scored day, so instead of reviewing just "yesterday" (which would come up empty), review the FULL WEEK that just ended (Monday through Sunday). Give an honest week-in-review: how the week actually went overall (real average score, real total strikes/wishes/exceptions, a real pattern if one exists across the days) -- then close with plain, specific encouragement on where to improve this coming week. Same warm, honest, never-scolding tone as the daily version, just a wider lens. Exception Days and weekends within the week (score/eligible null, exceptionType set or not) are NOT a performance gap -- name them plainly the same way the daily version would ("Saturday and Sunday don't score," "Thursday was a planned [exceptionType]") rather than reading them as missing/bad days. If the week was genuinely solid, say so plainly and warmly rather than manufacturing a rough patch that isn't in the data. CRITICAL — the data given below covers ONLY last week (through Sunday); you have been given absolutely nothing about today (Monday) itself, not even whether he's started it yet. Never reference, imply, or speculate about today in any way — no "off to a good start," no "let's keep it up today," nothing. "This coming week" as a general forward-looking close is fine; anything specific to today itself is not, since you have no real data for it and would be inventing it. A bit longer than the daily version since there's a real week to cover, but still tight: 3-5 sentences.`;
   const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
 
   const response = await anthropic.messages.create({
@@ -3074,10 +3074,56 @@ async function generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFi
   return JSON.parse(raw).message;
 }
 
+// Does the actual generation for RED SKY AT MORNING -- either the daily
+// single-day version, or (on a Monday) the full-previous-week version.
+// Pulled out of the handler so caching can wrap it cleanly (see
+// generateRedSkyReport below): this always does a real generation, never
+// checks the cache itself.
+async function computeRedSkyMorning(agentId, agentName, age, todayEastern) {
+  // parseDateStr/formatDateStr (not raw Date.setDate/subtract-24h) --
+  // per parseDateStr's own comment, noon-UTC keeps this calendar
+  // subtraction safe across the two DST-transition days a year, which
+  // the previous local-Date approach got wrong by a full day right at
+  // the transition boundary (verified with a full-year sweep).
+  const y = parseDateStr(todayEastern);
+  y.setUTCDate(y.getUTCDate() - 1);
+  const targetDate = formatDateStr(y);
+
+  // Monday's "yesterday" is Sunday, which never scores -- pull the
+  // full previous week instead of a day with nothing real to review.
+  const isMonday = parseDateStr(todayEastern).getUTCDay() === 1;
+  if (isMonday) {
+    const weekOf = previousWeekMonday(todayEastern);
+    const weekEnd = formatDateStr(new Date(parseDateStr(weekOf).getTime() + 6 * 24 * 60 * 60 * 1000));
+    const dates = dateRange(weekOf, weekEnd, 7);
+    const exceptionsByDate = await fetchExceptionsByDate(dates);
+    const weekData = await fetchBoyWeekData(agentId, dates, exceptionsByDate);
+    weekData.weekOf = weekOf;
+    weekData.weekEnd = weekEnd;
+
+    const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
+    const seenSnap = await seenRef.once('value');
+    const isFirstTime = !seenSnap.val();
+    if (isFirstTime) await seenRef.set(true);
+
+    const message = await generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFirstTime);
+    return { locked: false, message, date: targetDate, weekOf, isWeekReview: true };
+  }
+
+  const dayData = await fetchRedSkyDayData(agentId, targetDate);
+  const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
+  const seenSnap = await seenRef.once('value');
+  const isFirstTime = !seenSnap.val();
+  if (isFirstTime) await seenRef.set(true);
+
+  const message = await generateRedSkyMessage('morning', agentId, agentName, age, dayData, isFirstTime);
+  return { locked: false, message, date: targetDate };
+}
+
 exports.generateRedSkyReport = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
-    const { agentId, type } = data || {};
+    const { agentId, type, force } = data || {};
     if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
       throw new functions.https.HttpsError('invalid-argument', 'A valid agentId is required.');
     }
@@ -3090,44 +3136,22 @@ exports.generateRedSkyReport = functions
     const todayEastern = easternDateStr();
 
     if (type === 'morning') {
-      // parseDateStr/formatDateStr (not raw Date.setDate/subtract-24h) --
-      // per parseDateStr's own comment, noon-UTC keeps this calendar
-      // subtraction safe across the two DST-transition days a year, which
-      // the previous local-Date approach got wrong by a full day right at
-      // the transition boundary (verified with a full-year sweep).
-      const y = parseDateStr(todayEastern);
-      y.setUTCDate(y.getUTCDate() - 1);
-      const targetDate = formatDateStr(y);
-
-      // Monday's "yesterday" is Sunday, which never scores -- pull the
-      // full previous week instead of a day with nothing real to review.
-      const isMonday = parseDateStr(todayEastern).getUTCDay() === 1;
-      if (isMonday) {
-        const weekOf = previousWeekMonday(todayEastern);
-        const weekEnd = formatDateStr(new Date(parseDateStr(weekOf).getTime() + 6 * 24 * 60 * 60 * 1000));
-        const dates = dateRange(weekOf, weekEnd, 7);
-        const exceptionsByDate = await fetchExceptionsByDate(dates);
-        const weekData = await fetchBoyWeekData(agentId, dates, exceptionsByDate);
-        weekData.weekOf = weekOf;
-        weekData.weekEnd = weekEnd;
-
-        const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
-        const seenSnap = await seenRef.once('value');
-        const isFirstTime = !seenSnap.val();
-        if (isFirstTime) await seenRef.set(true);
-
-        const message = await generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFirstTime);
-        return { locked: false, message, date: targetDate, weekOf, isWeekReview: true };
+      // Cached per real day (stewart/redsky/{agentId}/{date}/morning) --
+      // same reasoning and same pattern as Dawn's daily report: a real
+      // Sonnet/Haiku call every time a boy taps into Compass is wasteful
+      // for something that only meaningfully changes once a day, and John
+      // explicitly asked for it to stop regenerating on every open.
+      // `force` (not yet wired to any UI -- no button exists for this on
+      // the boys' side by design) bypasses the cache for an explicit
+      // regenerate request.
+      const cacheRef = db.ref(`stewart/redsky/${agentId}/${todayEastern}/morning`);
+      if (!force) {
+        const cached = await cacheRef.once('value');
+        if (cached.val()) return cached.val();
       }
-
-      const dayData = await fetchRedSkyDayData(agentId, targetDate);
-      const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
-      const seenSnap = await seenRef.once('value');
-      const isFirstTime = !seenSnap.val();
-      if (isFirstTime) await seenRef.set(true);
-
-      const message = await generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime);
-      return { locked: false, message, date: targetDate };
+      const result = await computeRedSkyMorning(agentId, agentName, age, todayEastern);
+      await cacheRef.set({ ...result, generatedAt: Date.now() });
+      return result;
     }
 
     // RED SKY AT NIGHT reports on TODAY, not "yesterday" -- it has no
