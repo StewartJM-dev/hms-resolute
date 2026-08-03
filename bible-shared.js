@@ -348,3 +348,75 @@ function getChapterNotes(book, chapter){
     return result;
   });
 }
+
+// ─── Family reading position: stewart/biblereading/{personId} ───
+// {book, chapter, updatedAt} -- the CHAPTER a person most recently opened,
+// overwritten on every chapter open (not an accumulating list, not a
+// verse-level bookmark -- bookmarks already exist separately for "save
+// this verse"). This is "what's everyone currently reading," meant to be
+// visible family-wide, same trust model as highlights/notes above (no
+// privacy boundary here, unlike the boys' private journal) -- the whole
+// point of a shared family Bible is seeing where everyone else is.
+
+function recordBibleReading(personId, book, chapter){
+  if(!_db || !personId) return;
+  _db.ref(`stewart/biblereading/${personId}`).set({
+    book, chapter: Number(chapter), updatedAt: Date.now()
+  });
+}
+
+// [{personId, name, color, book, chapter, updatedAt}, ...] for all six
+// family members, in FAMILY_PERSON_IDS order -- book/chapter/updatedAt
+// are null for anyone who's never opened a chapter yet.
+function getFamilyReading(){
+  if(!_db) return Promise.resolve(FAMILY_PERSON_IDS.map(id => ({
+    personId: id, name: FAMILY_DISPLAY_NAMES[id], color: FAMILY_COLORS[id],
+    book: null, chapter: null, updatedAt: null
+  })));
+  return _db.ref('stewart/biblereading').once('value').then(snap => {
+    const data = snap.val() || {};
+    return FAMILY_PERSON_IDS.map(id => {
+      const rec = data[id] || {};
+      return {
+        personId: id, name: FAMILY_DISPLAY_NAMES[id], color: FAMILY_COLORS[id],
+        book: rec.book || null, chapter: rec.chapter || null, updatedAt: rec.updatedAt || null
+      };
+    });
+  });
+}
+
+function bibleRelativeTimeAgo(ms){
+  const diffMin = Math.floor((Date.now() - ms) / 60000);
+  if(diffMin < 1) return 'just now';
+  if(diffMin < 60) return diffMin + 'm ago';
+  const diffHr = Math.floor(diffMin / 60);
+  if(diffHr < 24) return diffHr + 'h ago';
+  const diffDay = Math.floor(diffHr / 24);
+  if(diffDay === 1) return 'yesterday';
+  if(diffDay < 7) return diffDay + 'd ago';
+  return Math.floor(diffDay / 7) + 'w ago';
+}
+
+// Fully inline-styled (no dependency on any one surface's own CSS classes)
+// so this renders identically whether it's dropped into Bridge, Officers'
+// Country, or the boys' Word tab -- same reasoning as everything else in
+// this file being the one shared copy instead of three drifting ones.
+// openChapterFn is the caller's own chapter-navigation function name
+// (Bridge/Officers' Country: 'openBibleChapter'; boys: 'openWordChapter')
+// so tapping a family member's row jumps straight to their current spot.
+function familyReadingPanelHtml(reading, openChapterFn){
+  const rows = reading.map(r => {
+    const hasPosition = !!r.book;
+    const posText = hasPosition ? (r.book + ' ' + r.chapter) : 'Hasn’t started reading yet';
+    const timeText = hasPosition ? bibleRelativeTimeAgo(r.updatedAt) : '';
+    const clickAttr = hasPosition ? ` onclick="${openChapterFn}('${r.book.replace(/'/g,"\\'")}',${r.chapter})" style="cursor:pointer;"` : '';
+    return `<div${clickAttr} style="display:flex;justify-content:space-between;align-items:center;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.08);">
+      <span style="font-family:'Lato',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.3px;color:${r.color};">${r.name}</span>
+      <span style="font-family:'Crimson Pro',Georgia,serif;font-size:13px;color:${hasPosition?'rgba(255,255,255,.85)':'rgba(255,255,255,.4)'};font-style:${hasPosition?'normal':'italic'};">${posText}${timeText?' &middot; '+timeText:''}</span>
+    </div>`;
+  }).join('');
+  return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(200,146,42,.25);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+    <div style="font-family:'Orbitron','Cinzel',sans-serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2,#e8b84a);opacity:.85;margin-bottom:4px;">Family Reading</div>
+    ${rows}
+  </div>`;
+}

@@ -20,7 +20,7 @@
 <script>const PUSH_SW_PATH = '../firebase-messaging-sw.js';</script>
 <script src="../push-notifications.js"></script>
 <script src="../mission-engine.js?v=20260728"></script>
-<script src="../bible-shared.js?v=20260731"></script>
+<script src="../bible-shared.js?v=20260803"></script>
 <style>
 :root{
   --green:#1a4a2e;--green2:#2d6a47;--green3:#3d8a5e;
@@ -1995,11 +1995,18 @@ function renderBibleBookGrid(el){
   const books = Object.keys(currentBibleData());
   const bookBtn = b => `<button class="bib-book-btn" onclick="openBibleBook('${b}')">${b}</button>`;
   el.innerHTML = `
+    <div id="bib-family-reading"></div>
     <div class="bib-testament-label">Old Testament</div>
     <div class="bib-book-grid">${books.slice(0, BIB_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
     <div class="bib-testament-label">New Testament</div>
     <div class="bib-book-grid">${books.slice(BIB_OT_BOOK_COUNT).map(bookBtn).join('')}</div>
   `;
+  // Who's reading what, family-wide (bible-shared.js) -- fetched async so
+  // it never blocks the book grid itself from rendering immediately.
+  getFamilyReading().then(reading => {
+    const panelEl = document.getElementById('bib-family-reading');
+    if(panelEl) panelEl.innerHTML = familyReadingPanelHtml(reading, 'openBibleChapter');
+  });
 }
 
 function openBibleBook(book){
@@ -2028,6 +2035,7 @@ function openBibleChapter(book, chapter, opts){
   opts = opts || {};
   _bibNav.book = book;
   _bibNav.chapter = String(chapter);
+  recordBibleReading(currentPersonId(), book, chapter);
   if(_bibMode !== 'browse') setBibleMode('browse');
   else renderBibleBrowse();
   if(opts.scrollToVerse) setTimeout(() => scrollToBibleVerse(opts.scrollToVerse), 80);
