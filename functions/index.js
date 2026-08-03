@@ -603,7 +603,12 @@ async function fetchLookupData(agentId, dates) {
 // Cloud Functions can't reach). Keep both the scoring logic and
 // meals.json in sync with kitchen/index.html if either ever changes.
 const MEALS_DB = require('./meals.json');
-const ING_STOPWORDS = ['fresh', 'frozen', 'canned', 'can', 'cans', 'box', 'boxes', 'bag', 'bags', 'jar', 'jars', 'lb', 'lbs', 'oz', 'cup', 'cups', 'tbsp', 'tsp', 'pkg', 'pkgs', 'package', 'pieces', 'piece', 'cloves', 'clove', 'diced', 'chopped', 'sliced', 'minced', 'crushed', 'ground', 'small', 'medium', 'large', 'leftover', 'cooked', 'optional', 'divided', 'thawed', 'drained', 'to', 'of', 'the', 'for', 'and', 'or', 'a', 'an', 'with', 'about', 'approx', 'retain', 'juice', 'each', 'head', 'heads', 'bunch', 'stick', 'sticks', 'container', 'bottle', 'bottles', 'pkt', 'pkts', 'count', 'dash', 'pinch', 'taste'];
+// Kept in sync with kitchen/index.html's own ING_STOPWORDS/ingTokens/
+// wordsMatch/haveIngredient -- see that file for the full rationale
+// (word-boundary + plural-suffix matching, replacing raw substring
+// containment that produced real false positives like "instant yeast"
+// matching "Instant Potatoes").
+const ING_STOPWORDS = ['fresh', 'frozen', 'canned', 'can', 'cans', 'box', 'boxes', 'bag', 'bags', 'jar', 'jars', 'lb', 'lbs', 'oz', 'cup', 'cups', 'tbsp', 'tsp', 'pkg', 'pkgs', 'package', 'pieces', 'piece', 'cloves', 'clove', 'diced', 'chopped', 'sliced', 'minced', 'crushed', 'ground', 'small', 'medium', 'large', 'leftover', 'cooked', 'optional', 'divided', 'thawed', 'drained', 'to', 'of', 'the', 'for', 'and', 'or', 'a', 'an', 'with', 'about', 'approx', 'retain', 'juice', 'each', 'head', 'heads', 'bunch', 'stick', 'sticks', 'container', 'bottle', 'bottles', 'pkt', 'pkts', 'count', 'dash', 'pinch', 'taste', 'hot', 'instant', 'hamburger'];
 
 function ingTokens(str) {
   return String(str).toLowerCase()
@@ -613,12 +618,20 @@ function ingTokens(str) {
     .filter(w => w.length > 2 && !ING_STOPWORDS.includes(w));
 }
 
+function wordsMatch(a, b) {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  if (shorter.length < 4) return false;
+  return shorter + 's' === longer || shorter + 'es' === longer;
+}
+
 function haveIngredient(ingStr, invNames) {
   const tokens = ingTokens(ingStr);
   if (!tokens.length) return true; // pure seasoning/water etc -- assume on hand
   return invNames.some(inv => {
     const invToks = ingTokens(inv);
-    return tokens.some(t => invToks.some(it => it === t || (t.length > 4 && it.includes(t)) || (it.length > 4 && t.includes(it))));
+    return tokens.some(t => invToks.some(it => wordsMatch(t, it)));
   });
 }
 
