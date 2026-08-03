@@ -3527,11 +3527,25 @@ function mostRecentMondayStr(){
   const diff = (dow === 0) ? 6 : dow - 1;
   return localDateStr(new Date(d.getTime() - diff*24*60*60*1000));
 }
+function previousWeekMondayStr(){
+  const monday = new Date(mostRecentMondayStr()+'T12:00:00');
+  return localDateStr(new Date(monday.getTime() - 7*24*60*60*1000));
+}
+// On Monday, "this week" (mostRecentMondayStr) is today -- a brand-new
+// week with essentially no real data in it yet. What John actually wants
+// to see on Monday is last week's finished rollup instead (John's fix);
+// every other day of the week, the current, still-growing week is exactly
+// right (Tuesday shows Monday's day, Wednesday shows Monday+Tuesday, etc).
+// Both the display below and the Regenerate button use this same
+// selector so they're never targeting two different weeks.
+function reportCardWeekOf(){
+  return (new Date().getDay() === 1) ? previousWeekMondayStr() : mostRecentMondayStr();
+}
 
 let rcListener = null;
 function renderReportCard(){
   if(!_db) return;
-  const weekOf = mostRecentMondayStr();
+  const weekOf = reportCardWeekOf();
   if(rcListener) rcListener.off && rcListener.off();
   const ref = _db.ref('stewart/reportcards/'+weekOf);
   rcListener = ref;
@@ -3616,7 +3630,11 @@ async function regenerateReportCard(){
   let ok = false;
   for(let attempt = 1; attempt <= 2 && !ok; attempt++){
     try{
-      await callFunction('generateWeeklyReportCard', {});
+      // Explicit weekOf -- must match reportCardWeekOf() (what's actually
+      // on screen), not the server's own default of "always this week,"
+      // or Regenerate would silently rebuild a week that isn't even
+      // displayed on a Monday.
+      await callFunction('generateWeeklyReportCard', {weekOf: reportCardWeekOf()});
       ok = true;
     }catch(err){
       console.error('Regenerate attempt '+attempt+' failed:', err);
