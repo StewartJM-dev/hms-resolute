@@ -191,19 +191,51 @@ exports.notifyShipAccountResolved = functions.database
 // NextDNS Website Lockdown — unlock on completion
 // (nextdns-lockdown-punchlist.md, Step 2)
 //
-// Each boy's Chromebook DNS points at his own NextDNS profile, denylisted
-// to Resolute-only by default (Step 1, John's manual NextDNS setup —
-// this code never touches that initial deny configuration). The moment a
-// boy's morning+lunch missions are ALL done for the day (mission-engine.js
-// morningLunchComplete — the single shared definition of what "done"
-// means here, confirmed mission-by-mission with John, not inferred), his
-// recreation sites move to his profile's allowlist for the rest of the
-// day. Nightly reset (Step 3) puts everyone back to locked the next
-// morning regardless of what happened the day before.
+// Each boy's Chromebook DNS points at a NextDNS profile, denylisted to
+// Resolute-only by default (Step 1, John's manual NextDNS setup — this
+// code never touches that initial deny configuration). The moment the
+// relevant boy(s)' morning+lunch missions are ALL done for the day
+// (mission-engine.js morningLunchComplete — the single shared definition
+// of what "done" means here, confirmed mission-by-mission with John, not
+// inferred), the recreation sites move to that profile's allowlist for
+// the rest of the day. Nightly reset (Step 3) puts everyone back to
+// locked the next morning regardless of what happened the day before.
 //
+// TEAMS, not four independent devices — real-world constraint discovered
+// during setup: only two Chromebooks exist right now (two more are
+// coming), and Samuel+John Jr. share one while Stephen+Daniel will share
+// the other. ChromeOS's Secure DNS setting is DEVICE-wide, not tied to
+// which Google account is signed in — confirmed live (configuring it
+// under Samuel's login on the shared Chromebook applied to John Jr.'s
+// login too, per NextDNS's own "this device is using another profile"
+// banner). So for now, unlocking is a genuine team effort: BOTH teammates
+// must finish morning+lunch before their SHARED device's one active
+// profile unlocks, and the unlocked list is the union of both boys' own
+// domains, so whichever of them is on the shared device that evening can
+// reach either boy's approved sites. Mirrors the existing dish-team
+// pairing already established elsewhere in this app (mission-engine.js).
+// Revisit this once the other two Chromebooks arrive and each boy gets
+// his own device — at that point each team can split back into two
+// independent single-boy unlocks by just editing this array.
+const NEXTDNS_TEAMS = [
+  { members: ['samuel', 'johnjr'], profileAgentId: 'samuel' },
+  { members: ['stephen', 'daniel'], profileAgentId: 'stephen' }
+];
+function teamFor(agentId) {
+  return NEXTDNS_TEAMS.find(t => t.members.includes(agentId)) || null;
+}
+function teamRecreationDomains(team) {
+  const set = new Set();
+  team.members.forEach(id => (NEXTDNS_RECREATION_DOMAINS[id] || []).forEach(d => set.add(d)));
+  return [...set];
+}
+
 // CONFIG — fill in before this can actually call NextDNS. Profile IDs are
 // data, not something to hardcode inline into the trigger logic below, so
-// a profile change later is a one-line edit here, not a code change.
+// a profile change later is a one-line edit here, not a code change. All
+// four are kept (not just the two teams currently use) so this is ready
+// to go the moment the other two Chromebooks arrive and NEXTDNS_TEAMS
+// above splits back into four independent entries.
 // NEXTDNS_API_KEY is a Cloud Functions secret (same pattern as
 // ANTHROPIC_API_KEY), never committed to source.
 const NEXTDNS_PROFILE_IDS = {
@@ -220,24 +252,17 @@ const NEXTDNS_PROFILE_IDS = {
 // mission-engine.js, one definition instead of a duplicate that could
 // drift between what's shown and what actually unlocks.
 
-// TODO (needs John's input before this is real): confirm whether the
-// profiles use NextDNS's "allowlist-only" mode (deny everything except
-// what's allowlisted) or explicit broad denylisting — determines whether
-// unlocking needs BOTH a denylist DELETE and an allowlist POST per domain,
-// or just the allowlist POST. Shaped for the denylist+allowlist pair per
-// the punch list's own description; adjust once that's confirmed.
 // POST adds to the list with the domain in the BODY, against the bare
 // list URL. DELETE is the opposite shape — domain in the URL PATH, no
-// body at all. Live-verified against the real NextDNS API before this was
-// fixed: DELETE with the domain in the body (matching POST's shape)
-// returned 404/"notFound" and silently deleted nothing — caught by
-// unlockRecreationSites' own .catch(), so it never crashed anything, but
-// it also never actually cleaned up a denylist entry. Doesn't break the
-// unlock itself (NextDNS's own docs: "Allowing takes precedence over
-// everything else, including security features," confirmed by testing —
-// the allowlist POST alone unlocks regardless of the denylist DELETE's
-// outcome) but was worth fixing properly rather than leaving a
-// permanently-failing best-effort cleanup call in place.
+// body at all. Live-verified against the real NextDNS API: DELETE with
+// the domain in the body (matching POST's shape) returned 404/"notFound"
+// and silently deleted nothing — caught by the caller's own .catch(), so
+// it never crashed anything, but it also never actually cleaned up a
+// denylist entry. The real API wants the shape below. Also confirmed live
+// that this doesn't block the unlock itself either way — NextDNS's own
+// docs ("Allowing takes precedence over everything else, including
+// security features") hold up under testing: the allowlist POST alone
+// unlocks regardless of the denylist DELETE's outcome.
 async function nextDnsRequest(method, profileId, listType, domain) {
   const apiKey = process.env.NEXTDNS_API_KEY;
   const url = method === 'DELETE'
@@ -256,17 +281,16 @@ async function nextDnsRequest(method, profileId, listType, domain) {
 // Returns true only if the unlock actually happened — the caller uses
 // this to decide whether it's honest to record stewart/nextdnsUnlock as
 // unlocked:true. Returning true from a no-op (missing profile ID) would
-// let that status node claim a boy's sites are unlocked when nothing
-// actually changed at NextDNS, AND would block any future retry once a
-// profile ID does get configured, since the idempotency check above
-// would see the day as already "handled."
-async function unlockRecreationSites(agentId) {
-  const profileId = NEXTDNS_PROFILE_IDS[agentId];
+// let that status node claim sites are unlocked when nothing actually
+// changed at NextDNS, AND would block any future retry once a profile ID
+// does get configured, since the idempotency check above would see the
+// day as already "handled."
+async function unlockRecreationSites(profileAgentId, domains) {
+  const profileId = NEXTDNS_PROFILE_IDS[profileAgentId];
   if (!profileId) {
-    console.error(`nextdns: no profile ID configured for ${agentId} — cannot unlock. Fails safe (stays locked), does not throw.`);
+    console.error(`nextdns: no profile ID configured for ${profileAgentId} — cannot unlock. Fails safe (stays locked), does not throw.`);
     return false;
   }
-  const domains = NEXTDNS_RECREATION_DOMAINS[agentId] || [];
   for (const domain of domains) {
     await nextDnsRequest('DELETE', profileId, 'denylist', domain).catch(e => console.error('nextdns denylist delete failed:', e.message));
     await nextDnsRequest('POST', profileId, 'allowlist', domain).catch(e => console.error('nextdns allowlist add failed:', e.message));
@@ -289,23 +313,76 @@ exports.checkNextDnsUnlock = functions
     // real-time unlock call; that day is already over.
     if (date !== easternDateStr()) return null;
 
-    const doneSnap = await db.ref(`stewart/missions/${agentId}/${date}`).once('value');
-    const doneMap = doneSnap.val() || {};
-    const complete = morningLunchComplete(agentId, parseLocalDate(date), doneMap);
-    if (!complete) return null;
+    const team = teamFor(agentId);
+    if (!team) return null;
+
+    // BOTH teammates must be done — a shared-device unlock is a joint
+    // accomplishment, not "whichever brother finishes first carries the
+    // other." Re-checks every team member's data on every single write
+    // (not just the boy whose checkbox just changed), since either boy
+    // finishing last is what should trigger the unlock.
+    const doneMaps = await Promise.all(team.members.map(id =>
+      db.ref(`stewart/missions/${id}/${date}`).once('value').then(s => s.val() || {})
+    ));
+    const allComplete = team.members.every((id, i) => morningLunchComplete(id, parseLocalDate(date), doneMaps[i]));
+    if (!allComplete) return null;
 
     // Idempotency — once unlocked, stays unlocked for the day regardless
     // of what else happens (Behavior section: "the unlock persists for
-    // the rest of that day"). Never re-call NextDNS for a day already
-    // marked unlocked, and never re-lock mid-day if something later gets
-    // unchecked — only the nightly reset (Step 3) re-locks.
-    const statusRef = db.ref(`stewart/nextdnsUnlock/${agentId}/${date}`);
+    // the rest of that day"). Checked against the FIRST team member's own
+    // status node — both members' nodes are always written together
+    // below, so checking one is checking the pair. Never re-call NextDNS
+    // for a day already marked unlocked, and never re-lock mid-day if
+    // something later gets unchecked — only the nightly reset re-locks.
+    const statusRef = db.ref(`stewart/nextdnsUnlock/${team.members[0]}/${date}`);
     const statusSnap = await statusRef.once('value');
     if (statusSnap.val() && statusSnap.val().unlocked) return null;
 
-    const unlocked = await unlockRecreationSites(agentId);
+    const unlocked = await unlockRecreationSites(team.profileAgentId, teamRecreationDomains(team));
     if (!unlocked) return null; // no profile configured yet — stay silent, don't record a false unlocked status
-    await statusRef.set({ unlocked: true, unlockedAt: Date.now() });
+    // Written to EACH team member's own path (not just the profile
+    // owner's) so boys/index.html's Recreation Sites card — which reads
+    // stewart/nextdnsUnlock/{currentAgent.id}/{date} — shows the correct
+    // unlocked status for both boys, not just whichever one owns the
+    // shared device's profile.
+    const payload = { unlocked: true, unlockedAt: Date.now() };
+    await Promise.all(team.members.map(id => db.ref(`stewart/nextdnsUnlock/${id}/${date}`).set(payload)));
+    return null;
+  });
+
+// Step 3: nightly reset — re-locks every team back to Resolute-only at
+// midnight Eastern, regardless of whether they unlocked the day before.
+// Reverse of unlockRecreationSites: DELETE from allowlist, POST back to
+// denylist. Runs unconditionally for every team with a configured
+// profile — a team that never unlocked that day has nothing to undo, but
+// re-denylisting an already-denylisted domain (or un-allowlisting an
+// already-absent one) is a harmless no-op at the NextDNS API level, not
+// an error condition. Iterates over TEAMS (currently 2), not over all
+// four boys individually — Samuel and John Jr. share one profile right
+// now, so relocking per-boy would just issue the same API calls twice.
+async function relockRecreationSites(profileAgentId, domains) {
+  const profileId = NEXTDNS_PROFILE_IDS[profileAgentId];
+  if (!profileId) return;
+  for (const domain of domains) {
+    await nextDnsRequest('DELETE', profileId, 'allowlist', domain).catch(e => console.error('nextdns allowlist delete failed:', e.message));
+    await nextDnsRequest('POST', profileId, 'denylist', domain).catch(e => console.error('nextdns denylist add failed:', e.message));
+  }
+}
+
+exports.nightlyNextDnsReset = functions
+  .runWith({ secrets: ['NEXTDNS_API_KEY'] })
+  .pubsub.schedule('0 0 * * *')
+  .timeZone('America/New_York')
+  .onRun(async () => {
+    // Per-team try/catch so one team's NextDNS failure never blocks the
+    // other team from being re-locked — same pattern as detectJournalPatterns.
+    for (const team of NEXTDNS_TEAMS) {
+      try {
+        await relockRecreationSites(team.profileAgentId, teamRecreationDomains(team));
+      } catch (e) {
+        console.error('nightlyNextDnsReset failed for team', team.members.join('+'), e);
+      }
+    }
     return null;
   });
 
