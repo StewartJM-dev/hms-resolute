@@ -13,7 +13,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 // before every deploy — see that file's comment — so this stays the one
 // real copy, not a duplicate that can drift the way this file's own
 // header comment warns against.
-const { parseLocalDate, morningLunchComplete } = require('./mission-engine.js');
+const { parseLocalDate, morningLunchComplete, foldWishesBalance } = require('./mission-engine.js');
 const { NEXTDNS_RECREATION_DOMAINS } = require('./nextdns-config.js');
 admin.initializeApp();
 
@@ -1654,13 +1654,42 @@ exports.notifyTomWebsiteRequest = functions.database
     return null;
   });
 
+// Folds any not-yet-folded past days' earned wishes into the stored,
+// capped balance (mission-engine.js's foldWishesBalance -- see that file's
+// wishes-economy header comment for why a stored/capped balance replaced
+// the old sum-of-all-history approach). Safe to call redundantly.
+async function getFoldedWishesBalance(agentId) {
+  const today = easternDateStr();
+  const [balSnap, throughSnap, wishesSnap] = await Promise.all([
+    db.ref(`stewart/wishesBalance/${agentId}`).once('value'),
+    db.ref(`stewart/wishesBalanceThrough/${agentId}`).once('value'),
+    db.ref(`stewart/wishes/${agentId}`).once('value')
+  ]);
+  const days = wishesSnap.val() || {};
+  const earnedByDate = {};
+  Object.keys(days).forEach(d => { earnedByDate[d] = (days[d] || {}).earned || 0; });
+  const storedThrough = throughSnap.val();
+  const { balance, foldedThrough } = foldWishesBalance(balSnap.val(), storedThrough, today, earnedByDate);
+  if (foldedThrough !== storedThrough) {
+    await Promise.all([
+      db.ref(`stewart/wishesBalance/${agentId}`).set(balance),
+      db.ref(`stewart/wishesBalanceThrough/${agentId}`).set(foldedThrough)
+    ]);
+  }
+  return balance;
+}
+
 // Secure wish-spend commit, deliberately kept separate from askTom (which
 // already ran the AI call and returned a message). Confirming a wish is a
 // fast, non-AI RTDB transaction — the boy can cancel without ever being
 // charged, and the actual balance write only ever happens server-side, the
 // same trust-boundary reasoning as why the client never writes its own
-// score. Optimistically increments then verifies, rolling back on overspend,
-// so a race between two rapid taps can't double-spend past the real balance.
+// score. Folds first (so a legitimately-just-unlocked wish isn't rejected),
+// then decrements the stored balance directly via an RTDB transaction --
+// returning undefined from the transaction callback aborts it atomically
+// when the balance is already 0, which is a cleaner and more directly
+// race-safe way to reject an overspend than the old optimistic-increment-
+// then-verify-then-rollback dance this replaced.
 exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
   const { agentId, today } = data || {};
   if (!agentId || !ALLOWED_AGENT_IDS.includes(agentId)) {
@@ -1668,23 +1697,24 @@ exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
   }
   const localToday = (typeof today === 'string' && DATE_RE.test(today)) ? today : easternDateStr();
 
-  await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => (current || 0) + 1);
+  await getFoldedWishesBalance(agentId);
 
-  const snap = await db.ref(`stewart/wishes/${agentId}`).once('value');
-  const days = snap.val() || {};
-  let earned = 0, used = 0;
-  Object.keys(days).forEach(d => {
-    const rec = days[d] || {};
-    if (d < localToday) earned += (rec.earned || 0);
-    used += (rec.used || 0);
+  const txResult = await db.ref(`stewart/wishesBalance/${agentId}`).transaction(current => {
+    if (!current || current <= 0) return; // undefined -- aborts the transaction, no write
+    return current - 1;
   });
 
-  if (used > earned) {
-    await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => Math.max(0, (current || 0) - 1));
-    return { spent: false, reason: 'no_wishes_available', remaining: Math.max(0, earned - (used - 1)) };
+  if (!txResult.committed) {
+    return { spent: false, reason: 'no_wishes_available', remaining: txResult.snapshot.val() || 0 };
   }
 
-  return { spent: true, remaining: earned - used };
+  // Historical ledger (weekly report totals, Red Sky's per-day wishesUsed)
+  // stays separate from the live balance -- same reasoning as the Screen
+  // Time Bank keeping its own daily award flags alongside the running
+  // balance. Never gates spending; just records it happened.
+  await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => (current || 0) + 1);
+
+  return { spent: true, remaining: txResult.snapshot.val() };
 });
 
 // ════════════════════════════════════════════════════
@@ -2953,19 +2983,31 @@ function ownWhiteGloveRoomsForDay(wgDay, agentId) {
 }
 
 async function fetchRedSkyDayData(agentId, dateStr) {
-  const [scoreSnap, eligibleSnap, deductionSnap, wishSnap, strikeSnap, wgSnap] = await Promise.all([
+  const [scoreSnap, eligibleSnap, deductionSnap, wishSnap, strikeSnap, wgSnap, exceptionsSnap] = await Promise.all([
     db.ref(`stewart/scores/${agentId}/${dateStr}`).once('value'),
     db.ref(`stewart/eligible/${agentId}/${dateStr}`).once('value'),
     db.ref(`stewart/deductions/${agentId}/${dateStr}`).once('value'),
     db.ref(`stewart/wishes/${agentId}/${dateStr}`).once('value'),
     db.ref(`stewart/strikes/${agentId}/${dateStr}`).once('value'),
-    db.ref(`stewart/whiteglove/${dateStr}`).once('value')
+    db.ref(`stewart/whiteglove/${dateStr}`).once('value'),
+    db.ref(`stewart/exceptions/${dateStr}`).once('value')
   ]);
   const deductions = deductionSnap.val() || {};
   const wishes = wishSnap.val() || {};
   const strikeRec = strikeSnap.val() || {};
+  // score/eligible are null on weekends AND on Exception Days (mission-
+  // engine.js's recalculateScore short-circuits both the same way) --
+  // generateWeeklyReportCard already has to tell this apart from a real
+  // bad day (see the "CRITICAL -- Exception Days" rule in TINK_SYSTEM_PROMPT
+  // below); Red Sky at Morning was missing that same context entirely, so
+  // a null day read as an unexplained blank rather than a known day off,
+  // and Tom had nothing real to reason from when writing about it.
+  const exception = findExceptionForAgent(exceptionsSnap.val(), agentId);
   return {
     date: dateStr,
+    isWeekend: isWeekendStr(dateStr),
+    exceptionType: exception ? exception.type : null,
+    exceptionNote: exception ? (exception.note || '') : null,
     score: scoreSnap.val(),
     eligible: eligibleSnap.val(),
     deductionReasons: Object.keys(deductions).filter(k => k !== 'outOfTime'),
@@ -2990,7 +3032,7 @@ const RED_SKY_SCHEMA = {
 async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const roleInstructions = type === 'morning'
-    ? `This is RED SKY AT MORNING — he's just opened it, reviewing YESTERDAY. Forward-looking and gentle: name what actually went rough yesterday if anything did (a low score, a strike, a failed White Glove room, running out of time) plainly but without dwelling — then pivot firmly to today as a fresh start, "let's not repeat yesterday's mistakes," never a scolding. If yesterday was genuinely clean (good score, no strikes, rooms passed), say so plainly and warmly — don't manufacture a rough patch that isn't in the data. 2-4 sentences.`
+    ? `This is RED SKY AT MORNING — he's just opened it, reviewing YESTERDAY. Forward-looking and gentle: name what actually went rough yesterday if anything did (a low score, a strike, a failed White Glove room, running out of time) plainly but without dwelling — then pivot firmly to today as a fresh start, "let's not repeat yesterday's mistakes," never a scolding. If yesterday was genuinely clean (good score, no strikes, rooms passed), say so plainly and warmly — don't manufacture a rough patch that isn't in the data. CRITICAL — score and eligible are null on weekends AND on Exception Days, NOT because he underperformed: check isWeekend and exceptionType/exceptionNote FIRST. If isWeekend is true, say plainly that yesterday was a scheduled day off (Saturday/Sunday chores are tracked separately, not scored) — never describe it as "no missions done" or a blank/rough day. If exceptionType is set, name the real reason plainly and matter-of-factly the same way ("yesterday was a planned [exceptionType]" using exceptionNote if it adds real detail) — never read it as a slump or a gap to explain away. Strikes/wishes/White Glove data can still be real and worth mentioning even on a day off or exception day; only the null score itself needs this context. 2-4 sentences.`
     : `This is RED SKY AT NIGHT — today's good report, only ever shown after every one of today's missions is actually done, so this IS a real earned moment. Celebrate today specifically and concretely (real numbers, real specifics — which rooms he passed, wishes earned, a clean conduct day) — warm, proud, earned, not generic cheerleading. If something today wasn't perfect despite finishing all missions (a strike, a failed room) still be honest about it, but the overall frame stays a genuine win — he finished the mission. 2-4 sentences.`;
   const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
 
@@ -3022,9 +3064,14 @@ exports.generateRedSkyReport = functions
 
     let targetDate;
     if (type === 'morning') {
-      const y = new Date();
-      y.setDate(y.getDate() - 1);
-      targetDate = easternDateStr(y);
+      // parseDateStr/formatDateStr (not raw Date.setDate/subtract-24h) --
+      // per parseDateStr's own comment, noon-UTC keeps this calendar
+      // subtraction safe across the two DST-transition days a year, which
+      // the previous local-Date approach got wrong by a full day right at
+      // the transition boundary (verified with a full-year sweep).
+      const y = parseDateStr(easternDateStr());
+      y.setUTCDate(y.getUTCDate() - 1);
+      targetDate = formatDateStr(y);
     } else {
       targetDate = easternDateStr();
       // Night is gated on full chore completion, server-side — a real

@@ -327,8 +327,23 @@ function detectDishTransfer(myDoneToday, partnerDoneToday, myExpectedToday){
 // Earning is written here (see recalculateScore below); SPENDING a wish is
 // deliberately NOT done here — that's a trust boundary enforced server-side
 // by askTom (functions/index.js), same reasoning as why the boys' client
-// code never writes its own score. getAvailableWishes() below is read-only,
-// for UI display.
+// code never writes its own score.
+//
+// Balance model (John's decision, one-time correction + ongoing cap): the
+// spendable balance is a real STORED, capped running total at
+// stewart/wishesBalance/{agentId} — same concept as the Screen Time Bank's
+// stewart/screenTimeBalance, not a derived sum-of-all-history like this used
+// to be. That distinction actually matters here, not just stylistically: once
+// a cap is involved, the balance can't be correctly reconstructed from raw
+// history alone whenever spending and earning interleave (spending opens up
+// headroom below the cap for future earning to fill; a pure "sum everything
+// then clamp once" loses that headroom and undercounts). So earning is
+// folded into the stored balance exactly once per day, in order, via
+// foldWishesBalance() below, and spending decrements that same stored value
+// directly (functions/index.js's spendTomWish). getAvailableWishes() is
+// still read-only from a caller's perspective for UI display — it just also
+// lazily catches the stored balance up first if any past days haven't been
+// folded in yet, which is always safe/idempotent to do redundantly.
 // ══════════════════════════════════════════════════════
 function wishesForPct(pct){
   if(pct >= 1) return 3;
@@ -337,22 +352,55 @@ function wishesForPct(pct){
   return 0;
 }
 
-// Current spendable wish balance: every PRIOR day's earned wishes, minus
-// everything used (including today's own usage), floored at 0. Today's own
-// earned wishes are excluded on purpose — per the original design, wishes
-// earned today don't unlock until tomorrow.
+const WISHES_MAX_BALANCE = 3;
+
+// Pure — given the currently-stored balance, the last date already folded
+// into it (or null if never folded), today's date, and {date: earnedAmount}
+// for the full stewart/wishes/{agentId} history, returns the up-to-date
+// balance and the new foldedThrough cursor. Today's own earned is always
+// excluded (wishes earned today unlock tomorrow, unchanged from the
+// original design); already-folded dates are skipped so repeat calls don't
+// double-count. Summing the whole unfolded gap and capping once (rather
+// than capping day-by-day) is safe specifically because nothing ever spends
+// mid-gap — any spend attempt during an uncaught-up gap folds first, so by
+// the time a decrement actually applies, the fold is already caught up to
+// the present moment.
+function foldWishesBalance(storedBalance, foldedThrough, today, earnedByDate){
+  let sum = 0;
+  let newThrough = foldedThrough || null;
+  Object.keys(earnedByDate).sort().forEach(dateStr => {
+    if(dateStr >= today) return;
+    if(foldedThrough && dateStr <= foldedThrough) return;
+    sum += (earnedByDate[dateStr] || 0);
+    newThrough = dateStr;
+  });
+  return {
+    balance: Math.min(WISHES_MAX_BALANCE, (storedBalance || 0) + sum),
+    foldedThrough: newThrough
+  };
+}
+
+// Current spendable wish balance — folds any newly-unlocked past days into
+// the stored balance first (writing back only if anything actually changed),
+// then returns it.
 function getAvailableWishes(agentId){
   if(!_db) return Promise.resolve(0);
   const today = localDateStr();
-  return _db.ref(`stewart/wishes/${agentId}`).once('value').then(snap => {
-    const days = snap.val() || {};
-    let earned = 0, used = 0;
-    Object.keys(days).forEach(dateStr => {
-      const rec = days[dateStr] || {};
-      if(dateStr < today) earned += (rec.earned || 0);
-      used += (rec.used || 0);
-    });
-    return Math.max(0, earned - used);
+  return Promise.all([
+    _db.ref(`stewart/wishesBalance/${agentId}`).once('value'),
+    _db.ref(`stewart/wishesBalanceThrough/${agentId}`).once('value'),
+    _db.ref(`stewart/wishes/${agentId}`).once('value')
+  ]).then(([balSnap, throughSnap, wishesSnap]) => {
+    const days = wishesSnap.val() || {};
+    const earnedByDate = {};
+    Object.keys(days).forEach(dateStr => { earnedByDate[dateStr] = (days[dateStr] || {}).earned || 0; });
+    const storedThrough = throughSnap.val();
+    const { balance, foldedThrough } = foldWishesBalance(balSnap.val(), storedThrough, today, earnedByDate);
+    if(foldedThrough !== storedThrough){
+      _db.ref(`stewart/wishesBalance/${agentId}`).set(balance);
+      _db.ref(`stewart/wishesBalanceThrough/${agentId}`).set(foldedThrough);
+    }
+    return balance;
   });
 }
 
@@ -1104,6 +1152,7 @@ if(typeof module !== 'undefined' && module.exports){
   module.exports = {
     localDateStr, parseLocalDate,
     buildMissions,
-    morningLunchMissions, morningLunchComplete
+    morningLunchMissions, morningLunchComplete,
+    WISHES_MAX_BALANCE, foldWishesBalance
   };
 }
