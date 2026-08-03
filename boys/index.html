@@ -3808,14 +3808,18 @@ async function renderTomWishCounter(){
 
 // Red Sky at Morning / Red Sky at Night (combined-batch-punchlist.md Part
 // 7, made fully automatic as a later follow-up) — no buttons. Morning
-// fires once per day, the first time a boy opens Compass. Night fires
-// once per day, the first time he opens Compass at/after 6pm with today's
-// missions actually complete — checked client-side first against
-// stewart/eligible (the same field generateRedSkyReport itself gates on
-// server-side) so an unprompted "you're not done yet, sailor" card never
-// surfaces on its own; that gentle nudge only makes sense as a reply to a
-// boy who asked, and this never asks on his behalf. The server-side gate
-// stays in place regardless as the real enforcement.
+// stays viewable all day until 6pm; Night takes over from 6pm until
+// midnight once today's missions are actually complete — checked client-
+// side first against stewart/eligible (the same field generateRedSkyReport
+// itself gates on server-side) so an unprompted "you're not done yet,
+// sailor" card never surfaces on its own; that gentle nudge only makes
+// sense as a reply to a boy who asked, and this never asks on his behalf.
+// The server-side gate stays in place regardless as the real enforcement.
+// Re-fetches on every Compass visit rather than once-per-day-then-forget
+// (the earlier design): the server now caches both Morning and Night per
+// real day, so a revisit is a cheap cache read, not a fresh AI call —
+// which is what actually lets the card STAY viewable/re-appear across
+// tab switches instead of flashing once and vanishing until tomorrow.
 function redSkyCardHtml(type, message, locked){
   const label = type === 'morning' ? 'Red Sky at Morning' : 'Red Sky at Night';
   return `<div style="background:${locked?'rgba(255,255,255,.04)':'rgba(200,146,42,.1)'};border:1px solid ${locked?'rgba(255,255,255,.15)':'rgba(200,146,42,.4)'};border-radius:10px;padding:14px;margin-bottom:10px;">
@@ -3840,35 +3844,21 @@ async function autoShowRedSky(){
   if(!currentAgent || !_db) return;
   const el = document.getElementById('redsky-content');
   if(!el) return;
-  const today = localDateStr();
-  let state = {};
-  try { state = JSON.parse(localStorage.getItem('redsky-'+currentAgent.id+'-'+today) || '{}'); } catch(e){}
 
-  const cards = [];
-  let changed = false;
-
-  if(!state.morning){
-    cards.push(await fetchRedSkyCard('morning'));
-    state.morning = true; changed = true;
-  }
-
-  if(new Date().getHours() >= 18 && !state.night){
+  let type = 'morning';
+  if(new Date().getHours() >= 18){
+    const today = localDateStr();
     const eligSnap = await _db.ref(`stewart/eligible/${currentAgent.id}/${today}`).once('value');
     const elig = eligSnap.val();
     const allDone = !!(elig && elig.total > 0 && elig.completed >= elig.total);
-    if(allDone){
-      cards.push(await fetchRedSkyCard('night'));
-      state.night = true; changed = true;
-    }
+    // Not earned yet -- fall back to Morning's card rather than showing
+    // nothing; Night only takes over once it's actually earned.
+    if(allDone) type = 'night';
   }
 
-  if(changed){
-    try { localStorage.setItem('redsky-'+currentAgent.id+'-'+today, JSON.stringify(state)); } catch(e){}
-  }
-  if(cards.length){
-    el.style.display = 'block';
-    el.innerHTML = cards.join('');
-  }
+  const card = await fetchRedSkyCard(type);
+  el.style.display = 'block';
+  el.innerHTML = card;
 }
 
 async function askTomChat(){

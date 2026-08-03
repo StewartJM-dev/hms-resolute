@@ -3171,12 +3171,26 @@ exports.generateRedSkyReport = functions
     // weekend in the first place (autoShowRedSky checks eligible.total>0
     // before calling). Confirmed via that logic rather than assumed --
     // no change needed here.
+    //
+    // Cached the same way Morning is (stewart/redsky/{agentId}/{date}/night)
+    // now that the client re-fetches on every Compass visit after 6pm
+    // instead of fetching once and remembering locally -- without this,
+    // every revisit during the evening would burn a fresh real AI call.
+    // The locked/not-yet-earned response is NOT cached -- it's cheap (no AI
+    // call happens before the allDone check) and needs to re-check live
+    // each time so it flips to the real message the moment he finishes.
     const targetDate = todayEastern;
     const eligSnap = await db.ref(`stewart/eligible/${agentId}/${targetDate}`).once('value');
     const elig = eligSnap.val();
     const allDone = !!(elig && elig.total > 0 && elig.completed >= elig.total);
     if (!allDone) {
       return { locked: true, message: "Not tonight, sailor — finish today's missions first. This one's earned." };
+    }
+
+    const cacheRef = db.ref(`stewart/redsky/${agentId}/${todayEastern}/night`);
+    if (!force) {
+      const cached = await cacheRef.once('value');
+      if (cached.val()) return cached.val();
     }
 
     const dayData = await fetchRedSkyDayData(agentId, targetDate);
@@ -3186,7 +3200,9 @@ exports.generateRedSkyReport = functions
     if (isFirstTime) await seenRef.set(true);
 
     const message = await generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime);
-    return { locked: false, message, date: targetDate };
+    const result = { locked: false, message, date: targetDate };
+    await cacheRef.set({ ...result, generatedAt: Date.now() });
+    return result;
   });
 
 // ════════════════════════════════════════════════════
