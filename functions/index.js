@@ -3048,6 +3048,32 @@ async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isF
   return JSON.parse(raw).message;
 }
 
+// Monday's Red Sky at Morning (John's fix): "yesterday" on a Monday is
+// Sunday, which never scores by design -- the daily version would have
+// nothing real to review and either come up blank or (before the isWeekend
+// fix above) get misread as a bad day. Rather than describe an empty day
+// off every single Monday, pull the FULL PREVIOUS WEEK (fetchBoyWeekData,
+// the same per-boy week aggregation the household weekly report itself
+// uses) and give an honest week-in-review instead -- still Tom's voice,
+// still not a lecture, just a wider lens for the one day a week that needs
+// it. Every other weekday keeps the single-day version unchanged.
+async function generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFirstTime) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const roleInstructions = `This is RED SKY AT MORNING, but it's Monday -- Sunday isn't a scored day, so instead of reviewing just "yesterday" (which would come up empty), review the FULL WEEK that just ended (Monday through Sunday). Give an honest week-in-review: how the week actually went overall (real average score, real total strikes/wishes/exceptions, a real pattern if one exists across the days) -- then close with plain, specific encouragement on where to improve this coming week. Same warm, honest, never-scolding tone as the daily version, just a wider lens. Exception Days and weekends within the week (score/eligible null, exceptionType set or not) are NOT a performance gap -- name them plainly the same way the daily version would ("Saturday and Sunday don't score," "Thursday was a planned [exceptionType]") rather than reading them as missing/bad days. If the week was genuinely solid, say so plainly and warmly rather than manufacturing a rough patch that isn't in the data. A bit longer than the daily version since there's a real week to cover, but still tight: 3-5 sentences.`;
+  const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
+
+  const response = await anthropic.messages.create({
+    model: TOM_MODEL,
+    max_tokens: 500,
+    system,
+    output_config: { format: { type: 'json_schema', schema: RED_SKY_SCHEMA } },
+    messages: [{ role: 'user', content: `${agentName}'s real week (${weekData.weekOf} through ${weekData.weekEnd}):\n${JSON.stringify(weekData)}` }]
+  });
+  await logTomUsage(agentId, response.usage);
+  const raw = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  return JSON.parse(raw).message;
+}
+
 exports.generateRedSkyReport = functions
   .runWith({ secrets: ['ANTHROPIC_API_KEY'] })
   .https.onCall(async (data, callableContext) => {
@@ -3061,28 +3087,63 @@ exports.generateRedSkyReport = functions
 
     const agentName = AGENT_DISPLAY_NAMES[agentId];
     const age = AGENT_AGES[agentId];
+    const todayEastern = easternDateStr();
 
-    let targetDate;
     if (type === 'morning') {
       // parseDateStr/formatDateStr (not raw Date.setDate/subtract-24h) --
       // per parseDateStr's own comment, noon-UTC keeps this calendar
       // subtraction safe across the two DST-transition days a year, which
       // the previous local-Date approach got wrong by a full day right at
       // the transition boundary (verified with a full-year sweep).
-      const y = parseDateStr(easternDateStr());
+      const y = parseDateStr(todayEastern);
       y.setUTCDate(y.getUTCDate() - 1);
-      targetDate = formatDateStr(y);
-    } else {
-      targetDate = easternDateStr();
-      // Night is gated on full chore completion, server-side — a real
-      // earned moment, not just a client-side hide a boy could route
-      // around by calling the function directly.
-      const eligSnap = await db.ref(`stewart/eligible/${agentId}/${targetDate}`).once('value');
-      const elig = eligSnap.val();
-      const allDone = !!(elig && elig.total > 0 && elig.completed >= elig.total);
-      if (!allDone) {
-        return { locked: true, message: "Not tonight, sailor — finish today's missions first. This one's earned." };
+      const targetDate = formatDateStr(y);
+
+      // Monday's "yesterday" is Sunday, which never scores -- pull the
+      // full previous week instead of a day with nothing real to review.
+      const isMonday = parseDateStr(todayEastern).getUTCDay() === 1;
+      if (isMonday) {
+        const weekOf = previousWeekMonday(todayEastern);
+        const weekEnd = formatDateStr(new Date(parseDateStr(weekOf).getTime() + 6 * 24 * 60 * 60 * 1000));
+        const dates = dateRange(weekOf, weekEnd, 7);
+        const exceptionsByDate = await fetchExceptionsByDate(dates);
+        const weekData = await fetchBoyWeekData(agentId, dates, exceptionsByDate);
+        weekData.weekOf = weekOf;
+        weekData.weekEnd = weekEnd;
+
+        const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
+        const seenSnap = await seenRef.once('value');
+        const isFirstTime = !seenSnap.val();
+        if (isFirstTime) await seenRef.set(true);
+
+        const message = await generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFirstTime);
+        return { locked: false, message, date: targetDate, weekOf, isWeekReview: true };
       }
+
+      const dayData = await fetchRedSkyDayData(agentId, targetDate);
+      const seenRef = db.ref(`stewart/redsky/${agentId}/seenIntro`);
+      const seenSnap = await seenRef.once('value');
+      const isFirstTime = !seenSnap.val();
+      if (isFirstTime) await seenRef.set(true);
+
+      const message = await generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime);
+      return { locked: false, message, date: targetDate };
+    }
+
+    // RED SKY AT NIGHT reports on TODAY, not "yesterday" -- it has no
+    // equivalent Monday/Sunday dependency. It's already self-gated
+    // correctly on any day with nothing to complete: eligible is null on
+    // weekends the same way score is, so allDone is false and this
+    // returns locked, and the CLIENT never even attempts the call on a
+    // weekend in the first place (autoShowRedSky checks eligible.total>0
+    // before calling). Confirmed via that logic rather than assumed --
+    // no change needed here.
+    const targetDate = todayEastern;
+    const eligSnap = await db.ref(`stewart/eligible/${agentId}/${targetDate}`).once('value');
+    const elig = eligSnap.val();
+    const allDone = !!(elig && elig.total > 0 && elig.completed >= elig.total);
+    if (!allDone) {
+      return { locked: true, message: "Not tonight, sailor — finish today's missions first. This one's earned." };
     }
 
     const dayData = await fetchRedSkyDayData(agentId, targetDate);
