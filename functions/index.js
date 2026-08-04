@@ -1596,6 +1596,11 @@ exports.askTom = functions
     // the first verse — the deep-link lands on that verse, which is the
     // right destination either way (single verse or the start of a range).
     let citedVerse = null;
+    // Carried through to the client and only queued into
+    // stewart/tomWebsiteRequests (which is what actually notifies parents)
+    // once a wish is genuinely spent -- see the 'interest' branch below for
+    // why this can no longer happen here, eagerly, on every ask.
+    let suggestedWebsite = null;
 
     if (type === 'wish_spend' && overBudget) {
       type = 'declined';
@@ -1621,20 +1626,25 @@ exports.askTom = functions
         message += `\n\nI couldn't pull the exact verse just now — ask your father to help you find it in Scripture. He'll know right where to look.`;
       }
     } else if (category === 'interest' && parsed.suggestedWebsite) {
-      try {
-        await db.ref(`stewart/tomWebsiteRequests/${agentId}`).push({
-          website: parsed.suggestedWebsite,
-          question,
-          agentName,
-          status: 'pending',
-          timestamp: admin.database.ServerValue.TIMESTAMP
-        });
-      } catch (e) {
-        console.error('Failed to queue Tom website request:', e);
-      }
+      // BUG FIX (John's report, live on John Jr.'s account): this used to
+      // push to stewart/tomWebsiteRequests -- which is what triggers the
+      // real parent notification -- right here, unconditionally, on every
+      // single ask. But 'interest' always maps to type:'wish_spend' above,
+      // meaning the boy's own client gates the real message behind an
+      // actual wish spend and only reveals it on a successful confirm. The
+      // notification (and the underlying real website suggestion) was
+      // firing regardless of whether he had a wish, could afford one, or
+      // the confirm even succeeded -- so parents got real "Tom suggested
+      // gardening.com" notifications for requests the boy never actually
+      // saw the result of, while he saw "you're fresh out, sailor" and
+      // nothing else, over and over, one real AI call and one real
+      // notification per attempt. Now just carried through in the response;
+      // confirmTomWish (boys/index.html) queues this exact same write
+      // itself, only after spendTomWish actually reports a real spend.
+      suggestedWebsite = parsed.suggestedWebsite;
     }
 
-    return { type, category, message, citedVerse };
+    return { type, category, message, citedVerse, suggestedWebsite };
   });
 
 // Notifies parents when Tom suggests a website, so they know and can review

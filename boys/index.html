@@ -3922,7 +3922,13 @@ async function sendTomQuestion(question, verseContext){
         // way it promotes realText into text.
         citedVerse: result.citedVerse || null,
         category: result.category,
-        type: result.type
+        type: result.type,
+        // Held the same way -- askTom no longer queues the parent
+        // notification itself (it used to fire unconditionally on every
+        // ask, regardless of whether the wish was ever actually spent).
+        // confirmTomWish() queues it, only after a real successful spend.
+        suggestedWebsite: result.suggestedWebsite || null,
+        question
       });
     } else {
       await thinkingRef.update({
@@ -3965,6 +3971,22 @@ async function confirmTomWish(key){
       // message; only cleared in the fallback branches below, where the
       // real content (and any citation) never actually gets shown.
       await ref.update({ text: msg.realText, pendingWish: null, realText: null });
+      // Parent notification (John's fix) only ever fires from HERE now,
+      // after a real confirmed spend — askTom() used to queue this
+      // unconditionally on every ask regardless of whether the wish was
+      // ever actually spent, so parents got real "Tom suggested
+      // gardening.com" notifications for requests the boy never even got
+      // to see the result of. Same write shape askTom used to push
+      // itself, just gated correctly now.
+      if(msg.suggestedWebsite){
+        _db.ref(`stewart/tomWebsiteRequests/${currentAgent.id}`).push({
+          website: msg.suggestedWebsite,
+          question: msg.question || '',
+          agentName: currentAgent.name,
+          status: 'pending',
+          timestamp: Date.now()
+        }).catch(() => {});
+      }
     } else {
       await ref.update({ text: "That one's worth a wish, but you're fresh out, sailor. Come back once you've earned more.", pendingWish: null, realText: null, citedVerse: null });
     }
