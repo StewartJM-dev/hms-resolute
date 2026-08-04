@@ -1518,6 +1518,19 @@ exports.askTom = functions
     if (!question) {
       throw new functions.https.HttpsError('invalid-argument', 'question is required.');
     }
+
+    // Compass's own 4-strike auto-pause (John's fix), enforced server-side
+    // -- the client checks this too (sendTomQuestion, boys/index.html) for
+    // immediate UX, but a boy could otherwise route around a client-only
+    // gate by calling this function directly, same trust-boundary
+    // reasoning as the budget cap below.
+    const compassMuteSnap = await db.ref(`stewart/compassmutes/${agentId}`).once('value');
+    const compassMute = compassMuteSnap.val();
+    const compassMutedUntil = compassMute === true ? Infinity : (typeof compassMute === 'number' ? compassMute : 0);
+    if (compassMutedUntil && Date.now() < compassMutedUntil) {
+      return { type: 'declined', category: 'declined_offtopic', message: "Compass is paused for today, sailor — too many strikes. Back tomorrow." };
+    }
+
     // Step 3 (Family Bible punch list): a question asked from within the
     // Bible section carries which verse was in view. Resolved server-side
     // against the real KJV (same lookupVerse the citation flow already
@@ -1534,12 +1547,17 @@ exports.askTom = functions
 
     async function moderateAndRespond(category) {
       const count = await recordStrike(agentId, easternDateStr(), category, 'tomchat', question);
-      const message = tomModerationNudgeText(category, count);
+      // Compass's own strike pool (John's fix) -- separate from the shared
+      // group/private-chat count above, with its own more lenient
+      // threshold (4). See recordCompassStrike/autoPauseCompassForStrikes.
+      const compassCount = await recordCompassStrike(agentId, easternDateStr());
+      const message = tomModerationNudgeText(category, count, compassCount);
       await pushTomModerationNudge(agentId, message, category);
       if (category === 'unkind') {
         await notifyParentsOfUnkindMessage(agentId, agentName, question, 'tomchat', String(Date.now()));
       }
       if (count >= AUTO_PAUSE_STRIKE_THRESHOLD) await autoPauseForStrikes(agentId, agentName);
+      if (compassCount >= AUTO_PAUSE_COMPASS_STRIKE_THRESHOLD) await autoPauseCompassForStrikes(agentId, agentName);
       return { type: 'declined', category, message };
     }
 
@@ -1800,17 +1818,34 @@ const TOM_MODERATION_NUDGE_BANNED_TERM = "That number's off-limits in the chat, 
 // actually triggers.
 const AUTO_PAUSE_STRIKE_THRESHOLD = 3;
 
+// Compass's own, separate, more lenient threshold (John's fix) -- strikes
+// picked up in Tom chat used to feed the SAME shared daily count as group
+// chat and the private thread, but nothing ever actually enforced a pause
+// against Compass itself (stewart/chatmutes was only ever checked by
+// sendGroupMessage) -- a boy could rack up strikes there indefinitely with
+// zero consequence. Tracked as its own pool via recordCompassStrike below
+// rather than reusing the shared count, specifically so Compass can have
+// its own threshold instead of inheriting group/private chat's stricter one.
+const AUTO_PAUSE_COMPASS_STRIKE_THRESHOLD = 4;
+
 // Appends the boy's live strike count to the base nudge so he knows exactly
 // where he stands in the moment ("that's strike 2 of 3 today"), not just
 // that he got corrected — makes the escalation legible instead of each
-// nudge feeling like an isolated, disconnected event.
-function tomModerationNudgeText(category, count) {
+// nudge feeling like an isolated, disconnected event. compassCount, when
+// given (always, from the one tomchat call site), drives the strike line
+// off Compass's own pool/threshold instead of the shared one, since that's
+// the consequence actually relevant to a Compass conversation.
+function tomModerationNudgeText(category, count, compassCount) {
   const base = category === 'banned_term' ? TOM_MODERATION_NUDGE_BANNED_TERM
     : category === 'gibberish_spam' ? TOM_MODERATION_NUDGE_GIBBERISH
     : TOM_MODERATION_NUDGE_UNKIND;
-  const strikeLine = count >= AUTO_PAUSE_STRIKE_THRESHOLD
-    ? `That's strike ${count} of ${AUTO_PAUSE_STRIKE_THRESHOLD} today, sailor — chat's paused for the rest of the day.`
-    : `That's strike ${count} of ${AUTO_PAUSE_STRIKE_THRESHOLD} today, sailor.`;
+  const strikeLine = (typeof compassCount === 'number')
+    ? (compassCount >= AUTO_PAUSE_COMPASS_STRIKE_THRESHOLD
+        ? `That's strike ${compassCount} of ${AUTO_PAUSE_COMPASS_STRIKE_THRESHOLD} in Compass today, sailor — Compass is paused for the rest of the day.`
+        : `That's strike ${compassCount} of ${AUTO_PAUSE_COMPASS_STRIKE_THRESHOLD} in Compass today, sailor.`)
+    : (count >= AUTO_PAUSE_STRIKE_THRESHOLD
+        ? `That's strike ${count} of ${AUTO_PAUSE_STRIKE_THRESHOLD} today, sailor — chat's paused for the rest of the day.`
+        : `That's strike ${count} of ${AUTO_PAUSE_STRIKE_THRESHOLD} today, sailor.`);
   return `${base} ${strikeLine}`;
 }
 
@@ -1834,6 +1869,15 @@ async function recordStrike(agentId, date, category, source, text) {
     timestamp: Date.now()
   });
   const result = await db.ref(`stewart/strikes/${agentId}/${date}/count`).transaction(current => (current || 0) + 1);
+  return result.snapshot.val();
+}
+
+// Compass's own strike counter (John's fix) -- stewart/strikes/{agentId}/
+// {date}/compassCount, separate from the shared /count above. The incident
+// itself is already logged once by recordStrike (source:'tomchat'), so this
+// only tracks the sub-count Compass's own auto-pause threshold reads.
+async function recordCompassStrike(agentId, date) {
+  const result = await db.ref(`stewart/strikes/${agentId}/${date}/compassCount`).transaction(current => (current || 0) + 1);
   return result.snapshot.val();
 }
 
@@ -1922,6 +1966,27 @@ async function autoPauseForStrikes(agentId, agentName) {
 
   const title = 'Chat Auto-Paused — ' + agentName;
   const body = agentName + " hit 3 strikes today from Tom's chat moderation — group chat is paused for the rest of the day.";
+  await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
+}
+
+// Compass's own auto-pause (John's fix) -- mirrors autoPauseForStrikes
+// exactly, just against stewart/compassmutes instead of stewart/chatmutes,
+// and enforced by askTom itself (server-side check near the top of the
+// function) plus checkCompassMute()/sendTomQuestion client-side
+// (boys/index.html), the same two-layer pattern group chat's mute already
+// uses (checkChatMute() + sendGroupMessage()'s own check).
+async function autoPauseCompassForStrikes(agentId, agentName) {
+  const untilMs = endOfEasternDayMs();
+  const muteRef = db.ref(`stewart/compassmutes/${agentId}`);
+  const result = await muteRef.transaction(current => {
+    if (current === true) return undefined;
+    if (typeof current === 'number' && current >= untilMs) return undefined;
+    return untilMs;
+  });
+  if (!result.committed) return; // already paused at least this strong — no notification needed
+
+  const title = 'Compass Auto-Paused — ' + agentName;
+  const body = agentName + ' hit 4 strikes today in Compass — Tom chat is paused for the rest of the day.';
   await Promise.all(['john', 'dawn'].map(p => sendToPerson(p, title, body, 'bridge/')));
 }
 

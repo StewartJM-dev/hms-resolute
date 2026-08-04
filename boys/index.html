@@ -1165,6 +1165,7 @@ body.theme-wild .word-mode-btn.active{background:var(--wild2);border-color:var(-
 
       <div style="background:var(--black);border:1px solid var(--gold);border-radius:10px;overflow:hidden;">
         <div style="font-size:9px;color:rgba(255,255,255,.4);padding:8px 13px 0;">Ask Tom anything. App questions are always free.</div>
+        <div id="compass-mute-notice" style="display:none;margin:8px 13px 0;padding:8px 12px;border-radius:8px;background:rgba(181,69,27,.15);border:1px solid rgba(181,69,27,.4);color:#cc5533;font-size:11.5px;text-align:center;"></div>
         <div style="padding:10px 13px;max-height:340px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:8px;" id="tom-messages"></div>
         <div style="display:flex;gap:8px;padding:10px 13px;border-top:2px solid var(--gold);background:var(--black);">
           <input type="text" id="tom-input" placeholder="Ask Tom..." maxlength="280" autocomplete="off" name="msg-tom-nofill"
@@ -1870,7 +1871,7 @@ function showTab(name, btn){
   if(name === 'xbox'){ renderGameTime(); renderReadingLog(); }
   if(name === 'transmissions'){ renderTransmissions(); initGroupThreadInline(); initPrivateThreadInline(); }
   if(name === 'training'){ renderSelfAssessment(); renderJournalEntries(); renderTeachMeVote(); renderFamilyDevotionalDisplay(); renderCourageDare(); }
-  if(name === 'compass'){ initTomChat(); renderTomWishCounter(); autoShowRedSky(); }
+  if(name === 'compass'){ initTomChat(); renderTomWishCounter(); autoShowRedSky(); checkCompassMute(); }
   if(name === 'word') renderWordTab();
 }
 
@@ -3186,6 +3187,36 @@ function checkChatMute(){
   });
 }
 
+// Compass's own auto-pause (John's fix) — separate pool, separate (more
+// lenient) 4-strike threshold from group/private chat's 3, since Compass
+// strikes used to feed the SAME shared daily count without anything ever
+// actually enforcing a pause against Compass itself (stewart/chatmutes was
+// only ever checked by sendGroupMessage). Mirrors checkChatMute() exactly,
+// just against stewart/compassmutes and the Compass input/notice instead.
+function checkCompassMute(){
+  if(!currentAgent||!_db) return;
+  _db.ref('stewart/compassmutes/'+currentAgent.id).on('value', mSnap => {
+    const mute = mSnap.val();
+    const mutedUntil = (mute===true) ? Infinity : (typeof mute==='number' ? mute : 0);
+    const active = mutedUntil && Date.now() < mutedUntil;
+    const input = document.getElementById('tom-input');
+    const notice = document.getElementById('compass-mute-notice');
+    if(input){
+      input.disabled = !!active;
+      input.placeholder = active ? 'Compass paused for today…' : 'Ask Tom...';
+    }
+    if(notice){
+      if(active){
+        const when = (mutedUntil===Infinity) ? '' : (' until '+new Date(mutedUntil).toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}));
+        notice.textContent = '⏸ Compass is paused'+when+' — too many strikes today.';
+        notice.style.display = 'block';
+      } else {
+        notice.style.display = 'none';
+      }
+    }
+  });
+}
+
 function updateGroupBadge(){
   if(!_db) return;
   _db.ref('stewart/groupchat').limitToLast(1).once('value', snap => {
@@ -3884,6 +3915,16 @@ async function askTomChat(){
 // client claims, same as citedVerse already does for citations.
 async function sendTomQuestion(question, verseContext){
   if(_tomSendLock || !_db || !currentAgent || !question) return;
+  // Client-side gate for immediate UX (matches sendGroupMessage's own
+  // mute check) — askTom() enforces this same pause server-side too, so
+  // this can't be routed around by calling the function directly.
+  const muteSnap = await _db.ref('stewart/compassmutes/'+currentAgent.id).once('value');
+  const mute = muteSnap.val();
+  const mutedUntil = (mute===true) ? Infinity : (typeof mute==='number' ? mute : 0);
+  if(mutedUntil && Date.now() < mutedUntil){
+    checkCompassMute();
+    return;
+  }
   const history = tomHistoryForApi(); // capture before pushing the new question
   _tomSendLock = true;
 
