@@ -2676,7 +2676,7 @@ function renderPayScreen(){
       if(weekTransfers.length){
         transferNote = '<div style="margin-bottom:12px;">';
         weekTransfers.forEach(([date, t]) => {
-          const d = new Date(date);
+          const d = parseLocalDate(date);
           const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
           const toList = (t.to||'').split(',');
           const fromList = (t.from||'').split(',');
@@ -2700,7 +2700,7 @@ function renderPayScreen(){
       if(weekDeductions.length){
         deductionNote = '<div style="margin-bottom:12px;">';
         weekDeductions.forEach(({date, items}) => {
-          const d = new Date(date);
+          const d = parseLocalDate(date);
           const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
           Object.entries(items).forEach(([reasonKey, pts]) => {
             const label = BEHAVIOR_LABELS[reasonKey] || reasonKey;
@@ -2719,7 +2719,7 @@ function renderPayScreen(){
       if(weekWgDays.length){
         wgNote = '<div style="margin-bottom:12px;">';
         weekWgDays.forEach(date => {
-          const d = new Date(date);
+          const d = parseLocalDate(date);
           const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
           const dayMissions = buildMissions(currentAgent.id, d);
           wgPayImpact[date].forEach(missionId => {
