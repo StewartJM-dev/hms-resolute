@@ -1707,24 +1707,40 @@ exports.spendTomWish = functions.https.onCall(async (data, callableContext) => {
   }
   const localToday = (typeof today === 'string' && DATE_RE.test(today)) ? today : easternDateStr();
 
-  await getFoldedWishesBalance(agentId);
-
-  const txResult = await db.ref(`stewart/wishesBalance/${agentId}`).transaction(current => {
-    if (!current || current <= 0) return; // undefined -- aborts the transaction, no write
-    return current - 1;
-  });
-
-  if (!txResult.committed) {
-    return { spent: false, reason: 'no_wishes_available', remaining: txResult.snapshot.val() || 0 };
+  // BUG FIX (found live, reproduced with diagnostic logging): this used to
+  // decrement via db.ref(...).transaction(current => current<=0 ? undefined
+  // : current-1). Confirmed via a live test call that Firebase's admin SDK
+  // invoked that callback with current=null on a fresh Cloud Functions
+  // connection -- NOT the real stored value (3 at the time, verified via
+  // getFoldedWishesBalance one line above it in the same execution) --
+  // and returning undefined for that null immediately ABORTS the whole
+  // transaction rather than retrying once the real value loads. Every
+  // OTHER .transaction() in this file happens to be safe from this because
+  // none of them ever return undefined (they all default null to 0 and
+  // proceed); this was the one place that aborted on a falsy value, and it
+  // was rejecting every single spend attempt, for every boy, unconditionally,
+  // the entire time it was deployed. Switched to the same plain
+  // read-then-write pattern already proven for balance updates elsewhere
+  // in this codebase (checkScreenTimeAward, boys/index.html) -- for a
+  // single boy tapping "confirm" on his own device, the tiny race window
+  // this trades away is not a real concern.
+  const balance = await getFoldedWishesBalance(agentId);
+  if (!balance || balance <= 0) {
+    return { spent: false, reason: 'no_wishes_available', remaining: balance || 0 };
   }
+  const remaining = balance - 1;
+  await db.ref(`stewart/wishesBalance/${agentId}`).set(remaining);
 
   // Historical ledger (weekly report totals, Red Sky's per-day wishesUsed)
   // stays separate from the live balance -- same reasoning as the Screen
   // Time Bank keeping its own daily award flags alongside the running
-  // balance. Never gates spending; just records it happened.
+  // balance. Never gates spending; just records it happened. Safe as a
+  // transaction (unlike the one above) -- it never returns undefined, so a
+  // speculative null-current callback just proceeds from 0 instead of
+  // aborting.
   await db.ref(`stewart/wishes/${agentId}/${localToday}/used`).transaction(current => (current || 0) + 1);
 
-  return { spent: true, remaining: txResult.snapshot.val() };
+  return { spent: true, remaining };
 });
 
 // ════════════════════════════════════════════════════
