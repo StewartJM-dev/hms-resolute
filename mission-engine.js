@@ -289,10 +289,16 @@ function calculateDayScore(agentId, missions, doneMap, opts){
   const eligibleCompleted = eligibleMissions.filter(m => doneMap[m.id] && !(failedWgMissionIds && failedWgMissionIds.has(m.id))).length;
   const eligibleTotal = eligibleMissions.length;
   const dollars = eligibleTotal > 0 ? (eligibleCompleted / eligibleTotal) : 0;
+  // rawEligibleCompleted ignores WG disqualification entirely — just "how
+  // many of his payable missions did he actually check off." The gap
+  // between this and eligibleCompleted (when failedWgMissionIds is set) IS
+  // the WG pay-disqualification count, needed so report writeups can state
+  // it plainly instead of leaving parents to reverse-engineer a percentage.
+  const rawEligibleCompleted = eligibleMissions.filter(m => doneMap[m.id]).length;
 
   return {
     earned, possible, pct,
-    eligibleCompleted, eligibleTotal,
+    eligibleCompleted, eligibleTotal, rawEligibleCompleted,
     points100: Math.round(pct * 100),
     dollars,
     minutes: pct * 6
@@ -475,7 +481,11 @@ function recalculateScore(agentId, dateStr){
       // alongside the percentage score without needing its own copy of
       // buildMissions to compute one (the report card in particular runs
       // server-side, where mission-engine.js isn't loaded at all).
-      _db.ref(`stewart/eligible/${agentId}/${dateStr}`).set({ completed: base.eligibleCompleted, total: base.eligibleTotal }),
+      // rawCompleted ignores WG disqualification — the gap between it and
+      // completed (when nonzero) is exactly how many missions lost pay to
+      // a failed room, letting the report card state that plainly instead
+      // of a bare percentage that reads as a contradiction.
+      _db.ref(`stewart/eligible/${agentId}/${dateStr}`).set({ completed: base.eligibleCompleted, total: base.eligibleTotal, rawCompleted: base.rawEligibleCompleted }),
       // Visibility (Part 5's "not silent" requirement) — which of his own
       // missions lost pay to a failed room today, if any, so his own Pay
       // tab can say why instead of a number just quietly coming up short.

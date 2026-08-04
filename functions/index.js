@@ -1343,7 +1343,7 @@ What actually exists in HMS Resolute today, for app-help questions — never inv
 - Screen Time Bank: a completely separate thing from session windows above — bonus minutes earned toward game time from finishing missions, spent through the Xbox tab, nothing to do with the Chromebook's recreation-site unlock.
 - Red Sky at Morning and Red Sky at Night: two short personal reports from you, named for Matthew 16:2-3 (reading the sky as a sign, the way Jesus described). Neither is something he requests — both just show up on their own in the Compass tab, no button. Red Sky at Morning looks back honestly at yesterday and appears the first time he opens Compass that day. Red Sky at Night celebrates a day where he's genuinely finished everything — it only appears once all of today's missions are actually done, and only after 6pm.
 - Chat rules (apply to group chat, private messages, and messages to you alike): gibberish/spam gets deleted with a private nudge explaining why; unkindness isn't deleted but always notifies Mom and Dad immediately, every time; 3 strikes in one day pauses chat access until midnight. The strike count resets daily, but that's not the same as forgotten — the weekly report card Mom and Dad see covers the full week's pattern regardless of the daily reset.
-- White Glove: Mom's room inspections — that's hers to run, not yours to explain in detail.
+- White Glove: Mom's room inspections — running them, deciding pass/fail, is hers, not yours to second-guess or explain the judgment call behind. But the mechanical RESULT is real data you do have and should explain plainly when asked or when it's relevant to a Red Sky report: a mission tied to a room that failed White Glove doesn't count toward pay that day even if he actually did the chore and checked it off — it still counts toward his score, just not the cash. If a boy asks why his "eligible chores" count looks low despite finishing everything, or why he didn't get paid for something he swears he did, that's very likely why — say so plainly ("that chore was in a room that didn't pass White Glove, so it didn't count toward pay that day, even though you did it") rather than deflecting to "ask Mom."
 - War Room: submit a prayer request, or pray for someone else's.
 - Crow's Nest: add a praise, or see what someone else is grateful for.
 - Officers' Country (Mom's dashboard), the Bridge (Dad's command post), and the Vineyard/Captain's Quarters exist, but they are parent-only spaces — you have no detail on what's inside them and never describe, explain, or speculate about their contents.
@@ -2271,6 +2271,22 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
       // against the chore-log grids in the first place.
       eligibleCompleted: (eligible && typeof eligible.completed === 'number') ? eligible.completed : null,
       eligibleTotal: (eligible && typeof eligible.total === 'number') ? eligible.total : null,
+      // rawEligibleCompleted ignores White Glove disqualification; the gap
+      // against eligibleCompleted above (wgDisqualifiedCount) is exactly
+      // how many finished missions lost their pay share to a failed room
+      // that day — lets the write-up state the real reason for a low
+      // "eligible" count instead of leaving a bare percentage to explain
+      // itself. null (not 0) when there's no eligible data at all that day
+      // (weekend/exception), same "missing" vs. "real zero" convention
+      // used everywhere else in this function.
+      rawEligibleCompleted: (eligible && typeof eligible.rawCompleted === 'number') ? eligible.rawCompleted : null,
+      wgDisqualifiedCount: (eligible && typeof eligible.rawCompleted === 'number' && typeof eligible.completed === 'number')
+        ? (eligible.rawCompleted - eligible.completed) : null,
+      // Dollars lost to WG disqualification that day, out of the $1.00/day
+      // pay pool split evenly across eligibleTotal missions — same split
+      // calculateDayScore uses for `dollars`.
+      wgDollarsLost: (eligible && typeof eligible.rawCompleted === 'number' && typeof eligible.completed === 'number' && eligible.total > 0)
+        ? (eligible.rawCompleted - eligible.completed) / eligible.total : null,
       deductionTotal: Object.values(deductions).reduce((a, b) => a + b, 0),
       // outOfTime is stored in the same stewart/deductions node (Bridge's
       // "Ran out of time" flag) but carries 0 points and isn't a behavior
@@ -2293,6 +2309,13 @@ async function fetchBoyWeekData(agentId, dates, exceptionsByDate) {
     avgScore: scoredDays.length ? Math.round(scoredDays.reduce((a, d) => a + d.score, 0) / scoredDays.length) : null,
     totalEligibleCompleted: days.reduce((a, d) => a + (d.eligibleCompleted || 0), 0),
     totalEligibleAssigned: days.reduce((a, d) => a + (d.eligibleTotal || 0), 0),
+    // Week-level White Glove pay impact — sum of each day's disqualified
+    // count/dollars, so the write-up can cite a week pattern ("lost pay to
+    // White Glove on 3 of 5 days, $1.40 total") the same way it already
+    // does for totalEligibleCompleted/totalEligibleAssigned above.
+    totalWgDisqualified: days.reduce((a, d) => a + (d.wgDisqualifiedCount || 0), 0),
+    totalWgDollarsLost: days.reduce((a, d) => a + (d.wgDollarsLost || 0), 0),
+    daysWithWgLoss: days.filter(d => (d.wgDisqualifiedCount || 0) > 0).length,
     totalDeductions: days.reduce((a, d) => a + d.deductionTotal, 0),
     totalWishesEarned: days.reduce((a, d) => a + d.wishesEarned, 0),
     totalWishesUsed: days.reduce((a, d) => a + d.wishesUsed, 0),
@@ -2778,7 +2801,12 @@ const REPORT_WRITEUP_SYSTEM_PROMPT = `You write concise, specific weekly summari
 
 Write like a sharp, honest coach's report, not a form letter. Be specific: cite real days, real numbers, real patterns ("completed every morning round, missed evening three times" — not "did well overall"). Note trends across the week (improving, slipping, consistent) where the data actually shows one. If a category has no data for the week (e.g. zero strikes, zero Courage Dare entries), say so plainly and briefly rather than padding — absence of a problem is itself useful information, but don't manufacture insight where there isn't any.
 
-Each day has BOTH a "score" (0-100%, weighted by how many points each chore is worth) and a raw "eligibleCompleted"/"eligibleTotal" count (how many actual chores he finished out of how many he had, excluding Computer Missions and Officer of the Watch checks — the same two things already excluded from score). These are genuinely different numbers and can diverge (a boy can finish most of his LOW-point chores and skip a big one, giving a lower score than his completed-count alone would suggest, or the reverse). Cite BOTH together at least once per boy's summary, e.g. "scored 73% — 11 of 15 eligible chores" — don't make the parent reconcile a percentage against what they see on the chore-log grid themselves. Use totalEligibleCompleted/totalEligibleAssigned the same way for the week-level pattern.
+Each day has BOTH a "score" (0-100%, weighted by how many points each chore is worth) and a raw "eligibleCompleted"/"eligibleTotal" count (how many of his actual chores counted toward PAY that day, out of how many he had — excluding Computer Missions and Officer of the Watch checks, the same two things already excluded from score). These are genuinely different numbers and can diverge for two very different reasons — tell them apart, because they read completely differently to a parent:
+
+1. He genuinely didn't finish everything. In this case just say so plainly: "completed 11 of 15 assigned missions."
+2. He finished everything (or nearly everything) but White Glove failures stripped some of those completed chores out of his PAY count even though he did them — a room that didn't pass inspection. This is the case the data flags directly: each day also carries "rawEligibleCompleted" (how many he actually finished, ignoring White Glove) and "wgDisqualifiedCount" (rawEligibleCompleted minus eligibleCompleted — how many of those finished chores got knocked out of pay) and "wgDollarsLost" (the dollar amount that cost him that day, out of the $1.00/weekday pay pool). Whenever wgDisqualifiedCount is greater than 0 for a day, DO NOT cite eligibleCompleted/eligibleTotal as a bare fraction or percentage — that reads as a contradiction when he actually did the work ("scored 100% — 4 of 19 eligible chores" looks like he barely did anything, when he actually finished everything). Instead use this exact pattern: "Completed all 19 assigned missions; 15 were disqualified due to White Glove failure, reducing pay by $0.79" (substitute rawEligibleCompleted for "all X", wgDisqualifiedCount for "Y", and wgDollarsLost formatted as dollars for "$Z" — and swap "Completed all X" for "Completed X of {eligibleTotal}" if rawEligibleCompleted fell short of eligibleTotal too, i.e. some chores were genuinely undone AND some were White-Glove-disqualified).
+
+Only cite the plain eligibleCompleted/eligibleTotal fraction (case 1 above) when wgDisqualifiedCount is 0 or null that day. At the week level, use totalEligibleCompleted/totalEligibleAssigned for the plain completion pattern, and totalWgDisqualified/totalWgDollarsLost/daysWithWgLoss the same way whenever daysWithWgLoss is greater than 0 — e.g. "lost pay to White Glove on 3 of 5 days this week, $2.15 total" — so a week with heavy White Glove impact doesn't get summarized as a quiet, low-scoring week when he was actually finishing his chores.
 
 Each day also carries a "ranOutOfTime" flag (true/false) — set from the Bridge tab when a boy ran out of time before finishing his chores that day. This is explicitly NOT a behavior issue or punishment (it carries no point penalty and is separate from deductionReasons) — it's pure pattern-tracking. Don't mention it at all if it happened zero or one day this week; that's normal and not worth a sentence. If totals.daysOutOfTime is 2+ for a boy, note it once, neutrally, as a scheduling/pacing pattern worth John/Dawn knowing about (e.g. "ran out of time before finishing chores twice this week") — never frame it as a fault or lump it in with deductions/strikes.
 
@@ -3103,13 +3131,23 @@ async function fetchRedSkyDayData(agentId, dateStr) {
   // a null day read as an unexplained blank rather than a known day off,
   // and Tom had nothing real to reason from when writing about it.
   const exception = findExceptionForAgent(exceptionsSnap.val(), agentId);
+  const eligible = eligibleSnap.val();
+  // wgDisqualifiedCount/wgDollarsLost: same White Glove pay-impact split
+  // fetchBoyWeekData exposes for the household report card — pulled out
+  // explicitly here too so Red Sky can state it plainly instead of
+  // reverse-engineering it from a bare eligible.completed/total fraction.
+  const wgDisqualifiedCount = (eligible && typeof eligible.rawCompleted === 'number' && typeof eligible.completed === 'number')
+    ? (eligible.rawCompleted - eligible.completed) : null;
+  const wgDollarsLost = (wgDisqualifiedCount !== null && eligible.total > 0) ? wgDisqualifiedCount / eligible.total : null;
   return {
     date: dateStr,
     isWeekend: isWeekendStr(dateStr),
     exceptionType: exception ? exception.type : null,
     exceptionNote: exception ? (exception.note || '') : null,
     score: scoreSnap.val(),
-    eligible: eligibleSnap.val(),
+    eligible,
+    wgDisqualifiedCount,
+    wgDollarsLost,
     deductionReasons: Object.keys(deductions).filter(k => k !== 'outOfTime'),
     ranOutOfTime: deductions.outOfTime !== undefined,
     wishesEarned: wishes.earned || 0,
@@ -3132,7 +3170,7 @@ const RED_SKY_SCHEMA = {
 async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isFirstTime) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const roleInstructions = type === 'morning'
-    ? `This is RED SKY AT MORNING — he's just opened it, reviewing YESTERDAY. Forward-looking and gentle: name what actually went rough yesterday if anything did (a low score, a strike, a failed White Glove room, running out of time) plainly but without dwelling — then pivot firmly to today as a fresh start, "let's not repeat yesterday's mistakes," never a scolding. If yesterday was genuinely clean (good score, no strikes, rooms passed), say so plainly and warmly — don't manufacture a rough patch that isn't in the data. CRITICAL — score and eligible are null on weekends AND on Exception Days, NOT because he underperformed: check isWeekend and exceptionType/exceptionNote FIRST. If isWeekend is true, say plainly that yesterday was a scheduled day off (Saturday/Sunday chores are tracked separately, not scored) — never describe it as "no missions done" or a blank/rough day. If exceptionType is set, name the real reason plainly and matter-of-factly the same way ("yesterday was a planned [exceptionType]" using exceptionNote if it adds real detail) — never read it as a slump or a gap to explain away. Strikes/wishes/White Glove data can still be real and worth mentioning even on a day off or exception day; only the null score itself needs this context. 2-4 sentences.`
+    ? `This is RED SKY AT MORNING — he's just opened it, reviewing YESTERDAY. Forward-looking and gentle: name what actually went rough yesterday if anything did (a low score, a strike, a failed White Glove room, running out of time) plainly but without dwelling — then pivot firmly to today as a fresh start, "let's not repeat yesterday's mistakes," never a scolding. If yesterday was genuinely clean (good score, no strikes, rooms passed), say so plainly and warmly — don't manufacture a rough patch that isn't in the data. CRITICAL — score and eligible are null on weekends AND on Exception Days, NOT because he underperformed: check isWeekend and exceptionType/exceptionNote FIRST. If isWeekend is true, say plainly that yesterday was a scheduled day off (Saturday/Sunday chores are tracked separately, not scored) — never describe it as "no missions done" or a blank/rough day. If exceptionType is set, name the real reason plainly and matter-of-factly the same way ("yesterday was a planned [exceptionType]" using exceptionNote if it adds real detail) — never read it as a slump or a gap to explain away. Strikes/wishes/White Glove data can still be real and worth mentioning even on a day off or exception day; only the null score itself needs this context. If wgDisqualifiedCount is greater than 0, that means a room he was in charge of didn't pass White Glove yesterday and it cost him real pay even though he finished the chore — say so plainly and specifically ("that laundry chore didn't count toward pay yesterday — the room didn't pass inspection, which cost about $Z"), don't just cite eligible.completed/eligible.total as a bare number, since a low "eligible" count next to a good score reads as a contradiction unless you explain why. 2-4 sentences.`
     : `This is RED SKY AT NIGHT — today's good report, only ever shown after every one of today's missions is actually done, so this IS a real earned moment. Celebrate today specifically and concretely (real numbers, real specifics — which rooms he passed, wishes earned, a clean conduct day) — warm, proud, earned, not generic cheerleading. If something today wasn't perfect despite finishing all missions (a strike, a failed room) still be honest about it, but the overall frame stays a genuine win — he finished the mission. 2-4 sentences.`;
   const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
 
@@ -3159,7 +3197,7 @@ async function generateRedSkyMessage(type, agentId, agentName, age, dayData, isF
 // it. Every other weekday keeps the single-day version unchanged.
 async function generateRedSkyWeekMessage(agentId, agentName, age, weekData, isFirstTime) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const roleInstructions = `This is RED SKY AT MORNING, but it's Monday -- Sunday isn't a scored day, so instead of reviewing just "yesterday" (which would come up empty), review the FULL WEEK that just ended (Monday through Sunday). Give an honest week-in-review: how the week actually went overall (real average score, real total strikes/wishes/exceptions, a real pattern if one exists across the days) -- then close with plain, specific encouragement on where to improve this coming week. Same warm, honest, never-scolding tone as the daily version, just a wider lens. Exception Days and weekends within the week (score/eligible null, exceptionType set or not) are NOT a performance gap -- name them plainly the same way the daily version would ("Saturday and Sunday don't score," "Thursday was a planned [exceptionType]") rather than reading them as missing/bad days. If the week was genuinely solid, say so plainly and warmly rather than manufacturing a rough patch that isn't in the data. CRITICAL — the data given below covers ONLY last week (through Sunday); you have been given absolutely nothing about today (Monday) itself, not even whether he's started it yet. Never reference, imply, or speculate about today in any way — no "off to a good start," no "let's keep it up today," nothing. "This coming week" as a general forward-looking close is fine; anything specific to today itself is not, since you have no real data for it and would be inventing it. A bit longer than the daily version since there's a real week to cover, but still tight: 3-5 sentences.`;
+  const roleInstructions = `This is RED SKY AT MORNING, but it's Monday -- Sunday isn't a scored day, so instead of reviewing just "yesterday" (which would come up empty), review the FULL WEEK that just ended (Monday through Sunday). Give an honest week-in-review: how the week actually went overall (real average score, real total strikes/wishes/exceptions, a real pattern if one exists across the days) -- then close with plain, specific encouragement on where to improve this coming week. Same warm, honest, never-scolding tone as the daily version, just a wider lens. Exception Days and weekends within the week (score/eligible null, exceptionType set or not) are NOT a performance gap -- name them plainly the same way the daily version would ("Saturday and Sunday don't score," "Thursday was a planned [exceptionType]") rather than reading them as missing/bad days. If the week was genuinely solid, say so plainly and warmly rather than manufacturing a rough patch that isn't in the data. If totals.daysWithWgLoss is greater than 0, name the real pattern plainly ("lost pay to a White Glove room X days this week, about $Z total") — never cite totalEligibleCompleted/totalEligibleAssigned as a bare fraction on a week where White Glove pay loss is the actual reason it looks low, since that reads as a contradiction when he was finishing the chores. CRITICAL — the data given below covers ONLY last week (through Sunday); you have been given absolutely nothing about today (Monday) itself, not even whether he's started it yet. Never reference, imply, or speculate about today in any way — no "off to a good start," no "let's keep it up today," nothing. "This coming week" as a general forward-looking close is fine; anything specific to today itself is not, since you have no real data for it and would be inventing it. A bit longer than the daily version since there's a real week to cover, but still tight: 3-5 sentences.`;
   const system = `${TOM_VOICE}\n\n${tomAgeGuidance(age, agentName)}\n\n${roleInstructions}${isFirstTime ? '\n\n' + RED_SKY_MATTHEW_INTRO : ''}\n\nUse ONLY the real data given below — never invent a detail, an incident, or a number that isn't there. This is his own data only; there is no sibling information available to you and none should ever be implied.`;
 
   const response = await anthropic.messages.create({
