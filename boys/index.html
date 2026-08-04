@@ -1475,11 +1475,16 @@ function _sessionTimeRef(agentId, date, windowKey){
 // Persists elapsed accrued from sinceMs through capMs into the currently-
 // tracked window, folds it into baseElapsed, and resets sinceMs to capMs —
 // so the next tick's delta doesn't double-count what was just written.
+// Capped at SESSION_CAP_SECONDS (John's fix) -- previously unbounded, so a
+// tab left open/visible past the 30-minute window just kept accumulating
+// forever (confirmed live: John Jr.'s session2 hit 7843s/131min, session3
+// hit 15764s/262min). The display already treats anything >= the cap as
+// "done"; only the stored value itself was never actually clamped.
 function _sessionTimerFlush(capMs){
   if(!_sessionTimer) return;
   const now = typeof capMs === 'number' ? capMs : Date.now();
   const deltaSec = Math.max(0, Math.floor((now - _sessionTimer.sinceMs) / 1000));
-  const newElapsed = _sessionTimer.baseElapsed + deltaSec;
+  const newElapsed = Math.min(SESSION_CAP_SECONDS, _sessionTimer.baseElapsed + deltaSec);
   _sessionTimeRef(_sessionTimer.agentId, _sessionTimer.date, _sessionTimer.window)
     .update({ elapsedSeconds: newElapsed })
     .catch(() => {});
@@ -3934,6 +3939,14 @@ async function sendTomQuestion(question, verseContext){
     // into the Word tab instead of the citation being unreachable prose.
     await thinkingRef.update({ text: result.message, citedVerse: result.citedVerse || null, category: result.category, type: result.type });
   }
+
+  // Keeps the visible wish counter honest -- previously only refreshed on
+  // Compass tab-open and after a confirmed/cancelled spend, so it could sit
+  // stale (showing an earlier count) through an entire chat session even
+  // though the wish_spend branch above always does a FRESH balance check
+  // of its own. A boy could see one number in the counter and a
+  // contradicting "fresh out, sailor" from that live check moments later.
+  renderTomWishCounter();
 
   _tomSendLock = false;
 }
